@@ -1,0 +1,277 @@
+import React, { useState } from 'react';
+import { View, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { Text, TextInput, Button, useTheme, IconButton } from 'react-native-paper';
+import { Rating } from 'react-native-ratings';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadBytes, ref as storageRef, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../../config/firebase';
+
+const ReviewForm = ({ onSubmit, initialRating = 0, onCancel }) => {
+  const theme = useTheme();
+  const [rating, setRating] = useState(initialRating);
+  const [comment, setComment] = useState('');
+  const [images, setImages] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const handleRatingChange = (newRating) => {
+    setRating(newRating);
+  };
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'We need access to your photos to upload images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        setImages(prev => [...prev, ...result.assets.map(asset => asset.uri)]);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
+    if (rating === 0) {
+      Alert.alert('Rating Required', 'Please provide a rating before submitting.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      // Upload images first if any
+      let uploadedImageUrls = [];
+      
+      if (images.length > 0) {
+        const uploadPromises = images.map(async (uri, index) => {
+          const response = await fetch(uri);
+          const blob = await response.blob();
+          const fileName = `review_${Date.now()}_${index}.jpg`;
+          const fileRef = storageRef(storage, `review_images/${fileName}`);
+          
+          await uploadBytes(fileRef, blob);
+          const downloadURL = await getDownloadURL(fileRef);
+          return downloadURL;
+        });
+        
+        uploadedImageUrls = await Promise.all(uploadPromises);
+      }
+      
+      // Submit review with image URLs
+      await onSubmit({
+        rating,
+        comment,
+        images: uploadedImageUrls,
+        createdAt: new Date().toISOString(),
+      });
+      
+      // Reset form
+      setRating(0);
+      setComment('');
+      setImages([]);
+      
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      Alert.alert('Error', 'Failed to submit review. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <ScrollView style={styles.container}>
+      <Text style={styles.sectionTitle}>Write a Review</Text>
+      
+      <View style={styles.ratingContainer}>
+        <Text style={styles.label}>Your Rating</Text>
+        <Rating
+          type="star"
+          ratingCount={5}
+          imageSize={36}
+          showRating
+          startingValue={rating}
+          onFinishRating={handleRatingChange}
+          style={styles.ratingStars}
+        />
+      </View>
+      
+      <TextInput
+        label="Your Review"
+        value={comment}
+        onChangeText={setComment}
+        multiline
+        numberOfLines={4}
+        style={styles.commentInput}
+        placeholder="Share your experience..."
+      />
+      
+      <View style={styles.imageUploadContainer}>
+        <Text style={styles.label}>Add Photos (Optional)</Text>
+        <Text style={styles.hint}>Add up to 5 photos to your review</Text>
+        
+        <View style={styles.imagePreviews}>
+          {images.map((uri, index) => (
+            <View key={index} style={styles.imagePreviewContainer}>
+              <Image source={{ uri }} style={styles.imagePreview} />
+              <IconButton
+                icon="close"
+                size={16}
+                style={styles.removeImageButton}
+                onPress={() => removeImage(index)}
+              />
+            </View>
+          ))}
+          
+          {images.length < 5 && (
+            <TouchableOpacity 
+              style={styles.addImageButton}
+              onPress={pickImage}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.addImageText}>+</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      
+      <View style={styles.buttonContainer}>
+        {onCancel && (
+          <Button
+            mode="outlined"
+            onPress={onCancel}
+            style={[styles.button, { marginRight: 12 }]}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+        )}
+        
+        <Button
+          mode="contained"
+          onPress={handleSubmit}
+          loading={isSubmitting}
+          disabled={isSubmitting || rating === 0}
+          style={styles.button}
+        >
+          Submit Review
+        </Button>
+      </View>
+      
+      {uploadProgress > 0 && uploadProgress < 100 && (
+        <View style={styles.progressContainer}>
+          <Text>Uploading: {Math.round(uploadProgress)}%</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 20,
+  },
+  ratingContainer: {
+    marginBottom: 20,
+    alignItems: 'flex-start',
+  },
+  label: {
+    fontSize: 14,
+    marginBottom: 8,
+    color: '#333',
+  },
+  ratingStars: {
+    alignSelf: 'flex-start',
+    marginVertical: 8,
+  },
+  commentInput: {
+    marginBottom: 20,
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  imageUploadContainer: {
+    marginBottom: 20,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  imagePreviews: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 0,
+    margin: 0,
+    elevation: 2,
+  },
+  addImageButton: {
+    width: 80,
+    height: 80,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderStyle: 'dashed',
+  },
+  addImageText: {
+    fontSize: 24,
+    color: '#666',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
+  },
+  button: {
+    minWidth: 150,
+  },
+  progressContainer: {
+    marginTop: 16,
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+});
+
+export default ReviewForm;
