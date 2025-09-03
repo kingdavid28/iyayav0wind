@@ -1,76 +1,120 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  FlatList, 
-  RefreshControl,
+  ScrollView,
   SafeAreaView,
-  ActivityIndicator,
   StatusBar,
-  Image,
-  TextInput
+  Modal,
+  Alert
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { 
-  Search, 
-  Bell, 
-  Plus, 
-  Filter,
-  MessageCircle,
-  Home,
-  User,
-  Calendar,
-  Clock,
-  MapPin,
-  Star,
-  Shield,
-  CheckCircle,
-  Baby,
-  LogOut
-} from 'lucide-react-native';
 
 // Import components
-import { 
-  CaregiverCard, 
-  JobCard, 
-  NannyCard, 
-  QuickAction, 
-  ChildModal, 
-  ProfileModal, 
-  JobPostingModal 
-} from './components';
-import { BookingModal } from '../../components/BookingModal';
-import { LinearGradient } from 'expo-linear-gradient';
+import Header from './components/Header';
+import NavigationTabs from './components/NavigationTabs';
+import HomeTab from './components/HomeTab';
+import SearchTab from './components/SearchTab';
+import BookingsTab from './components/BookingsTab';
 
-// Import local hard-coded design tokens (no global theme)
-import { colors, spacing, typography, styles } from '../styles/ParentDashboard.styles';
+// Import modals
+import ChildModal from './modals/ChildModal';
+import ProfileModal from './modals/ProfileModal';
+import FilterModal from './modals/FilterModal';
+import JobPostingModal from './modals/JobPostingModal';
+import BookingModal from './modals/BookingModal';
+import PaymentModal from './modals/PaymentModal';
+
+// Import styles
+import { colors, styles } from '../styles/ParentDashboard.styles';
 
 // Import services
-import { bookingsAPI, jobsAPI, providersAPI, authAPI } from '../../config/api';
-import { useAuth } from '../../contexts/AuthContext';
+import { bookingsAPI, jobsAPI, caregiversAPI, authAPI } from '../../config/api';
+import { userService } from '../../services/userService';
+import { useApp } from '../../context/AppContext';
+import useAuth from '../../contexts/useAuth';
+
+// Import utilities
+import { fetchMyBookings, getCaregiverDisplayName } from './utils/bookingUtils';
+import { applyFilters, countActiveFilters } from './utils/caregiverUtils';
+
+// Sample data
+const SAMPLE_CHILDREN = [
+  {
+    id: 'child-1',
+    name: 'Maya',
+    age: 4,
+    avatar: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=200&h=200&fit=crop',
+    allergies: 'Peanuts',
+  },
+  {
+    id: 'child-2',
+    name: 'Miguel',
+    age: 6,
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
+    allergies: '',
+  },
+];
+
+const SAMPLE_CAREGIVERS = [
+  {
+    id: '507f1f77bcf86cd799439011',
+    name: 'Ana Dela Cruz',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop',
+    rating: 4.8,
+    reviewCount: 124,
+    hourlyRate: 350,
+    location: 'Cebu City',
+    specialties: ['Infant Care', 'CPR Certified'],
+    skills: ['Infant Care', 'CPR Certified'],
+    experience: 5,
+    verified: true
+  },
+  // ... other sample caregivers
+];
 
 const ParentDashboard = () => {
   const navigation = useNavigation();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const { state } = useApp();
+  
   // State management
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [showChildModal, setShowChildModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showJobPostingModal, setShowJobPostingModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [caregivers, setCaregivers] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [filteredCaregivers, setFilteredCaregivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
+  const [caregiversLoading, setCaregiversLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  
+  // Filter state
+  const [filters, setFilters] = useState({
+    availability: { availableNow: false, days: [] },
+    location: { distance: 10, location: '' },
+    rate: { min: 0, max: 1000 },
+    experience: { min: 0, max: 30 },
+    certifications: [],
+    rating: 0,
+  });
+  const [activeFilters, setActiveFilters] = useState(0);
 
-  // Local UI state for new layout
+  // Local UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [children, setChildren] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [bookingsFilter, setBookingsFilter] = useState('upcoming');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentBookingId, setPaymentBookingId] = useState(null);
+  const [paymentBase64, setPaymentBase64] = useState('');
+  const [paymentMime, setPaymentMime] = useState('image/jpeg');
 
-  // Child form state (for add/edit)
+  // Child form state
   const [childName, setChildName] = useState('');
   const [childAge, setChildAge] = useState('');
   const [childNotes, setChildNotes] = useState('');
@@ -80,152 +124,138 @@ const ParentDashboard = () => {
   const [profileName, setProfileName] = useState('');
   const [profileContact, setProfileContact] = useState('');
   const [profileLocation, setProfileLocation] = useState('');
-
-  // Booking modal state (merged from standalone dashboard)
+  
+  // Booking modal state
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
   const [selectedCaregiver, setSelectedCaregiver] = useState({
     id: '1',
-    name: 'Sarah Johnson',
+    name: 'Ana Dela Cruz',
     avatar: 'https://example.com/avatar.jpg',
     rating: 4.8,
     reviews: 124,
     rate: '$18/hr',
   });
-  const SAMPLE_CHILDREN = [
-    {
-      id: 'child-1',
-      name: 'Emma',
-      age: 4,
-      avatar: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=200&h=200&fit=crop',
-      allergies: 'Peanuts',
-    },
-    {
-      id: 'child-2',
-      name: 'Liam',
-      age: 6,
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
-      allergies: '',
-    },
-  ];
 
-  // Caregivers fallback (used only if backend returns none or errors)
-  const SAMPLE_CAREGIVERS = [
+  // Derived data
+  const displayName = (user?.displayName || (user?.email ? String(user.email).split('@')[0] : '') || '').trim();
+  const greetingName = (profileName && String(profileName).trim()) || displayName;
+
+  // Quick actions
+  const quickActions = useMemo(() => [
     {
-      id: 'caregiver1',
-      name: 'Sarah Johnson',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop',
-      rating: 4.8,
-      reviewCount: 124,
-      hourlyRate: 18,
-      location: 'San Francisco, CA',
-      specialties: ['Infant Care', 'CPR Certified']
+      id: 'find',
+      icon: 'search',
+      title: 'Find Caregiver',
+      onPress: () => setActiveTab('search')
     },
     {
-      id: 'caregiver2',
-      name: 'Maria Reyes',
-      avatar: 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=200&h=200&fit=crop',
-      rating: 4.7,
-      reviewCount: 96,
-      hourlyRate: 20,
-      location: 'Oakland, CA',
-      specialties: ['Meal Prep', 'Homework Help']
+      id: 'book',
+      icon: 'calendar',
+      title: 'Book Service',
+      onPress: () => {
+        if (caregivers?.length > 0) {
+          const cg = caregivers[0];
+          setSelectedCaregiver({
+            _id: cg._id || cg.id,
+            id: cg._id || cg.id,
+            userId: cg.userId || null,
+            name: cg.name,
+            avatar: cg.avatar || cg.profileImage,
+            rating: cg.rating,
+            reviews: cg.reviewCount,
+            hourlyRate: cg.hourlyRate,
+            rate: cg.hourlyRate ? `₱${cg.hourlyRate}/hr` : undefined,
+          });
+        } else {
+          setSelectedCaregiver({
+            _id: '1',
+            id: '1',
+            userId: '1',
+            name: 'Ana Dela Cruz',
+            avatar: 'https://example.com/avatar.jpg',
+            rating: 4.8,
+            reviews: 124,
+            hourlyRate: 350,
+            rate: '₱350/hr'
+          });
+        }
+        setIsBookingModalVisible(true);
+      }
+    },
+    {
+      id: 'messages',
+      icon: 'message-circle',
+      title: 'Messages',
+      onPress: () => navigation.navigate('Messages')
+    },
+    {
+      id: 'add-child',
+      icon: 'plus',
+      title: 'Add Child',
+      onPress: () => openAddChild()
+    },
+  ], [caregivers, navigation]);
+
+  // Data loading functions
+  const handleFetchBookings = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      const normalizedBookings = await fetchMyBookings(bookingsAPI);
+      setBookings(normalizedBookings);
+    } catch (err) {
+      console.warn('[fetchMyBookings] failed:', err?.message || err);
+    } finally {
+      setRefreshing(false);
     }
-  ];
+  }, []);
 
-  const SAMPLE_BOOKINGS = [
-    {
-      id: 'b1',
-      caregiver: 'Sarah Johnson',
-      caregiverId: 'caregiver1',
-      date: 'Today',
-      time: '2:00 PM - 6:00 PM',
-      children: ['Emma'],
-      status: 'confirmed',
-      totalCost: 100,
-    },
-    {
-      id: 'b2',
-      caregiver: 'Maria Reyes',
-      caregiverId: 'caregiver2',
-      date: 'Tomorrow',
-      time: '9:00 AM - 5:00 PM',
-      children: ['Emma', 'Liam'],
-      status: 'pending',
-      totalCost: 176,
-    },
-  ];
-
-  // Fetch jobs data
-  const fetchJobs = useCallback(async () => {
+  const fetchCaregivers = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await jobsAPI.getMy();
-      const list = res?.jobs || res?.data?.jobs || [];
-      // Normalize id field to id for UI lists
-      const normalized = list.map((j) => ({
-        ...j,
-        id: j._id || j.id,
+      const response = await caregiversAPI.getProviders();
+      const caregivers = response.data?.caregivers || [];
+      
+      const transformedCaregivers = caregivers.map(caregiver => ({
+        ...caregiver,
+        id: caregiver.id || caregiver._id,
+        name: caregiver.name || 'Unnamed Caregiver',
+        rating: typeof caregiver.rating === 'number' ? caregiver.rating : 0,
+        reviewCount: caregiver.reviewCount || 0,
+        hourlyRate: caregiver.hourlyRate || 0,
+        location: caregiver.location || caregiver.address || 'Location not specified',
+        skills: Array.isArray(caregiver.skills) ? caregiver.skills : [],
+        experience: caregiver.experience || { years: 0, months: 0, description: 'No experience information' },
+        availability: caregiver.availability || { days: [] },
+        ageCareRanges: Array.isArray(caregiver.ageCareRanges) ? caregiver.ageCareRanges : []
       }));
-      setJobs(normalized);
+      
+      setCaregivers(transformedCaregivers);
+      return transformedCaregivers;
     } catch (error) {
-      console.error('Error fetching jobs:', error);
+      console.error('Error fetching caregivers:', error);
+      return [];
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Fetch caregivers data via backend providers API
-  const fetchCaregivers = useCallback(async () => {
-    try {
-      const res = await providersAPI.search();
-      // Response may be an array or an object with providers list
-      const list = Array.isArray(res) ? res : (res?.providers || res?.data?.providers || []);
-      const normalized = list.map((p) => ({
-        ...p,
-        id: p._id || p.id,
-      }));
-      if (normalized.length > 0) {
-        setCaregivers(normalized);
-      } else {
-        setCaregivers(SAMPLE_CAREGIVERS);
-      }
-    } catch (error) {
-      console.error('Error fetching caregivers:', error);
-      // Fallback to samples on error
-      setCaregivers(SAMPLE_CAREGIVERS);
-    }
-  }, []);
-
-  // Handle refresh
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchJobs();
-    fetchCaregivers();
-    setTimeout(() => setRefreshing(false), 1000);
-  }, [fetchJobs, fetchCaregivers]);
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchJobs();
-    fetchCaregivers();
-    fetchMyChildren();
-    fetchMyBookings();
-  }, [fetchJobs, fetchCaregivers]);
-
-  // Load authenticated user's children (fallback to samples)
   const fetchMyChildren = useCallback(async () => {
     try {
-      const profile = await authAPI.getProfile();
+      let profile = state?.userProfile;
+      if (!profile && user?.uid) {
+        profile = await userService.getProfile(user.uid);
+      }
+
       const list = profile?.children || profile?.data?.children || [];
-      // Seed profile state for ProfileModal
       const pName = profile?.name || profile?.data?.name || '';
       const pContact = profile?.contact || profile?.data?.contact || '';
       const pLocation = profile?.location || profile?.data?.location || '';
+      
       setProfileName(String(pName || ''));
       setProfileContact(String(pContact || ''));
       setProfileLocation(String(pLocation || ''));
+
       if (Array.isArray(list) && list.length) {
-        // Normalize to expected shape
         const normalized = list.map((c) => ({
           id: c._id || c.id || String(Math.random()),
           name: c.name || c.firstName || 'Child',
@@ -237,29 +267,67 @@ const ParentDashboard = () => {
         setChildren(SAMPLE_CHILDREN);
       }
     } catch (err) {
-      // Backend not reachable or profile missing children
       setChildren(SAMPLE_CHILDREN);
     }
-  }, []);
+  }, [state?.userProfile, user?.uid]);
 
-  // Persist children array to profile (best-effort)
-  const persistChildren = useCallback(async (nextChildren) => {
+  const loadData = async () => {
     try {
-      const payload = {
-        children: nextChildren.map((c) => ({
-          id: c.id,
-          name: c.name,
-          age: Number(c.age || 0),
-          preferences: c.preferences || c.notes || '',
-        })),
-      };
-      await authAPI.updateProfile(payload);
-    } catch (e) {
-      console.warn('Unable to persist children to profile, keeping local state.', e?.message || e);
+      setLoading(true);
+      const profile = await authAPI.getProfile();
+      setUserData(profile.data);
+
+      const jobsResponse = await jobsAPI.getMyJobs();
+      setJobs(jobsResponse?.data?.jobs || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadData(),
+        fetchCaregivers(),
+        handleFetchBookings(),
+        fetchMyChildren()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadData, fetchCaregivers, handleFetchBookings, fetchMyChildren]);
+
+  // Initial data load
+  const didInitRef = useRef(false);
+  useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    
+    const loadInitialData = async () => {
+      await Promise.all([
+        loadData(),
+        fetchCaregivers(),
+        handleFetchBookings(),
+        fetchMyChildren()
+      ]);
+    };
+    
+    loadInitialData();
   }, []);
 
-  // Open add-child modal
+  // Refetch bookings when tab becomes active
+  useEffect(() => {
+    if (activeTab === 'bookings') {
+      handleFetchBookings();
+    }
+  }, [activeTab]);
+
+  // Child management functions
   const openAddChild = useCallback(() => {
     setEditingChildId(null);
     setChildName('');
@@ -268,7 +336,6 @@ const ParentDashboard = () => {
     setShowChildModal(true);
   }, []);
 
-  // Open edit-child modal
   const openEditChild = useCallback((child) => {
     setEditingChildId(child.id);
     setChildName(child.name || '');
@@ -277,13 +344,13 @@ const ParentDashboard = () => {
     setShowChildModal(true);
   }, []);
 
-  // Add or save child
   const handleAddOrSaveChild = useCallback(async () => {
     const trimmedName = (childName || '').trim();
     if (!trimmedName) return;
+    
     const ageNum = Number(childAge || 0);
-
     let next;
+    
     if (editingChildId) {
       next = children.map((c) =>
         c.id === editingChildId ? { ...c, name: trimmedName, age: ageNum, preferences: childNotes } : c
@@ -294,73 +361,42 @@ const ParentDashboard = () => {
         { id: `child-${Date.now()}`, name: trimmedName, age: ageNum, preferences: childNotes },
       ];
     }
+    
     setChildren(next);
     setShowChildModal(false);
     setEditingChildId(null);
     setChildName('');
     setChildAge('');
     setChildNotes('');
-    await persistChildren(next);
-  }, [childName, childAge, childNotes, editingChildId, children, persistChildren]);
+  }, [childName, childAge, childNotes, editingChildId, children]);
 
-  // Delete child
-  const handleDeleteChild = useCallback(async (id) => {
-    const next = children.filter((c) => c.id !== id);
-    setChildren(next);
-    await persistChildren(next);
-  }, [children, persistChildren]);
+  // Caregiver interaction functions
+  const handleViewCaregiver = (caregiver) => {
+    navigation.navigate('CaregiverProfile', { caregiverId: caregiver.id });
+  };
 
-  // Load authenticated user's bookings (fallback to samples)
-  const fetchMyBookings = useCallback(async () => {
-    try {
-      const res = await bookingsAPI.getMy();
-      const list = res?.bookings || res?.data?.bookings || (Array.isArray(res) ? res : []);
-      if (Array.isArray(list) && list.length) {
-        const normalized = list.map((b) => ({
-          id: b._id || b.id || String(Math.random()),
-          caregiver: b.caregiverName || b.caregiver?.name || 'Caregiver',
-          caregiverId: b.caregiverId || b.caregiver?._id || b.caregiver?.id || 'unknown',
-          date: b.date || b.startDate || '',
-          time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ''),
-          children: Array.isArray(b.children) ? b.children.map((c) => c.name || c) : [],
-          status: b.status || 'pending',
-          totalCost: b.totalCost ?? b.amount ?? 0,
-        }));
-        setBookings(normalized);
-      } else {
-        setBookings(SAMPLE_BOOKINGS);
-      }
-    } catch (err) {
-      setBookings(SAMPLE_BOOKINGS);
-    }
-  }, []);
+  const handleMessageCaregiver = (caregiver) => {
+    navigation.navigate('Chat', { 
+      recipientId: caregiver.id,
+      recipientName: caregiver.name,
+      recipientAvatar: caregiver.avatar
+    });
+  };
 
-  // Quick actions data
-  const quickActions = [
-    { id: 'find', icon: 'search', title: 'Find Caregiver', onPress: () => setActiveTab('search') },
-    { id: 'book', icon: 'calendar', title: 'Book Service', onPress: () => {
-        // Use real caregiver if available, otherwise fallback to mock
-        if (caregivers && caregivers.length > 0) {
-          const cg = caregivers[0];
-          setSelectedCaregiver({
-            id: cg.id,
-            name: cg.name,
-            avatar: cg.avatar,
-            rating: cg.rating,
-            reviews: cg.reviewCount,
-            rate: cg.hourlyRate ? `$${cg.hourlyRate}/hr` : undefined,
-          });
-        } else {
-          setSelectedCaregiver({ id: '1', name: 'Sarah Johnson', avatar: 'https://example.com/avatar.jpg', rating: 4.8, reviews: 124, rate: '$18/hr' });
-        }
-        setIsBookingModalVisible(true);
-      }
-    },
-    { id: 'messages', icon: 'message-circle', title: 'Messages', onPress: () => navigation.navigate('Messages') },
-    { id: 'add-child', icon: 'plus', title: 'Add Child', onPress: openAddChild },
-  ];
+  const handleBookCaregiver = (caregiver) => {
+    setSelectedCaregiver({
+      id: caregiver.id,
+      name: caregiver.name,
+      avatar: caregiver.avatar,
+      rating: caregiver.rating,
+      reviews: caregiver.reviewCount,
+      hourlyRate: caregiver.hourlyRate,
+      rate: caregiver.hourlyRate ? `₱${caregiver.hourlyRate}/hr` : undefined,
+    });
+    setIsBookingModalVisible(true);
+  };
 
-  // Booking confirmation handler (posts to backend and navigates)
+  // Booking functions
   const handleBookingConfirm = async (bookingData) => {
     const payload = {
       caregiverId: bookingData.caregiverId,
@@ -374,364 +410,214 @@ const ParentDashboard = () => {
       specialInstructions: bookingData.specialInstructions || '',
       hourlyRate: bookingData.hourlyRate,
       totalCost: bookingData.totalCost,
-      status: bookingData.status || 'pending_payment',
+      status: bookingData.status || 'pending',
     };
 
     try {
       const res = await bookingsAPI.create(payload);
-      const createdId = res?.booking?._id || res?.booking?.id || res?.id || null;
-      navigation.navigate('Bookings', { createdBookingId: createdId });
+      setActiveTab('bookings');
+      await handleFetchBookings();
+      setIsBookingModalVisible(false);
       return res;
     } catch (err) {
-      // Propagate so modal can show inline error
+      console.error('Booking error:', err);
       throw err;
     }
   };
 
-  // Header (brand + badge + actions)
-  const renderHeader = () => (
-    <View style={[styles.header]}>
-      <LinearGradient
-        colors={["#FDE2F3", "#E5E1FF"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12 }}
-      >
-        <View style={styles.headerTop}>
-          <View style={styles.logoContainer}>
-            {/* Replace with your brand Image if available */}
-            {/* <Image source={iYayaLogoBrand} style={styles.logoImage} /> */}
-            <Text style={styles.logoText}>iYaya</Text>
-            <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>I am a Parent</Text>
-            </View>
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerButton} onPress={() => navigation.navigate('Messages')}>
-              <MessageCircle size={22} color={colors.textInverse} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton} onPress={() => setShowProfileModal(true)}>
-              <User size={22} color={colors.textInverse} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton} onPress={signOut}>
-              <LogOut size={22} color={colors.textInverse} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </LinearGradient>
-    </View>
-  );
-
-  // Welcome card
-  const renderWelcome = () => (
-    <View style={[styles.welcomeCard, { backgroundColor: colors.secondaryLight }]}> 
-      <Text style={styles.welcomeTitle}>Welcome back! 👋</Text>
-      <Text style={styles.welcomeSubtitle}>Let's find the perfect caregiver for your little ones.</Text>
-    </View>
-  );
-
-  // Render quick actions (grid)
-  const renderQuickActions = () => {
-    const styleFor = (id) => {
-      switch (id) {
-        case 'find':
-          return { bg: '#FFF1F7', border: '#FBCFE8', icon: '#EC4899' };
-        case 'book':
-          return { bg: '#EFF6FF', border: '#BFDBFE', icon: '#3B82F6' };
-        case 'messages':
-          return { bg: '#F5F3FF', border: '#DDD6FE', icon: '#8B5CF6' };
-        case 'add-child':
-          return { bg: '#ECFDF5', border: '#BBF7D0', icon: '#10B981' };
-        default:
-          return { bg: colors.surface, border: colors.border, icon: colors.primary };
-      }
-    };
-
-    return (
-      <View style={styles.quickActionsContainer}>
-        {quickActions.map((action) => {
-          const s = styleFor(action.id);
-          return (
-            <TouchableOpacity
-              key={action.id}
-              style={[
-                styles.quickAction,
-                { borderColor: s.border, backgroundColor: s.bg, borderWidth: 1, borderRadius: 16, paddingVertical: 20 }
-              ]}
-              onPress={action.onPress}
-              activeOpacity={0.85}
-            >
-              {action.icon === 'plus' && <Plus size={28} color={s.icon} />}
-              {action.icon === 'calendar' && <Calendar size={28} color={s.icon} />}
-              {action.icon === 'message-circle' && <MessageCircle size={28} color={s.icon} />}
-              {action.icon === 'search' && <Search size={28} color={s.icon} />}
-              <Text style={[styles.quickActionText, { color: '#111827' }]}>{action.title}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    );
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      setRefreshing(true);
+      await bookingsAPI.cancel(bookingId);
+    } catch (e) {
+      console.warn('Failed to cancel booking:', e?.message || e);
+    } finally {
+      await handleFetchBookings();
+    }
   };
 
-  // Children section
-  const renderChildrenSection = () => (
-    <View style={[styles.sectionCard, { backgroundColor: colors.surface, padding: spacing.md }]}> 
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionTitleContainer}>
-          <Baby size={20} color={colors.secondary} />
-          <Text style={styles.sectionTitle}>Your Children</Text>
-        </View>
-        <TouchableOpacity onPress={openAddChild} style={[styles.addButton, { borderColor: colors.secondary }]}>
-          <Plus size={16} color={colors.secondary} />
-          <Text style={[styles.addButtonText, { color: colors.secondary }]}>Add Child</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.childrenList}>
-        {children.map((child) => (
-          <View key={child.id} style={[styles.childCard, { backgroundColor: colors.backgroundLight }]}>
-            <View style={[styles.childIcon, { backgroundColor: colors.secondaryLight }]}>
-              <Baby size={24} color={colors.secondary} />
-            </View>
-            <View style={styles.childInfo}>
-              <Text style={styles.childName}>{child.name}</Text>
-              <Text style={styles.childDetails}>Age {child.age}{child.preferences ? ` • ${child.preferences}` : ''}</Text>
-            </View>
-            <TouchableOpacity style={styles.editButton} onPress={() => openEditChild(child)}>
-              <Text style={[styles.editButtonText, { color: colors.secondary }]}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
+  const openPaymentModal = (bookingId) => {
+    setPaymentBookingId(bookingId);
+    setPaymentBase64('');
+    setPaymentMime('image/jpeg');
+    setShowPaymentModal(true);
+  };
 
-  // Upcoming bookings section
-  const renderBookingsSection = () => (
-    <View style={[styles.sectionCard, { backgroundColor: colors.surface, padding: spacing.md }]}> 
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionTitleContainer}>
-          <Clock size={20} color={colors.info} />
-          <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-        </View>
-      </View>
-      <View style={styles.bookingsList}>
-        {bookings.map((b) => (
-          <View key={b.id} style={[styles.bookingCard, { backgroundColor: colors.backgroundLight }]}>
-            <View style={styles.bookingInfo}>
-              <Text style={styles.bookingCaregiver}>{b.caregiver}</Text>
-              <Text style={styles.bookingTime}>{b.date} • {b.time}</Text>
-              <Text style={styles.bookingChildren}>Children: {b.children.join(', ')}</Text>
-            </View>
-            <View style={[styles.bookingStatus, { 
-              backgroundColor: b.status === 'confirmed' ? '#dcfce7' : '#e0e7ff',
-              borderColor: b.status === 'confirmed' ? colors.success : '#2563eb'
-            }]}>
-              <Text style={[styles.bookingStatusText, { color: b.status === 'confirmed' ? colors.success : '#2563eb' }]}>
-                {b.status}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
+  const handleUploadPayment = async () => {
+    if (!paymentBookingId || !paymentBase64) return;
+    
+    try {
+      await bookingsAPI.uploadPaymentProof(paymentBookingId, paymentBase64, paymentMime);
+      setShowPaymentModal(false);
+      setPaymentBookingId(null);
+      setPaymentBase64('');
+      await handleFetchBookings();
+    } catch (e) {
+      console.warn('Failed to upload payment proof:', e?.message || e);
+    }
+  };
 
-  // HOME tab content
-  const renderHomeTab = () => (
-    <View style={styles.dashboardContent}>
-      {renderWelcome()}
-      {renderQuickActions()}
-      {renderChildrenSection()}
-      {renderBookingsSection()}
-    </View>
-  );
+  // Filter functions
+  const handleApplyFilters = (newFilters) => {
+    setFilters(newFilters);
+    setActiveFilters(countActiveFilters(newFilters));
+    
+    const currentResults = searchQuery ? searchResults : caregivers;
+    const filtered = applyFilters(currentResults, newFilters);
+    setFilteredCaregivers(filtered);
+    
+    if (searchQuery) {
+      setSearchResults(searchFilteredCaregivers);
+    }
+  };
 
-  // SEARCH tab
-  const renderSearchTab = () => (
-    <View style={styles.caregiversContent}>
-      <View style={styles.searchHeader}>
-        <Text style={styles.searchTitle}>Find Caregivers</Text>
-        <TouchableOpacity style={[styles.filterButton, { borderColor: colors.secondary }]}
-        >
-          <Filter size={16} color={colors.secondary} />
-          <Text style={[styles.filterButtonText, { color: colors.secondary }]}>Filters</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.searchBar}>
-        <Search size={18} color={colors.textTertiary} />
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search by location, name, or specialty..."
-          placeholderTextColor={colors.textTertiary}
-          style={[styles.searchInput, { padding: 12 }]}
-        />
-      </View>
-      {(() => {
-        const q = (searchQuery || '').toLowerCase();
-        const filtered = caregivers.filter((cg) => {
-          if (!q) return true;
-          const name = String(cg.name || '').toLowerCase();
-          const location = String(cg.location || '').toLowerCase();
-          const specialties = Array.isArray(cg.specialties) ? cg.specialties.join(' ').toLowerCase() : '';
-          return name.includes(q) || location.includes(q) || specialties.includes(q);
-        });
-        return filtered.length > 0 ? (
-        <FlatList
-          data={filtered}
-          renderItem={({ item }) => (
-            <CaregiverCard
-              caregiver={item}
-              onBookPress={(cg) => {
-                setSelectedCaregiver({
-                  id: cg.id,
-                  name: cg.name,
-                  avatar: cg.avatar,
-                  rating: cg.rating,
-                  reviews: cg.reviewCount,
-                  rate: cg.hourlyRate ? `$${cg.hourlyRate}/hr` : undefined,
-                });
-                setIsBookingModalVisible(true);
-              }}
-              onMessagePress={(cg) => navigation.navigate('Messages', { recipientId: cg.id })}
-            />
-          )}
-          keyExtractor={(item) => String(item.id)}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        />
-        ) : (
-          <View style={styles.emptySection}>
-            <Text style={styles.emptySectionText}>No caregivers match your search</Text>
-          </View>
+  // Profile functions
+  const handleSaveProfile = async () => {
+    try {
+      const updateData = {
+        name: profileName.trim(),
+        contact: profileContact.trim(),
+        location: profileLocation.trim()
+      };
+
+      const result = await authAPI.updateProfile(updateData);
+      
+      if (result.success) {
+        setShowProfileModal(false);
+        Alert.alert('Success', 'Profile updated successfully');
+      } else {
+        Alert.alert('Error', result.error || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    }
+  };
+
+  // Render functions
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'home':
+        return (
+          <HomeTab
+            greetingName={greetingName}
+            profileName={profileName}
+            profileContact={profileContact}
+            profileLocation={profileLocation}
+            bookings={bookings}
+            children={children}
+            quickActions={quickActions}
+            onAddChild={openAddChild}
+            onEditChild={openEditChild}
+            onViewBookings={() => setActiveTab('bookings')}
+          />
         );
-      })()}
-    </View>
-  );
-
-  // BOOKINGS tab
-  const renderBookingsTab = () => (
-    <View style={styles.loadingContainer}>
-      <Calendar size={64} color={colors.textTertiary} />
-      <Text style={[styles.emptyStateTitle, { marginTop: spacing.md }]}>Bookings Management</Text>
-      <Text style={styles.emptyStateText}>Manage your upcoming and past bookings here.</Text>
-    </View>
-  );
-
-  // Top navigation tabs
-  const renderTopNav = () => (
-    <View style={styles.navContainer}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
-        {[
-          { id: 'home', label: 'Home', icon: Home },
-          { id: 'search', label: 'Find Caregivers', icon: Search },
-          { id: 'bookings', label: 'My Bookings', icon: Calendar },
-          { id: 'messages', label: 'Messages', icon: MessageCircle },
-        ].map((tab) => {
-          const IconComp = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              onPress={() => {
-                if (tab.id === 'messages') {
-                  navigation.navigate('Messages');
-                } else {
-                  setActiveTab(tab.id);
-                }
-              }}
-              style={[styles.navItem, active && styles.activeNavItem]}
-              activeOpacity={0.8}
-            >
-              <IconComp size={18} color={active ? colors.secondary : colors.textSecondary} />
-              <Text style={[styles.navText, active && styles.activeNavText]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
+      case 'search':
+        return (
+          <SearchTab
+            searchQuery={searchQuery}
+            filteredCaregivers={filteredCaregivers}
+            caregivers={caregivers}
+            searchLoading={searchLoading}
+            refreshing={refreshing}
+            activeFilters={activeFilters}
+            onRefresh={onRefresh}
+            onBookCaregiver={handleBookCaregiver}
+            onMessageCaregiver={handleMessageCaregiver}
+            onViewCaregiver={handleViewCaregiver}
+            onSearch={setSearchQuery}
+            onOpenFilter={() => setShowFilterModal(true)}
+          />
+        );
+      case 'bookings':
+        return (
+          <BookingsTab
+            bookings={bookings}
+            bookingsFilter={bookingsFilter}
+            setBookingsFilter={setBookingsFilter}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            onCancelBooking={handleCancelBooking}
+            onUploadPayment={openPaymentModal}
+            onViewBookingDetails={(bookingId) => navigation.navigate('BookingDetails', { bookingId })}
+            onWriteReview={(bookingId, caregiverId) => navigation.navigate('Review', { bookingId, caregiverId })}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-      {/* Header */}
-      {renderHeader()}
+      <Header 
+        navigation={navigation} 
+        onProfilePress={() => setShowProfileModal(true)} 
+        onSignOut={signOut} 
+      />
 
-      {/* Top Navigation */}
-      {renderTopNav()}
-
-      {/* Content */}
-      <View style={styles.content}>
-        {activeTab === 'home' && (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-            {renderHomeTab()}
-          </ScrollView>
-        )}
-        {activeTab === 'search' && (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-            {renderSearchTab()}
-          </ScrollView>
-        )}
-        {activeTab === 'bookings' && (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-            {renderBookingsTab()}
-          </ScrollView>
-        )}
-        {activeTab === 'messages' && (
-          <View style={{ flex: 1, padding: 16 }}>
-            <Text style={styles.sectionTitle}>Messages</Text>
-            <Text style={styles.emptyStateText}>Messaging screen coming soon.</Text>
-          </View>
-        )}
+      <NavigationTabs 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onProfilePress={() => setShowProfileModal(true)} 
+      />
+      
+      <View style={{ flex: 1 }}>
+        {renderActiveTab()}
       </View>
 
       {/* Modals */}
       <ChildModal
         visible={showChildModal}
-        onDismiss={() => setShowChildModal(false)}
+        onClose={() => setShowChildModal(false)}
         childName={childName}
         setChildName={setChildName}
         childAge={childAge}
         setChildAge={setChildAge}
         childNotes={childNotes}
         setChildNotes={setChildNotes}
-        handleAddChild={handleAddOrSaveChild}
-        children={children}
-        handleDeleteChild={handleDeleteChild}
-      />
-      
-      <ProfileModal
-        visible={showProfileModal}
-        onDismiss={() => setShowProfileModal(false)}
-        profileName={profileName}
-        setProfileName={setProfileName}
-        profileContact={profileContact}
-        setProfileContact={setProfileContact}
-        profileLocation={profileLocation}
-        setProfileLocation={setProfileLocation}
-        handleSaveProfile={async () => {
-          try {
-            await authAPI.updateProfile({
-              name: profileName,
-              contact: profileContact,
-              location: profileLocation,
-            });
-            setShowProfileModal(false);
-          } catch (e) {
-            console.warn('Failed to update profile', e?.message || e);
-            setShowProfileModal(false);
-          }
-        }}
-      />
-      
-      <JobPostingModal 
-        visible={showJobPostingModal} 
-        onClose={() => setShowJobPostingModal(false)}
-        onJobPosted={fetchJobs}
+        onSave={handleAddOrSaveChild}
+        editing={!!editingChildId}
       />
 
-      {/* Booking Modal (merged) */}
+      <ProfileModal
+        visible={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        name={profileName}
+        setName={setProfileName}
+        contact={profileContact}
+        setContact={setProfileContact}
+        location={profileLocation}
+        setLocation={setProfileLocation}
+        onSave={handleSaveProfile}
+      />
+
+      <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        filters={filters}
+        onApplyFilters={handleApplyFilters}
+      />
+
+      <JobPostingModal
+        visible={showJobPostingModal}
+        onClose={() => setShowJobPostingModal(false)}
+        onSubmit={(jobData) => {
+          console.log('Job posted:', jobData);
+          setShowJobPostingModal(false);
+        }}
+      />
+
+      <PaymentModal
+        visible={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        paymentBase64={paymentBase64}
+        setPaymentBase64={setPaymentBase64}
+        onUpload={handleUploadPayment}
+      />
+
       <BookingModal
         visible={isBookingModalVisible}
         onClose={() => setIsBookingModalVisible(false)}
@@ -742,6 +628,5 @@ const ParentDashboard = () => {
     </SafeAreaView>
   );
 };
-// Screen styles are now sourced from ../styles/ParentDashboard.styles
 
 export default ParentDashboard;

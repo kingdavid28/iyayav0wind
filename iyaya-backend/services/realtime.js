@@ -31,13 +31,13 @@ function init(server) {
       socket.on('typing:start', (payload) => {
         const { conversationId } = payload || {};
         if (!conversationId) return;
-        socket.to(conversationId).emit('typing:start', { userId: socket.data.userId });
+        socket.to(conversationId).emit('typing:start', { userId: socket.data.userId, conversationId });
       });
 
       socket.on('typing:stop', (payload) => {
         const { conversationId } = payload || {};
         if (!conversationId) return;
-        socket.to(conversationId).emit('typing:stop', { userId: socket.data.userId });
+        socket.to(conversationId).emit('typing:stop', { userId: socket.data.userId, conversationId });
       });
 
       socket.on('conversation:join', ({ conversationId }) => {

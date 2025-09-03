@@ -6,6 +6,9 @@ const jobs = require('../controllers/jobController');
 // All routes here are authenticated
 router.use(authenticate);
 
+// GET /api/jobs - list jobs (optionally filter by status)
+router.get('/', jobs.getAllJobs);
+
 // POST /api/jobs - create job
 router.post('/', jobs.createJob);
 

@@ -1,4 +1,27 @@
-import { __DEV__ } from "../config/constants"
+// Development mode check
+const __DEV__ = process.env.NODE_ENV === 'development';
+
+// Safely stringify values, handling circular references and non-serializable values
+function safeStringify(value) {
+  const seen = new WeakSet();
+  try {
+    return JSON.stringify(value, (key, val) => {
+      if (typeof val === 'object' && val !== null) {
+        if (seen.has(val)) return '[Circular]';
+        seen.add(val);
+      }
+      if (typeof val === 'function') return `[Function: ${val.name || 'anonymous'}]`;
+      if (val instanceof Error) return val.message || String(val);
+      return val;
+    });
+  } catch (_) {
+    try {
+      return String(value);
+    } catch (_) {
+      return '[Unserializable]';
+    }
+  }
+}
 
 class Logger {
   constructor() {
@@ -29,7 +52,7 @@ class Logger {
       // Convert error-like args to readable strings for console output
       const safeArgs = args.map(arg => {
         if (arg instanceof Error) return arg.message;
-        if (typeof arg === 'object') return JSON.stringify(arg);
+        if (typeof arg === 'object') return safeStringify(arg);
         return arg;
       });
       consoleMethod(`[${timestamp}] [${level.toUpperCase()}]`, message, ...safeArgs);
@@ -52,7 +75,7 @@ class Logger {
     // Convert error-like args to readable strings
     const safeArgs = args.map(arg => {
       if (arg instanceof Error) return arg.message;
-      if (typeof arg === 'object') return JSON.stringify(arg);
+      if (typeof arg === 'object') return safeStringify(arg);
       return arg;
     });
     this.log("error", message, ...safeArgs);
@@ -89,7 +112,7 @@ class Logger {
 
   // Export logs
   exportLogs() {
-    return JSON.stringify(this.logs, null, 2)
+    return safeStringify(this.logs)
   }
 }
 

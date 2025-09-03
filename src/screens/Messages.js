@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -11,20 +11,21 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, MessageSquare, User, Search, Send, Check, CheckCheck } from 'lucide-react-native';
-import { collection, query, where, orderBy, onSnapshot, doc as firestoreDoc, updateDoc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../config/firebase';
+import { ArrowLeft, MessageSquare, User, Search } from 'lucide-react-native';
+import { messagesAPI } from '../config/api';
+import { useMessaging } from '../contexts/MessagingContext';
+import { useAuth } from '../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 
 const SAMPLE_CONVERSATIONS = [
   {
     id: 'sample-1',
-    name: 'Sarah Johnson',
+    name: 'Ana Dela Cruz',
     lastMessage: 'Hi! Are you available this Saturday?',
     time: '2h ago',
     unread: true,
     unreadCount: 2,
-    recipientId: 'sample-sarah',
+    recipientId: 'sample-ana',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop',
   },
   {
@@ -44,73 +45,55 @@ const Messages = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const currentUser = auth.currentUser;
+  const { user: currentUser } = useAuth();
+  const { conversations: apiConversations, loading: apiLoading } = useMessaging();
 
-  // Fetch conversations in real-time
+  // Fetch conversations via MessagingContext (API-only)
   useEffect(() => {
-    if (!currentUser) {
-      // Fallback to sample conversations when not logged in
+    // Map API conversations to UI shape
+    const mapApi = (list = []) =>
+      list.map((c) => {
+        const otherId = Array.isArray(c.participants)
+          ? c.participants.find((id) => id !== currentUser?._id && id !== currentUser?.id && id !== currentUser?.uid)
+          : null;
+        const lm = c.lastMessage || c.last_message || {};
+        const lmText = lm.text || lm.content || lm.body || 'No messages yet';
+        const updatedAt = c.updatedAt || c.updated_at || lm.createdAt || lm.created_at || c.createdAt || c.created_at;
+        let time = 'Just now';
+        try {
+          const d = updatedAt ? new Date(updatedAt) : new Date();
+          time = formatDistanceToNow(d, { addSuffix: true });
+        } catch {}
+        const senderId = lm.senderId || lm.sender_id;
+        const currentId = currentUser?._id || currentUser?.id || currentUser?.uid;
+        const unread = lm && !lm.read && senderId && currentId && senderId !== currentId;
+        return {
+          id: c.id || c._id,
+          name: c.title || c.name || 'Conversation',
+          lastMessage: lmText,
+          time,
+          unread: !!unread,
+          unreadCount: unread ? 1 : 0,
+          recipientId: otherId,
+          avatar: c.avatar || null,
+        };
+      });
+
+    const mapped = mapApi(apiConversations || []);
+    if (!apiLoading && mapped.length === 0) {
       setConversations(SAMPLE_CONVERSATIONS);
-      setLoading(false);
-      return;
+    } else {
+      setConversations(mapped);
     }
-
-    const conversationsRef = collection(db, 'conversations');
-    const q = query(
-      conversationsRef,
-      where('participants', 'array-contains', currentUser.uid),
-      orderBy('lastUpdated', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      try {
-        const conversationsData = await Promise.all(
-          snapshot.docs.map(async (snap) => {
-            const data = snap.data();
-            const otherParticipantId = data.participants?.find((id) => id !== currentUser.uid);
-            let userData = null;
-            if (otherParticipantId) {
-              const userDoc = await getDoc(firestoreDoc(db, 'users', otherParticipantId));
-              userData = userDoc.data();
-            }
-
-            return {
-              id: snap.id,
-              name: userData?.displayName || 'Unknown User',
-              lastMessage: data?.lastMessage?.text || 'No messages yet',
-              time: data?.lastUpdated?.toDate ? formatDistanceToNow(data.lastUpdated.toDate(), { addSuffix: true }) : 'Just now',
-              unread: (data?.unreadCount?.[currentUser.uid] || 0) > 0,
-              unreadCount: data?.unreadCount?.[currentUser.uid] || 0,
-              recipientId: otherParticipantId || null,
-              avatar: userData?.photoURL || null,
-            };
-          })
-        );
-
-        if (conversationsData.length === 0) {
-          setConversations(SAMPLE_CONVERSATIONS);
-        } else {
-          setConversations(conversationsData);
-        }
-      } catch (e) {
-        // If anything fails (permissions, missing collections), use samples
-        setConversations(SAMPLE_CONVERSATIONS);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [currentUser]);
+    setLoading(apiLoading && mapped.length === 0);
+  }, [currentUser?._id, currentUser?.id, currentUser?.uid, apiConversations, apiLoading]);
 
   // Mark conversation as read
   const markAsRead = async (conversationId) => {
     if (!currentUser) return;
-    
-    const conversationRef = firestoreDoc(db, 'conversations', conversationId);
-    await updateDoc(conversationRef, {
-      [`unreadCount.${currentUser.uid}`]: 0
-    });
+    // REST: best-effort server call and optimistic UI update
+    try { await messagesAPI.markRead(conversationId); } catch {}
+    setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, unread: false, unreadCount: 0 } : c));
   };
 
   // Filter conversations based on search query
@@ -127,7 +110,7 @@ const Messages = () => {
       style={styles.conversationItem}
       onPress={() => {
         markAsRead(item.id);
-        navigation.navigate('Chat', { 
+        navigation.navigate('Messaging', { 
           conversationId: item.id,
           recipientName: item.name,
           recipientId: item.recipientId || item.id

@@ -1,21 +1,50 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Card, Avatar } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { API_CONFIG } from '../../../config/constants';
 
 const NannyCard = ({ nanny, onViewProfile, onMessage }) => {
   // Format the rating to one decimal place
   const formattedRating = nanny.rating ? nanny.rating.toFixed(1) : '4.8';
+  
+  // Handle experience which could be a number or an object
+  const experience = typeof nanny?.experience === 'number' 
+    ? nanny.experience 
+    : (nanny?.experience?.years || 0);
+  
+  // State to handle image loading errors
+  const [imageError, setImageError] = useState(false);
+
+  // Normalize image URL: if relative, prefix API host (strip trailing /api)
+  const imageUri = useMemo(() => {
+    try {
+      const raw = nanny?.image || nanny?.avatar || '';
+      if (!raw) return '';
+      if (/^(https?:)?\//i.test(raw) || raw.startsWith('data:')) return raw;
+      const host = (API_CONFIG?.BASE_URL || '').replace(/\/?api$/i, '');
+      return `${host}${raw.startsWith('/') ? '' : '/'}${raw}`;
+    } catch (_) {
+      return nanny?.image || '';
+    }
+  }, [nanny?.image, nanny?.avatar]);
+  
+  const handleImageError = (error) => {
+    console.log('Image loading error:', error.nativeEvent);
+    setImageError(true);
+  };
   
   return (
     <Card style={styles.caregiverCard}>
       <Card.Content style={styles.caregiverContent}>
         <View style={styles.caregiverHeader}>
           <View style={styles.avatarContainer}>
-            {nanny.image ? (
+            {imageUri && !imageError ? (
               <Image 
-                source={{ uri: nanny.image }} 
+                source={{ uri: imageUri }} 
                 style={styles.avatarImage}
+                onError={handleImageError}
+                onLoad={() => console.log('Image loaded successfully:', imageUri)}
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
@@ -37,15 +66,17 @@ const NannyCard = ({ nanny, onViewProfile, onMessage }) => {
             </View>
             
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={14} color="#6b7280" />
+              <Ionicons name="location" size={14} color="#6b7280" />
               <Text style={styles.location}>{nanny.distance || '0'} km away</Text>
             </View>
             
-            <Text style={styles.experience}>{nanny.experience || 'Experienced caregiver'}</Text>
+            <Text style={styles.experience}>
+              {experience ? `${experience} years experience` : 'Experienced caregiver'}
+            </Text>
           </View>
           
           <View style={styles.rateContainer}>
-            <Text style={styles.hourlyRate}>${nanny.hourlyRate || '20'}/hr</Text>
+            <Text style={styles.hourlyRate}>₱{nanny.hourlyRate || '400'}/hr</Text>
           </View>
         </View>
 

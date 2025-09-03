@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 
 const INITIAL_CHILDREN = [
-  { id: '1', name: 'Emma', age: 3 },
-  { id: '2', name: 'Liam', age: 5 },
+  { id: '1', name: 'Maya', age: 3 },
+  { id: '2', name: 'Miguel', age: 5 },
 ];
 
 const Children = () => {

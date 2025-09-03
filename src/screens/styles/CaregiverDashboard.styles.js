@@ -7,6 +7,57 @@ export const styles = StyleSheet.create({
     backgroundColor: "#F4F7FC",
     paddingHorizontal: 0,
   },
+  // Parent-like header styles
+  parentLikeHeaderContainer: {
+    paddingTop: 40,
+    paddingBottom: 8,
+    paddingHorizontal: 8,
+  },
+  parentLikeHeaderGradient: {
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  logoImage: {
+    width: 60,
+    height: 80,
+  },
+  headerBadge: {
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+    alignSelf: 'flex-start',
+  },
+  headerBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#2196f3',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 6,
+    marginLeft: 8,
+    minWidth: 36,
+  },
   header: {
     backgroundColor: "#FFFFFF",
     padding: 16,
@@ -104,6 +155,67 @@ export const styles = StyleSheet.create({
     color: "#2563EB",
     fontWeight: "600",
   },
+  // Parent-style horizontal top nav
+  navContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  navScroll: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  navTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    minWidth: 100,
+  },
+  navTabActive: {
+    backgroundColor: '#bed6fc',
+    borderColor: '#bed6fc',
+  },
+  navTabText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  navTabTextActive: {
+    color: '#3b83f5',
+    fontWeight: '600',
+  },
+  // Legacy styles for compatibility
+  navItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+  },
+  activeNavItem: {
+    backgroundColor: '#bed6fc',
+    borderColor: '#bed6fc',
+  },
+  navText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeNavText: {
+    color: '#3b83f5',
+  },
   content: {
     flex: 1,
     paddingTop: 16,
@@ -127,6 +239,78 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     marginBottom: 16,
+  },
+  // New quick stats and actions grids
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  quickTile: {
+    width: '48%',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    ...shadows.sm,
+  },
+  quickActionTile: {
+    width: '48%',
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  quickActionGradient: {
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    minHeight: 88,
+    justifyContent: 'center',
+  },
+  quickIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickActionIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)'
+  },
+  quickValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  quickLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  quickActionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
   },
   statCard: {
     width: '31%',
@@ -155,6 +339,12 @@ export const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 16,
   },
+  jobsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -175,10 +365,19 @@ export const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   jobCard: {
-    width: 280,
-    marginRight: 16,
+    width: '50%',
+    marginRight: 0,
+    marginBottom: 16,
     borderRadius: 12,
     ...shadows.sm,
+  },
+  jobCardHorizontal: {
+    width: 308,
+    marginRight: 16,
+    marginBottom: 0,
+  },
+  jobCardTablet: {
+    width: '31%',
   },
   jobHeader: {
     flexDirection: 'row',
@@ -260,6 +459,7 @@ export const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
+    flexWrap: 'wrap',
   },
   postedDate: {
     fontSize: 12,
@@ -267,10 +467,15 @@ export const styles = StyleSheet.create({
   },
   jobActionButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    maxWidth: '100%',
+    marginTop: 8,
   },
   secondaryButton: {
     marginRight: 8,
     borderColor: '#D1D5DB',
+    paddingHorizontal: 10,
+    flexShrink: 1,
   },
   secondaryButtonText: {
     color: '#374151',
@@ -279,6 +484,7 @@ export const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#2563EB',
+    flexShrink: 1,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -571,5 +777,23 @@ export const styles = StyleSheet.create({
   logoutButtonText: {
     color: '#FFFFFF',
     fontWeight: '500',
+  },
+  // Badge shown when caregiver already applied to a job
+  appliedBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#E8F5E9',
+    borderColor: '#C8E6C9',
+    borderWidth: 1,
+    flexShrink: 1,
+  },
+  appliedBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  appliedBadgeText: {
+    color: '#2E7D32',
+    fontWeight: '600',
   },
 });

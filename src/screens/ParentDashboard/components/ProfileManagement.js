@@ -34,7 +34,7 @@ const ProfileManagement = ({ visible, onClose }) => {
         const userData = payload?.data || payload;
         if (userData) {
           const img = userData.profileImage;
-          const absoluteImg = img && img.startsWith('/') ? `${API_CONFIG.BASE_URL}${img}` : img;
+          const absoluteImg = img && img.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${img}` : img;
           setProfile(prev => ({
             ...prev,
             displayName: userData.name || '',

@@ -1,16 +1,36 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Caregiver = require('../models/Caregiver');
 const ErrorResponse = require('../utils/errorResponse');
 const auditService = require('../services/auditService');
 const { jwtSecret, jwtExpiry, refreshTokenSecret, refreshTokenExpiry } = require('../config/auth');
 const fs = require('fs');
 const path = require('path');
 
+// Normalize incoming human-friendly roles to backend-internal roles
+function normalizeIncomingRole(input) {
+  const v = String(input || '').toLowerCase();
+  if (v === 'parent' || v === 'client') return { role: 'parent', userType: 'parent' };
+  if (v === 'caregiver' || v === 'provider' || v === 'nanny') return { role: 'caregiver', userType: 'caregiver' };
+  // Do NOT allow admin creation via public flows; map to parent
+  if (v === 'admin') return { role: 'parent', userType: 'parent' };
+  // Default to parent for safety
+  return { role: 'parent', userType: 'parent' };
+}
+
 // Helper function to generate tokens
 const generateTokens = (user) => {
+  // Map legacy roles for JWT tokens
+  let tokenRole = user.role;
+  if (user.role === 'provider' || user.userType === 'provider') {
+    tokenRole = 'caregiver';
+  } else if (user.role === 'client' || user.userType === 'client') {
+    tokenRole = 'parent';
+  }
+  
   const accessToken = jwt.sign(
-    { id: user._id, role: user.role },
+    { id: user._id, role: tokenRole },
     jwtSecret,
     { expiresIn: jwtExpiry }
   );
@@ -84,13 +104,34 @@ exports.uploadProfileImageBase64 = async (req, res, next) => {
 // Update current authenticated user's basic profile
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { name, phone, address, profileImage } = req.body || {};
+    const { name, phone, address, profileImage, children } = req.body || {};
 
     // Build update object only with provided fields
     const update = {};
     if (typeof name === 'string') update.name = name;
     if (typeof phone === 'string') update.phone = phone;
     if (profileImage) update.profileImage = profileImage;
+    // Allow parents to update children via /auth/profile as well
+    if (Array.isArray(children)) {
+      try {
+        // Fetch user to verify role
+        const current = await User.findById(req.user.id).select('role userType');
+        const isParent = current && (current.role === 'client' || current.role === 'parent' || current.userType === 'client' || current.userType === 'parent');
+        if (!isParent) {
+          return res.status(403).json({ success: false, error: 'Only parent users can update children.' });
+        }
+        // Basic sanitization of children payload
+        update.children = children
+          .filter(c => c && typeof c.name === 'string' && c.name.trim().length > 0)
+          .map(c => ({
+            name: String(c.name).trim(),
+            birthdate: c.birthdate ? new Date(c.birthdate) : undefined,
+            notes: typeof c.notes === 'string' ? c.notes : undefined
+          }));
+      } catch (e) {
+        return res.status(400).json({ success: false, error: 'Invalid children data' });
+      }
+    }
     if (address && typeof address === 'object') {
       update.address = {
         ...(address.street && { street: address.street }),
@@ -111,7 +152,7 @@ exports.updateProfile = async (req, res, next) => {
       query = { firebaseUid: req.user.id };
     }
 
-    const user = await User.findOneAndUpdate(query, update, { new: true }).select('-password');
+    const user = await User.findOneAndUpdate(query, update, { new: true, runValidators: true }).select('-password');
 
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -144,6 +185,93 @@ exports.updateChildren = async (req, res, next) => {
   }
 };
 
+// Update role for current authenticated user (parent/caregiver)
+exports.updateRole = async (req, res, next) => {
+  try {
+    const { role } = req.body || {};
+    if (!role) {
+      return res.status(400).json({ success: false, error: 'role is required' });
+    }
+
+    const { role: internalRole, userType } = normalizeIncomingRole(role);
+
+    // Determine lookup for Firebase vs JWT
+    let query = { _id: req.user.id };
+    if (req.user.firebase) {
+      query = { firebaseUid: req.user.id };
+    }
+
+    const user = await User.findOneAndUpdate(
+      query,
+      { role: internalRole, userType },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    auditService.logSecurityEvent('USER_ROLE_UPDATED', {
+      userId: user._id?.toString?.() || req.user.id,
+      newRole: internalRole,
+      newUserType: userType,
+      via: req.user.firebase ? 'firebase' : 'jwt',
+      timestamp: new Date(),
+    });
+
+    // If moving to caregiver role, make sure a caregiver profile exists with proper name
+    if (internalRole === 'caregiver' && user && user._id) {
+      try {
+        const existing = await Caregiver.findOne({ userId: user._id }).select('_id');
+        if (!existing) {
+          await Caregiver.create({
+            userId: user._id,
+            name: (user.name && user.name.trim().length > 0) ? user.name.trim() : (user.email ? user.email.split('@')[0] : 'Caregiver'),
+            bio: '',
+            profileImage: user.profileImage || '',
+            skills: [],
+            certifications: [],
+            ageCareRanges: [],
+            emergencyContacts: [],
+            documents: [],
+            portfolio: { images: [], videos: [] },
+            availability: {
+              days: [],
+              hours: { start: '08:00', end: '18:00' },
+              flexible: false,
+              weeklySchedule: {
+                Monday: { available: false, timeSlots: [] },
+                Tuesday: { available: false, timeSlots: [] },
+                Wednesday: { available: false, timeSlots: [] },
+                Thursday: { available: false, timeSlots: [] },
+                Friday: { available: false, timeSlots: [] },
+                Saturday: { available: false, timeSlots: [] },
+                Sunday: { available: false, timeSlots: [] }
+              }
+            },
+            verification: {
+              profileComplete: false,
+              identityVerified: false,
+              certificationsVerified: false,
+              referencesVerified: false,
+              trustScore: 0,
+              badges: []
+            },
+            backgroundCheck: { status: 'not_started', provider: 'internal', checkTypes: [] }
+          });
+        }
+      } catch (cgErr) {
+        console.warn('Warning: failed to ensure caregiver profile on role update:', cgErr?.message || cgErr);
+      }
+    }
+
+    return res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    console.error('Error in updateRole:', err);
+    return next(new ErrorResponse('Failed to update role', 500));
+  }
+};
+
 // Get current authenticated user
 const Contract = require('../models/Contract');
 
@@ -173,53 +301,100 @@ exports.getCurrentUser = async (req, res, next) => {
       try {
         // For Firebase users, we need to find by firebaseUid
         let user = await User.findOne({ firebaseUid: req.user.id }).select('-password');
-        
-        // If user not found, create a new user record
+
+        // If user not found, try to link an existing account by email first
         if (!user) {
+          const email = req.user.email;
+          if (email) {
+            const existingByEmail = await User.findOne({ email }).select('-password');
+            if (existingByEmail) {
+              // Link Firebase UID to existing account
+              if (!existingByEmail.firebaseUid) {
+                existingByEmail.firebaseUid = req.user.id;
+                await existingByEmail.save();
+              }
+              return res.status(200).json({ success: true, data: existingByEmail });
+            }
+          }
+
+          // No existing account by firebaseUid or email — create a new one
           console.log('Creating new user record for Firebase UID:', req.user.id);
-          
+
           // Generate a simple random password for Firebase users (not used for authentication)
           const randomPassword = 'FIREBASE_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-          
-          user = new User({
-            firebaseUid: req.user.id,
-            email: req.user.email,
-            name: req.user.name || (req.user.email ? req.user.email.split('@')[0] : 'New User'),
-            password: randomPassword, // Set a random password to satisfy validation
-            role: 'client', // Default role
-            userType: 'client', // Default userType
-            isEmailVerified: true, // Firebase email is already verified
-            // Add any other default fields as needed
-          });
-          
-          // Skip password hashing for Firebase users
-          user.password = randomPassword;
-          user.passwordConfirm = randomPassword;
-          
-          await user.save({ validateBeforeSave: false });
-          console.log('Created new Firebase user:', user._id);
-          
-          // Fetch the user again to get the full user object
-          user = await User.findById(user._id).select('-password');
+
+          try {
+            user = new User({
+              firebaseUid: req.user.id,
+              email: req.user.email,
+              name: req.user.name || (req.user.email ? req.user.email.split('@')[0] : 'New User'),
+              password: randomPassword, // Set a random password to satisfy validation
+              role: 'client', // Default role
+              userType: 'client', // Default userType
+              isEmailVerified: true, // Firebase email is already verified
+            });
+
+            // Skip password hashing for Firebase users
+            user.password = randomPassword;
+            user.passwordConfirm = randomPassword;
+
+            await user.save({ validateBeforeSave: false });
+            console.log('Created new Firebase user:', user._id);
+
+            // Fetch the user again to get the full user object
+            user = await User.findById(user._id).select('-password');
+          } catch (createErr) {
+            // Handle duplicate key (email) gracefully by linking
+            if (createErr && (createErr.code === 11000 || /duplicate key/i.test(createErr.message))) {
+              if (email) {
+                const existingAfterDup = await User.findOne({ email }).select('-password');
+                if (existingAfterDup) {
+                  if (!existingAfterDup.firebaseUid) {
+                    existingAfterDup.firebaseUid = req.user.id;
+                    await existingAfterDup.save();
+                  }
+                  return res.status(200).json({ success: true, data: existingAfterDup });
+                }
+              }
+            }
+            throw createErr;
+          }
         }
-        
-        // Return user data (Firebase users can always see their own data)
-        return res.status(200).json({ success: true, data: user });
+
+        // Return user data as a flat object and ensure a mapped role is present for the app
+        const obj = user.toObject ? user.toObject() : user;
+        const mappedRole = (obj.role === 'admin' || obj.userType === 'admin')
+          ? 'parent'
+          : (obj.role === 'client' || obj.userType === 'client')
+            ? 'parent'
+            : (obj.role === 'provider' || obj.userType === 'provider')
+              ? 'caregiver'
+              : (obj.role || 'parent');
+        return res.status(200).json({ ...obj, role: mappedRole });
       } catch (error) {
         console.error('Error in Firebase user lookup/creation:', error);
         return next(new ErrorResponse('Error processing user data', 500));
       }
     }
-    
+
     // For custom JWT users
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return next(new ErrorResponse('User not found', 404));
     }
+
     
     // If self-access (user requesting own profile), return all info
     if (req.user.id === String(user._id)) {
-      return res.status(200).json({ success: true, data: user });
+      const obj = user.toObject ? user.toObject() : user;
+      const mappedRole = (obj.role === 'admin' || obj.userType === 'admin')
+        ? 'parent'
+        : (obj.role === 'client' || obj.userType === 'client')
+          ? 'parent'
+          : (obj.role === 'provider' || obj.userType === 'provider')
+            ? 'caregiver'
+            : (obj.role || 'parent');
+      return res.status(200).json({ ...obj, role: mappedRole });
     }
     
     // For other users, only expose public info
@@ -241,7 +416,14 @@ exports.getCurrentUser = async (req, res, next) => {
       publicUser.phone = user.phone;
     }
     
-    return res.status(200).json({ success: true, data: publicUser });
+    const mappedRole = (user.role === 'admin' || user.userType === 'admin')
+      ? 'parent'
+      : (user.role === 'client' || user.userType === 'client')
+        ? 'parent'
+        : (user.role === 'provider' || user.userType === 'provider')
+          ? 'caregiver'
+          : (user.role || 'parent');
+    return res.status(200).json({ ...publicUser, role: mappedRole });
   } catch (err) {
     console.error('Error in getCurrentUser:', err);
     next(new ErrorResponse('Server error', 500));
@@ -297,13 +479,64 @@ exports.register = async (req, res, next) => {
   const { name, email, password, role } = req.body;
 
   try {
+    // Normalize incoming role to internal values
+    const { role: internalRole, userType } = normalizeIncomingRole(role);
+
     // Create user
     const user = await User.create({
       name,
       email,
       password,
-      role
+      role: internalRole,
+      userType
     });
+
+    // If registering as caregiver, auto-create a minimal caregiver profile using real name
+    if (internalRole === 'caregiver') {
+      try {
+        const existing = await Caregiver.findOne({ userId: user._id }).select('_id');
+        if (!existing) {
+          await Caregiver.create({
+            userId: user._id,
+            name: (user.name && user.name.trim().length > 0) ? user.name.trim() : (user.email ? user.email.split('@')[0] : 'Caregiver'),
+            bio: '',
+            profileImage: user.profileImage || '',
+            skills: [],
+            certifications: [],
+            ageCareRanges: [],
+            emergencyContacts: [],
+            documents: [],
+            portfolio: { images: [], videos: [] },
+            availability: {
+              days: [],
+              hours: { start: '08:00', end: '18:00' },
+              flexible: false,
+              weeklySchedule: {
+                Monday: { available: false, timeSlots: [] },
+                Tuesday: { available: false, timeSlots: [] },
+                Wednesday: { available: false, timeSlots: [] },
+                Thursday: { available: false, timeSlots: [] },
+                Friday: { available: false, timeSlots: [] },
+                Saturday: { available: false, timeSlots: [] },
+                Sunday: { available: false, timeSlots: [] }
+              }
+            },
+            verification: {
+              profileComplete: false,
+              identityVerified: false,
+              certificationsVerified: false,
+              referencesVerified: false,
+              trustScore: 0,
+              badges: []
+            },
+            backgroundCheck: { status: 'not_started', provider: 'internal', checkTypes: [] }
+          });
+        }
+      } catch (cgErr) {
+        // Log but do not block registration
+        console.warn('Warning: failed to auto-create caregiver profile on register:', cgErr?.message || cgErr);
+      }
+    }
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user);
@@ -321,7 +554,22 @@ exports.register = async (req, res, next) => {
       token: accessToken
     });
   } catch (err) {
-    next(new ErrorResponse('Registration failed', 500));
+    // Provide clearer error responses for common failure cases
+    console.error('Registration error:', err && (err.message || err));
+    // Duplicate email error from Mongo/Mongoose (various shapes)
+    const msg = (err && err.message) || '';
+    const isDupCode = err && (err.code === 11000 || err.code === 'E11000');
+    const isDupMsg = /duplicate key/i.test(msg) || /email already exists/i.test(msg);
+    const isDupKey = err && (err.keyPattern?.email || err.keyValue?.email);
+    if (isDupCode || isDupMsg || isDupKey) {
+      return res.status(409).json({ success: false, error: 'Email already exists' });
+    }
+    // Mongoose validation error
+    if (err && err.name === 'ValidationError') {
+      const details = Object.values(err.errors || {}).map(e => e.message);
+      return res.status(400).json({ success: false, error: 'Validation error', details });
+    }
+    return next(new ErrorResponse('Registration failed', 500));
   }
 };
 
@@ -389,5 +637,6 @@ module.exports = {
   refreshToken: exports.refreshToken,
   updateChildren: exports.updateChildren,
   updateProfile: exports.updateProfile,
+  updateRole: exports.updateRole,
   uploadProfileImageBase64: exports.uploadProfileImageBase64
 };

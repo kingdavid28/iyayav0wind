@@ -2,11 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { uploadBytes, ref as storageRef, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { db, storage } from '../config/firebase';
 import { CheckCircle, Upload, XCircle, AlertCircle, Clock, X, Check } from 'lucide-react-native';
-import { sendPaymentConfirmationEmail } from '../services/emailService';
+import { bookingsAPI } from '../config/api';
 
 const PaymentConfirmationScreen = () => {
   const [image, setImage] = useState(null);
@@ -14,34 +11,14 @@ const PaymentConfirmationScreen = () => {
   const [uploadStatus, setUploadStatus] = useState('');
   const [bookingStatus, setBookingStatus] = useState('pending');
   const [bookingData, setBookingData] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
+  const [mimeType, setMimeType] = useState('image/jpeg');
   const navigation = useNavigation();
   const route = useRoute();
   
   const { bookingId, amount, caregiverName, bookingDate, bookingData: initialBookingData } = route.params;
   
-  // Set up real-time listener for booking status updates
-  useEffect(() => {
-    if (!bookingId) return;
-    
-    const bookingRef = doc(db, 'bookings', bookingId);
-    const unsubscribe = onSnapshot(bookingRef, (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        setBookingData(data);
-        
-        // Update UI based on payment status
-        if (data.paymentStatus === 'verified') {
-          setUploadStatus('verified');
-          setBookingStatus('verified');
-        } else if (data.paymentStatus === 'rejected') {
-          setUploadStatus('rejected');
-          setBookingStatus('rejected');
-        }
-      }
-    });
-    
-    return () => unsubscribe();
-  }, [bookingId]);
+  // Firebase realtime listener removed. Booking updates should come from backend polling or navigation refresh.
   
   // Set initial booking data if provided
   useEffect(() => {
@@ -63,10 +40,16 @@ const PaymentConfirmationScreen = () => {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
+        base64: true,
       });
 
       if (!result.canceled) {
-        setImage(result.assets[0].uri);
+        const asset = result.assets[0];
+        setImage(asset.uri);
+        setImageBase64(asset.base64 || null);
+        // Best-effort mime type; expo may not provide it
+        const inferred = asset.mimeType || (asset.uri?.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+        setMimeType(inferred);
         setUploadStatus('');
       }
     } catch (error) {
@@ -80,69 +63,21 @@ const PaymentConfirmationScreen = () => {
       Alert.alert('No Image', 'Please select a payment screenshot first.');
       return;
     }
+    if (!imageBase64) {
+      Alert.alert('Image Error', 'Could not read image data. Please reselect the image.');
+      return;
+    }
 
     setUploading(true);
     setUploadStatus('uploading');
 
     try {
-      // Convert image URI to blob
-      const response = await fetch(image);
-      const blob = await response.blob();
-      
-      // Create a reference to the storage location
-      const fileRef = storageRef(storage, `payments/${bookingId}_${Date.now()}.jpg`);
-      
-      // Upload the file
-      const uploadTask = await uploadBytes(fileRef, blob);
-      
-      // Get the download URL
-      const downloadURL = await getDownloadURL(uploadTask.ref);
-      
-      // Update the booking document with payment details
-      const bookingRef = doc(db, 'bookings', bookingId);
-      const updateData = {
-        paymentStatus: 'pending_verification',
-        paymentScreenshot: downloadURL,
-        paymentDate: new Date().toISOString(),
-        status: 'payment_pending',
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Add user info if available
-      if (bookingData?.userEmail) {
-        updateData.userEmail = bookingData.userEmail;
-        updateData.userName = bookingData.userName || 'User';
-      }
-      
-      await updateDoc(bookingRef, updateData);
-      
-      // Send payment confirmation email if user email is available
-      if (bookingData?.userEmail) {
-        try {
-          await sendPaymentConfirmationEmail({
-            bookingId,
-            amount,
-            caregiverName,
-            bookingDate: bookingData.bookingDate || bookingDate,
-            paymentScreenshot: downloadURL,
-            userEmail: bookingData.userEmail,
-            userName: bookingData.userName || 'User'
-          });
-        } catch (emailError) {
-          console.error('Error sending confirmation email:', emailError);
-          // Don't fail the whole process if email fails
-        }
-      }
-      
+      const res = await bookingsAPI.uploadPaymentProof(bookingId, imageBase64, mimeType);
       setUploadStatus('pending_verification');
       setBookingStatus('pending_verification');
-      
-      Alert.alert(
-        'Payment Submitted',
-        'Your payment screenshot has been submitted successfully. We will verify your payment and confirm your booking shortly.',
-        [{ text: 'OK' }]
-      );
-      
+      if (res?.booking) setBookingData(res.booking);
+      Alert.alert('Payment Submitted', 'We received your payment proof. We will verify it shortly.');
+
     } catch (error) {
       console.error('Error uploading image:', error);
       setUploadStatus('error');

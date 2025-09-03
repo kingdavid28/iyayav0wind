@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMessaging } from '../contexts/MessagingContext';
 import { formatDistanceToNow } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
+// Firebase/Firestore removed: chat uses backend API via MessagingContext
 
 const ChatInterface = ({ route }) => {
   const { userId, jobId } = route.params || {};
@@ -33,6 +34,7 @@ const ChatInterface = ({ route }) => {
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
   const flatListRef = useRef(null);
+  // Firestore state removed
 
   // Initialize conversation when component mounts or userId changes
   useEffect(() => {
@@ -41,9 +43,10 @@ const ChatInterface = ({ route }) => {
         await getOrCreateConversation(userId, jobId);
       }
     };
-    
     init();
   }, [userId, jobId, getOrCreateConversation]);
+
+  // Firestore branch removed; MessagingContext handles fetching and realtime
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -53,6 +56,8 @@ const ChatInterface = ({ route }) => {
       }, 100);
     }
   }, [messages]);
+
+  // Unread clear handled by backend; Firestore logic removed
 
   const handleSend = async () => {
     if (!messageText.trim() || sending) return;
@@ -96,7 +101,8 @@ const ChatInterface = ({ route }) => {
     );
   };
 
-  if (loading && messages.length === 0) {
+  const isLoading = loading && messages.length === 0;
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
@@ -104,10 +110,11 @@ const ChatInterface = ({ route }) => {
     );
   }
 
-  if (error) {
+  const errMsg = error;
+  if (errMsg) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorText}>{errMsg}</Text>
       </View>
     );
   }

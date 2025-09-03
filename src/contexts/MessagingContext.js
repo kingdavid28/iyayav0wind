@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useContext, useRef } from 'r
 import { useAuth } from './AuthContext';
 import messageService from '../services/notificationService';
 import { messagesAPI } from '../config/api';
-import { initRealtime } from '../services/realtime';
+import { initRealtime, on as onSocket, emit as emitSocket, getSocket } from '../services/realtime';
 import { subscribeToNewMessages, fetchHistory, fetchConversations, sendMessage as chatSendMessage } from '../services/chatClient';
 
 const MessagingContext = createContext();
@@ -15,8 +15,10 @@ export const MessagingProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const enableRealtime = process.env.EXPO_PUBLIC_ENABLE_REALTIME === 'true';
+  const [otherTyping, setOtherTyping] = useState(false);
 
-  // Initialize realtime and fetch user's conversations via REST with light polling
+  // Initialize (optional) realtime and fetch user's conversations via REST with light polling
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -26,7 +28,10 @@ export const MessagingProvider = ({ children }) => {
     const init = async () => {
       setLoading(true);
       try {
-        await initRealtime(() => user?.getIdToken?.());
+        // Only attempt socket.io realtime if explicitly enabled
+        if (enableRealtime) {
+          await initRealtime(() => user?.getIdToken?.());
+        }
       } catch {}
 
       const load = async () => {
@@ -61,13 +66,16 @@ export const MessagingProvider = ({ children }) => {
       mounted = false;
       if (pollId) clearInterval(pollId);
     };
-  }, [user?.uid]);
+  }, [user?.uid, enableRealtime]);
 
   // Fetch messages for active conversation and subscribe via realtime (fallback to polling inside chatClient)
   useEffect(() => {
     if (!activeConversation?.id) return;
     let unsub = () => {};
     let mounted = true;
+    let offTypingStart = null;
+    let offTypingStop = null;
+    let typingStopTimeout = null;
 
     const init = async () => {
       setLoading(true);
@@ -90,14 +98,45 @@ export const MessagingProvider = ({ children }) => {
           return [...prev, msg];
         });
       });
+
+      // Listen for typing events via socket.io if available
+      const sock = getSocket?.();
+      if (sock) {
+        offTypingStart = onSocket('typing:start', (payload) => {
+          if (!mounted) return;
+          // Only react for current conversation
+          if (payload?.userId && payload?.conversationId && payload.conversationId !== activeConversation.id) return;
+          setOtherTyping(true);
+          if (typingStopTimeout) clearTimeout(typingStopTimeout);
+          typingStopTimeout = setTimeout(() => setOtherTyping(false), 3000);
+        });
+        offTypingStop = onSocket('typing:stop', (payload) => {
+          if (!mounted) return;
+          if (payload?.conversationId && payload.conversationId !== activeConversation.id) return;
+          setOtherTyping(false);
+        });
+      }
     };
 
     init();
     return () => {
       mounted = false;
       unsub?.();
+      if (offTypingStart) offTypingStart();
+      if (offTypingStop) offTypingStop();
+      if (typingStopTimeout) clearTimeout(typingStopTimeout);
     };
   }, [activeConversation?.id, user?.uid]);
+
+  // Expose typing helpers
+  const startTyping = () => {
+    if (!activeConversation?.id) return;
+    try { emitSocket('typing:start', { conversationId: activeConversation.id }); } catch {}
+  };
+  const stopTyping = () => {
+    if (!activeConversation?.id) return;
+    try { emitSocket('typing:stop', { conversationId: activeConversation.id }); } catch {}
+  };
 
   // Start or get existing conversation
   const startConversation = async (otherUserId, jobId = null) => {
@@ -133,9 +172,11 @@ export const MessagingProvider = ({ children }) => {
   };
 
   // Send a message
-  const sendMessage = async (content) => {
-    const text = content?.trim();
-    if (!text) return null;
+  const sendMessage = async (contentOrOptions) => {
+    const isObj = contentOrOptions && typeof contentOrOptions === 'object' && !Array.isArray(contentOrOptions);
+    const text = isObj ? (contentOrOptions.text || '') : (contentOrOptions?.trim?.() || '');
+    const attachments = isObj && Array.isArray(contentOrOptions.attachments) ? contentOrOptions.attachments : undefined;
+    if (!text && (!attachments || attachments.length === 0)) return null;
     try {
       const receiverId = activeConversation?.participants?.find((id) => id !== user?.uid);
       const payload = {
@@ -143,6 +184,7 @@ export const MessagingProvider = ({ children }) => {
         recipientId: receiverId,
         jobId: activeConversation?.jobId || undefined,
         text,
+        attachments,
         clientMessageId: `client-${Date.now()}`,
       };
       const msg = await chatSendMessage(payload);
@@ -179,11 +221,17 @@ export const MessagingProvider = ({ children }) => {
 
   // Mark messages as read
   const markMessagesAsRead = async (messageIds) => {
-    // Backend endpoint not yet wired in api.js; update local state optimistically.
-    if (!messageIds?.length) return;
+    // Best-effort: update local state and call backend conversation read endpoint
+    if (!messageIds?.length && !activeConversation?.id) return;
     try {
-      setMessages((prev) => prev.map((m) => (messageIds.includes(m.id) ? { ...m, read: true, readAt: new Date().toISOString() } : m)));
-      // TODO: add messagesAPI.markRead when backend endpoint is available
+      if (Array.isArray(messageIds) && messageIds.length > 0) {
+        setMessages((prev) => prev.map((m) => (messageIds.includes(m.id) ? { ...m, read: true, readAt: new Date().toISOString() } : m)));
+      } else if (activeConversation?.id) {
+        setMessages((prev) => prev.map((m) => ({ ...m, read: true, readAt: new Date().toISOString() })));
+      }
+      if (activeConversation?.id) {
+        try { await messagesAPI.markRead(activeConversation.id); } catch (_) {}
+      }
     } catch (error) {
       console.error('Error marking messages as read (local):', error);
     }
@@ -223,6 +271,9 @@ export const MessagingProvider = ({ children }) => {
         sendMessage,
         markMessagesAsRead,
         getConversation,
+        otherTyping,
+        startTyping,
+        stopTyping,
       }}
     >
       {children}

@@ -12,14 +12,14 @@ exports.createContract = async (req, res) => {
   }
 
   try {
-    const { providerId, serviceType, startDate, endDate, hours, rate, address, specialInstructions } = req.body;
+    const { caregiverId, serviceType, startDate, endDate, hours, rate, address, specialInstructions } = req.body;
     
-    // Validate provider exists
-    const provider = await User.findById(providerId);
-    if (!provider || provider.userType !== 'provider') {
+    // Validate caregiver exists
+    const caregiver = await User.findById(caregiverId);
+    if (!caregiver || caregiver.role !== 'caregiver') {
       return res.status(404).json({ 
         success: false,
-        error: 'Provider not found' 
+        error: 'Caregiver not found' 
       });
     }
     
@@ -27,7 +27,7 @@ exports.createContract = async (req, res) => {
     
     const contract = new Contract({
       clientId: req.user.id,
-      providerId,
+      caregiverId,
       serviceType,
       startDate,
       endDate,
@@ -41,9 +41,9 @@ exports.createContract = async (req, res) => {
     
     await contract.save();
     
-    // Populate provider details in response
+    // Populate caregiver details in response
     const populatedContract = await Contract.populate(contract, {
-      path: 'providerId',
+      path: 'caregiverId',
       select: 'name profileImage'
     });
     
@@ -63,11 +63,11 @@ exports.createContract = async (req, res) => {
 
 // Other contract methods with similar improvements
 
-// Get client contracts
-exports.getClientContracts = async (req, res) => {
+// Get parent contracts
+exports.getParentContracts = async (req, res) => {
   try {
-    const contracts = await Contract.find({ clientId: req.params.clientId })
-      .populate('providerId', 'name profileImage')
+    const contracts = await Contract.find({ clientId: req.params.parentId })
+      .populate('caregiverId', 'name profileImage')
       .sort({ createdAt: -1 });
       
     res.json(contracts);
@@ -77,10 +77,13 @@ exports.getClientContracts = async (req, res) => {
   }
 };
 
-// Get provider contracts
-exports.getProviderContracts = async (req, res) => {
+// Legacy method for backward compatibility
+exports.getClientContracts = exports.getParentContracts;
+
+// Get caregiver contracts
+exports.getCaregiverContracts = async (req, res) => {
   try {
-    const contracts = await Contract.find({ providerId: req.user.id })
+    const contracts = await Contract.find({ caregiverId: req.user.id })
       .populate('clientId', 'name profileImage')
       .sort({ createdAt: -1 });
       

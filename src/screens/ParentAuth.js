@@ -1,40 +1,46 @@
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { 
   View, 
   Text, 
   StyleSheet, 
-  Pressable, 
   Image, 
   TouchableOpacity, 
   Alert, 
   KeyboardAvoidingView, 
   Platform, 
   ScrollView,
-  ActivityIndicator,
   Keyboard
 } from "react-native";
 import { TextInput, Button, useTheme } from "react-native-paper";
 import { useAuth } from "../contexts/AuthContext";
+import { useApp, ACTION_TYPES } from "../context/AppContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { validator } from "../utils/validator";
+import { validateForm, validationRules } from "../utils/validation";
+import { useApi } from "../hooks/useApi";
+import { authAPI } from "../config/api";
+import { CommonActions } from '@react-navigation/native';
 
 const ParentAuth = ({ navigation, route }) => {
   const theme = useTheme();
-  const {
-    login,
-    signup,
-    signInWithGoogle,
-    signInWithFacebook,
-    resetPassword,
-    resendVerificationEmail,
-    loading: authLoading,
-    error: authError,
-    isEmailVerified,
-    user
-  } = useAuth();
+  const { dispatch } = useApp();
+  const { user: authUser, login, signup } = useAuth();
   
-  const [mode, setMode] = useState(route.params?.mode || 'login'); // 'login' or 'signup' or 'reset'
+  // When auth user is present (after login/signup), reset stack to ParentDashboard
+  useEffect(() => {
+    if (authUser) {
+      try {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'ParentDashboard' }],
+          })
+        );
+      } catch (_) {}
+    }
+  }, [authUser, navigation]);
+  
+  const [mode, setMode] = useState(route.params?.mode || 'login');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -43,11 +49,9 @@ const ParentAuth = ({ navigation, route }) => {
     confirmPassword: ''
   });
   const [formErrors, setFormErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { loading: isSubmitting, execute } = useApi();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
 
   // Handle form field changes
   const handleChange = (field, value) => {
@@ -65,36 +69,27 @@ const ParentAuth = ({ navigation, route }) => {
     }
   };
 
-  // Validate form
-  const validateForm = () => {
-    const errors = {};
+  // Validate form using validation system
+  const validateCurrentForm = () => {
+    let rules = {};
     
-    try {
-      validator.validateEmail(formData.email);
-    } catch (error) {
-      errors.email = error.message;
+    if (mode === 'login') {
+      rules = validationRules.userLogin;
+    } else if (mode === 'signup') {
+      rules = {
+        ...validationRules.userRegistration,
+        confirmPassword: (value) => {
+          if (value !== formData.password) {
+            return 'Passwords do not match';
+          }
+          return null;
+        }
+      };
+    } else if (mode === 'reset') {
+      rules = { email: validationRules.userRegistration.email };
     }
     
-    if (mode !== 'reset') {
-      try {
-        validator.validatePassword(formData.password);
-      } catch (error) {
-        errors.password = error.message;
-      }
-      
-      if (mode === 'signup') {
-        try {
-          validator.validateName(formData.name);
-        } catch (error) {
-          errors.name = error.message;
-        }
-        
-        if (formData.password !== formData.confirmPassword) {
-          errors.confirmPassword = 'Passwords do not match';
-        }
-      }
-    }
-    
+    const errors = validateForm(formData, rules);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -103,32 +98,46 @@ const ParentAuth = ({ navigation, route }) => {
   const handleSubmit = async () => {
     Keyboard.dismiss();
     
-    if (!validateForm()) {
+    if (!validateCurrentForm()) {
       return;
     }
     
     const { email, password, name, phone } = formData;
-    setIsSubmitting(true);
     
-    try {
+    const result = await execute(async () => {
       if (mode === 'login') {
         await login(email, password);
-        // Navigation handled in AuthContext state change
+        // Set role to parent
+        try { await authAPI.setRole('parent'); } catch (_) {}
+        try {
+          const profile = await authAPI.getProfile();
+          if (profile) {
+            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: profile });
+            const mergedUser = { ...profile, role: 'parent' };
+            dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser });
+          }
+        } catch (_) {}
       } else if (mode === 'signup') {
-        await signup(email, password, { name, phone });
-        setVerificationSent(true);
-        Alert.alert("Verify Your Email", "A verification email has been sent. Please check your inbox.");
+        await signup({ email, password, name, phone, role: 'parent' });
+        try { await authAPI.setRole('parent'); } catch (_) {}
+        try {
+          const profile = await authAPI.getProfile();
+          if (profile) {
+            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: profile });
+            const mergedUser = { ...profile, role: 'parent' };
+            dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser });
+          }
+        } catch (_) {}
       } else if (mode === 'reset') {
-        await resetPassword(email);
-        setResetSent(true);
-        Alert.alert("Password Reset", "If an account exists with this email, you'll receive a password reset link.");
+        await authAPI.resetPassword(email);
+        Alert.alert("Success", "Password reset link sent to your email");
+        setMode('login');
       }
-    } catch (error) {
-      console.error('Authentication error:', error);
-      Alert.alert("Error", error.message || "Authentication failed");
-    } finally {
-      setIsSubmitting(false);
-    }
+    }, {
+      onError: (error) => {
+        Alert.alert("Error", error.userMessage || "Authentication failed");
+      }
+    });
   };
 
   // Toggle between login/signup modes
@@ -141,453 +150,277 @@ const ParentAuth = ({ navigation, route }) => {
       phone: '',
       confirmPassword: ''
     });
+    setFormErrors({});
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: '#f8fafc',
-    },
-    authCard: {
-      backgroundColor: 'white',
-      borderRadius: 16,
-      padding: Platform.select({
-        web: 12,
-        default: 24
-      }),
-      width: Platform.select({
-        web: '50%',
-        default: '100%'
-      }),
-      maxWidth: Platform.select({
-        web: 400,
-        default: undefined
-      }),
-      alignSelf: Platform.select({
-        web: 'center',
-        default: 'auto'
-      }),
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-    },
-    backButton: {
-      position: 'absolute',
-      left: 16,
-      top: 40,
-      padding: 8,
-    },
-    logoContainer: {
-      marginTop: 100,
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    logoBackground: {
-  width: Platform.select({
-    web: 165,    // 50% larger (110 * 1.5)
-    default: 110 // Original mobile size
-  }),
-  height: Platform.select({
-    web: 165,    // 50% larger
-    default: 110
-  }),
-  borderRadius: Platform.select({
-    web: 60,     // Scaled proportionally (40 * 1.5)
-    default: 40
-  }),
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-logo: {
-  width: Platform.select({
-    web: 120,    // 50% larger (80 * 1.5)
-    default: 80  // Original mobile size
-  }),
-  height: Platform.select({
-    web: 120,
-    default: 80
-  }),
-},
-    appTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: '#9d174d',
-      marginTop: 8,
-    },
-    authContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      paddingHorizontal: 24,
-    },
-    authCard: {
-      backgroundColor: 'white',
-      borderRadius: 16,
-      padding: Platform.select({
-        web: 12,    // Smaller padding for web
-        default: 24  // Original padding for mobile
-      }),
-      width: Platform.select({
-        web: '50%',  // 50% width on web
-        default: '100%' // Full width on mobile
-      }),
-      maxWidth: Platform.select({
-        web: 400,    // Optional: Set a max-width for web
-        default: undefined
-      }),
-      alignSelf: Platform.select({
-        web: 'center', // Center the card on web
-        default: 'auto'
-      }),
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4
-    },
-    parentCard: {
-      borderTopWidth: 4,
-      borderTopColor: '#fbcfe8'
-    },
-    userTypeIndicator: {
-      alignItems: 'center',
-      marginBottom: 24
-    },
-    parentIconContainer: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 16
-    },
-    authTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#db2777',
-      textAlign: 'center'
-    },
-    formContainer: {
-      marginTop: 16
-    },
-    input: {
-      marginBottom: 16,
-      backgroundColor: 'white'
-    },
-    button: {
-      marginTop: 16,
-      borderRadius: 8,
-      paddingVertical: 8,
-      backgroundColor: '#db2777'
-    },
-    buttonText: {
-      color: 'white',
-      fontWeight: 'bold'
-    },
-    toggleText: {
-      marginTop: 16,
-      textAlign: 'center',
-      color: '#6b7280'
-    },
-    toggleLink: {
-      color: '#db2777',
-      fontWeight: 'bold'
-    },
-    errorText: {
-      color: '#ef4444',
-      fontSize: 12,
-      marginTop: -8,
-      marginBottom: 8
-    },
-    successText: {
-      color: '#10b981',
-      textAlign: 'center',
-      marginBottom: 16
-    },
-    // Added missing styles used in JSX and improved layout
-    title: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: '#111827',
-      textAlign: 'center',
-    },
-    subtitle: {
-      marginTop: 4,
-      fontSize: 14,
-      color: '#6b7280',
-      textAlign: 'center',
-    },
-    errorContainer: {
-      marginTop: 12,
-      padding: 10,
-      borderRadius: 8,
-      backgroundColor: '#fee2e2',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    successContainer: {
-      marginTop: 12,
-      padding: 10,
-      borderRadius: 8,
-      backgroundColor: '#d1fae5',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    dividerContainer: {
-      marginVertical: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: '#e5e7eb',
-      flex: 1,
-    },
-    dividerText: {
-      color: '#6b7280',
-      fontSize: 12,
-    },
-    socialButtonsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 12,
-    },
-    socialButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 14,
-      backgroundColor: '#fff',
-      borderRadius: 8,
-      borderWidth: Platform.select({ web: 1, default: 0 }),
-      borderColor: '#e5e7eb',
-      elevation: Platform.select({ default: 2, web: 0 }),
-    },
-    scrollContainer: {
-      paddingBottom: 24,
-    },
-    form: {
-      paddingHorizontal: 16,
-      paddingBottom: 24,
-    },
-  });
-
-  // Social login handler
-  const handleSocialLogin = async (provider) => {
-    try {
-      if (provider === 'google') {
-        await signInWithGoogle();
-      } else if (provider === 'facebook') {
-        await signInWithFacebook();
-      }
-      // Navigation is handled by AuthContext user state change in AppNavigator
-    } catch (error) {
-      console.error('Social login error:', error);
-      Alert.alert("Error", error.message || "An error occurred during social login");
-    }
-  };
+  const keyboardOffset = Platform.select({ ios: 80, android: 0 });
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={keyboardOffset}
       style={{ flex: 1 }}
     >
       <LinearGradient 
-        colors={['#fce8f4', '#e0f2fe']}
+        colors={["#fce8f4", "#f3e8ff"]}
         style={styles.container}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              {mode === 'login' 
-                ? 'Welcome Back' 
-                : mode === 'signup' 
-                  ? 'Create Account' 
-                  : 'Reset Password'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {mode === 'login' 
-                ? 'Sign in to continue' 
-                : mode === 'signup' 
-                  ? 'Create an account to get started'
-                  : 'Enter your email to reset your password'}
-            </Text>
-            
-            {authError && (
-              <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={20} color="#dc2626" />
-                <Text style={styles.errorText}>{authError}</Text>
-              </View>
-            )}
-            
-            {verificationSent && (
-              <View style={styles.successContainer}>
-                <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                <Text style={styles.successText}>
-                  Verification email sent! Please check your inbox.
-                </Text>
-              </View>
-            )}
-            
-            {resetSent && (
-              <View style={styles.successContainer}>
-                <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                <Text style={styles.successText}>
-                  If an account exists with this email, you'll receive a password reset link.
-                </Text>
-              </View>
-            )}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => navigation.goBack()} 
+            style={styles.backButton}
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={24} color="#db2777" />
+          </TouchableOpacity>
+
+          <View style={styles.logoContainer}>
+            <LinearGradient 
+              colors={["#fbcfe8", "#f9a8d4"]}
+              style={styles.logoBackground}
+            >
+              <Image 
+                source={require('../../assets/icon.png')} 
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel="iYaya logo"
+              />
+            </LinearGradient>
+            <Text style={styles.appTitle}>iYaya</Text>
           </View>
-          <View style={styles.form}>
-            {mode === 'signup' && (
-              <>
-                <TextInput
-                  label="Full Name"
-                  value={formData.name}
-                  onChangeText={(text) => handleChange('name', text)}
-                  style={styles.input}
-                  mode="outlined"
-                  error={!!formErrors.name}
-                  left={<TextInput.Icon icon="account" />}
-                />
-                {formErrors.name && <Text style={styles.errorText}>{formErrors.name}</Text>}
-                
-                <TextInput
-                  label="Phone Number"
-                  value={formData.phone}
-                  onChangeText={(text) => handleChange('phone', text.replace(/[^0-9]/g, ''))}
-                  style={[styles.input, { marginTop: 8 }]}
-                  mode="outlined"
-                  keyboardType="phone-pad"
-                  error={!!formErrors.phone}
-                  left={<TextInput.Icon icon="phone" />}
-                />
-                {formErrors.phone && <Text style={styles.errorText}>{formErrors.phone}</Text>}
-              </>
-            )}
-            
-            <TextInput
-              label="Email"
-              value={formData.email}
-              onChangeText={(text) => handleChange('email', text)}
-              style={[styles.input, { marginTop: mode === 'signup' ? 8 : 0 }]}
-              mode="outlined"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              error={!!formErrors.email}
-              left={<TextInput.Icon icon="email" />}
-            />
-            {formErrors.email && <Text style={styles.errorText}>{formErrors.email}</Text>}
-            
-            {mode !== 'reset' && (
-              <>
-                <TextInput
-                  label="Password"
-                  value={formData.password}
-                  onChangeText={(text) => handleChange('password', text)}
-                  style={[styles.input, { marginTop: 8 }]}
-                  mode="outlined"
-                  secureTextEntry={!showPassword}
-                  error={!!formErrors.password}
-                  left={<TextInput.Icon icon="lock" />}
-                  right={
-                    <TextInput.Icon
-                      icon={showPassword ? 'eye-off' : 'eye'}
-                      onPress={() => setShowPassword(!showPassword)}
-                    />
-                  }
-                />
-                {formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
-                
-                {mode === 'signup' && (
-                  <>
+        </View>
+
+        <View style={styles.authContainer}>
+          <View style={[styles.authCard, styles.parentCard]}>
+            <View style={styles.userTypeIndicator}>
+              <LinearGradient 
+                colors={["#fce7f3", "#fbcfe8"]}
+                style={styles.parentIconContainer}
+              >
+                <Ionicons name="happy-outline" size={32} color="#db2777" />
+              </LinearGradient>
+              <Text style={styles.authTitle}>
+                {mode === 'signup' ? 'Create Parent Account' : mode === 'reset' ? 'Reset Password' : 'Welcome Back Parent'}
+              </Text>
+            </View>
+
+            <View style={styles.formContainer}>
+              {/* Name & Phone for signup */}
+              {mode === 'signup' && (
+                <>
+                  <TextInput
+                    label="Full Name"
+                    value={formData.name}
+                    onChangeText={(text) => handleChange('name', text)}
+                    mode="outlined"
+                    style={styles.input}
+                    left={<TextInput.Icon icon="account" color="#db2777" />}
+                    theme={{ colors: { primary: '#db2777', background: 'white' } }}
+                    accessibilityLabel="Full name input"
+                    error={!!formErrors.name}
+                  />
+                  {formErrors.name ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.name}</Text> : null}
+                  
+                  <TextInput
+                    label="Phone Number"
+                    value={formData.phone}
+                    onChangeText={(text) => handleChange('phone', text)}
+                    mode="outlined"
+                    style={styles.input}
+                    keyboardType="phone-pad"
+                    left={<TextInput.Icon icon="phone" color="#db2777" />}
+                    theme={{ colors: { primary: '#db2777', background: 'white' } }}
+                    accessibilityLabel="Phone number input"
+                    error={!!formErrors.phone}
+                  />
+                  {formErrors.phone ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.phone}</Text> : null}
+                </>
+              )}
+
+              {/* Email */}
+              <TextInput
+                label="Email"
+                value={formData.email}
+                onChangeText={(text) => handleChange('email', text)}
+                mode="outlined"
+                style={styles.input}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                left={<TextInput.Icon icon="email" color="#db2777" />}
+                theme={{ colors: { primary: '#db2777', background: 'white' } }}
+                accessibilityLabel="Email input"
+                error={!!formErrors.email}
+              />
+              {formErrors.email ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.email}</Text> : null}
+
+              {/* Passwords (skip for reset mode) */}
+              {mode !== 'reset' && (
+                <>
+                  <TextInput
+                    label="Password"
+                    value={formData.password}
+                    onChangeText={(text) => handleChange('password', text)}
+                    mode="outlined"
+                    style={styles.input}
+                    secureTextEntry={!showPassword}
+                    right={
+                      <TextInput.Icon 
+                        icon={showPassword ? "eye-off" : "eye"} 
+                        onPress={() => setShowPassword(!showPassword)}
+                        color="#db2777"
+                      />
+                    }
+                    theme={{ colors: { primary: '#db2777', background: 'white' } }}
+                    accessibilityLabel="Password input"
+                    error={!!formErrors.password}
+                  />
+                  {formErrors.password ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.password}</Text> : null}
+
+                  {mode === 'signup' && (
                     <TextInput
                       label="Confirm Password"
                       value={formData.confirmPassword}
                       onChangeText={(text) => handleChange('confirmPassword', text)}
-                      style={[styles.input, { marginTop: 8 }]}
                       mode="outlined"
+                      style={styles.input}
                       secureTextEntry={!showConfirmPassword}
-                      error={!!formErrors.confirmPassword}
-                      left={<TextInput.Icon icon="lock" />}
                       right={
-                        <TextInput.Icon
-                          icon={showConfirmPassword ? 'eye-off' : 'eye'}
+                        <TextInput.Icon 
+                          icon={showConfirmPassword ? "eye-off" : "eye"} 
                           onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                          color="#db2777"
                         />
                       }
+                      theme={{ colors: { primary: '#db2777', background: 'white' } }}
+                      accessibilityLabel="Confirm password input"
+                      error={!!formErrors.confirmPassword}
                     />
-                    {formErrors.confirmPassword && (
-                      <Text style={styles.errorText}>{formErrors.confirmPassword}</Text>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-            
-            <Button 
-              mode="contained" 
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-              style={styles.button}
-              labelStyle={styles.buttonText}
-            >
-              {mode === 'signup' ? 'Sign Up' : mode === 'reset' ? 'Reset Password' : 'Log In'}
-            </Button>
-            
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.divider} />
-            </View>
-            
-            <View style={styles.socialButtonsContainer}>
-              <TouchableOpacity 
-                style={styles.socialButton}
-                onPress={() => handleSocialLogin('google')}
+                  )}
+                  {formErrors.confirmPassword ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.confirmPassword}</Text> : null}
+                </>
+              )}
+
+              {/* Primary action button */}
+              <Button 
+                mode="contained" 
+                onPress={handleSubmit}
+                loading={isSubmitting}
+                disabled={isSubmitting}
+                style={[styles.authButton, styles.parentAuthButton]}
+                labelStyle={styles.authButtonLabel}
+                accessibilityLabel={
+                  mode === 'signup' ? 'Create account button' : mode === 'reset' ? 'Send reset link button' : 'Sign in button'
+                }
               >
-                <Ionicons name="logo-google" size={20} color="#db2777" />
-                <Text style={{ marginLeft: 8 }}>Google</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.socialButton}
-                onPress={() => handleSocialLogin('facebook')}
-              >
-                <Ionicons name="logo-facebook" size={20} color="#db2777" />
-                <Text style={{ marginLeft: 8 }}>Facebook</Text>
-              </TouchableOpacity>
+                {mode === 'signup' ? 'Create Account' : mode === 'reset' ? 'Send Reset Link' : 'Sign In'}
+              </Button>
+
+              {/* Footer links */}
+              {mode !== 'reset' ? (
+                <>
+                  <TouchableOpacity onPress={() => setMode('reset')} accessibilityLabel="Switch to reset password">
+                    <Text style={styles.smallLink}>Forgot password?</Text>
+                  </TouchableOpacity>
+                  <View style={styles.authFooter}>
+                    <Text style={styles.authFooterText}>
+                      {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={toggleMode}
+                      accessibilityLabel={mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
+                    >
+                      <Text style={[styles.authFooterLink, { color: '#16a34a' }]}>
+                        {mode === 'signup' ? 'Sign In' : 'Sign Up'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <TouchableOpacity onPress={() => setMode('login')} accessibilityLabel="Back to sign in">
+                  <Text style={styles.smallLink}>Back to Sign In</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            
-            <Pressable onPress={toggleMode} style={styles.toggleText}>
-              <Text>
-                {mode === 'login' 
-                  ? "Don't have an account? " 
-                  : "Already have an account? "}
-                <Text style={styles.toggleLink}>
-                  {mode === 'login' ? 'Sign up' : 'Log in'}
-                </Text>
-              </Text>
-            </Pressable>
           </View>
+        </View>
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 16,
+    top: 40,
+    padding: 8,
+  },
+  logoContainer: {
+    marginTop: 50,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoBackground: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: { width: 50, height: 50 },
+  appTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#db2777',
+    marginTop: 8,
+  },
+  authContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  authCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  parentCard: { borderTopWidth: 4, borderTopColor: '#fbcfe8' },
+  userTypeIndicator: { alignItems: 'center', marginBottom: 24 },
+  parentIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  authTitle: { fontSize: 18, fontWeight: '600', color: '#db2777', textAlign: 'center' },
+  formContainer: { marginTop: 16 },
+  input: { marginBottom: 16, backgroundColor: 'white' },
+  authButton: { marginTop: 16, borderRadius: 8, paddingVertical: 8 },
+  parentAuthButton: { backgroundColor: '#db2777' },
+  authButtonLabel: { color: 'white', fontWeight: 'bold' },
+  authFooter: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
+  authFooterText: { color: '#6b7280' },
+  authFooterLink: { fontWeight: 'bold', marginLeft: 4 },
+  smallLink: { color: '#db2777', textAlign: 'center', marginTop: 8 },
+});
 
 export default ParentAuth;

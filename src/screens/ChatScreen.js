@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -10,90 +10,75 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { GiftedChat, Bubble, InputToolbar, Send, Time } from 'react-native-gifted-chat';
-import { useApp } from '../context/AppContext';
+import { GiftedChat, Bubble, InputToolbar, Send } from 'react-native-gifted-chat';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { collection, doc, onSnapshot, query, orderBy, updateDoc, serverTimestamp, getDoc, addDoc } from 'firebase/firestore';
-import { db, auth } from '../config/firebase';
 import { ArrowLeft, Send as SendIcon, Check, CheckCheck, MoreVertical, Image as ImageIcon } from 'lucide-react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { useMessaging } from '../contexts/MessagingContext';
 
 export default function ChatScreen() {
-  const { user } = useApp().state || {};
+  const { user } = useAuth();
   const route = useRoute();
   const navigation = useNavigation();
-  const { conversationId, recipientId, recipientName } = route.params;
+  const { conversationId, recipientId, recipientName } = route.params || {};
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [recipientData, setRecipientData] = useState({});
   const typingTimeoutRef = useRef(null);
+  const { messages: ctxMessages, getOrCreateConversation, setActiveConversation, activeConversation, sendMessage, markMessagesAsRead } = useMessaging();
 
-  // Fetch recipient data
+  // Initialize conversation via MessagingContext
   useEffect(() => {
-    const fetchRecipientData = async () => {
+    const init = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', recipientId));
-        if (userDoc.exists()) {
-          setRecipientData(userDoc.data());
+        if (conversationId) {
+          // Set active if exists; otherwise we still proceed as temp
+          setActiveConversation({ id: conversationId, participants: [user?.uid, recipientId].filter(Boolean) });
+        } else if (recipientId) {
+          await getOrCreateConversation(recipientId);
         }
-      } catch (error) {
-        console.error('Error fetching recipient data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
+    init();
+  }, [conversationId, recipientId, user?.uid, getOrCreateConversation, setActiveConversation]);
 
-    fetchRecipientData();
-  }, [recipientId]);
-
-  // Load chat history and subscribe to real-time updates
-  useEffect(() => {
-    if (!conversationId) return;
-
-    const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-    const q = query(messagesRef, orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messagesData = snapshot.docs.map(doc => ({
-        _id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
+  // Map context messages to GiftedChat format
+  const giftedMessages = useMemo(() => {
+    return (ctxMessages || [])
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
+      .map((m) => ({
+        _id: m.id || m._id,
+        text: m.content || m.text || '',
+        createdAt: m.createdAt ? new Date(m.createdAt) : (m.created_at ? new Date(m.created_at) : new Date()),
+        user: {
+          _id: m.senderId || m.sender_id,
+          name: m.senderName || m.sender_name || '',
+          avatar: m.senderAvatar || m.sender_avatar || undefined,
+        },
+        read: !!m.read,
+        sent: true,
+        received: !!m.delivered || !!m.received,
       }));
-      
-      setMessages(messagesData);
-      setIsLoading(false);
-      
-      // Mark messages as read
-      markMessagesAsRead(messagesData);
-    });
+  }, [ctxMessages]);
 
-    return () => unsubscribe();
-  }, [conversationId]);
+  useEffect(() => {
+    setMessages(giftedMessages);
+  }, [giftedMessages]);
 
-  // Mark messages as read
-  const markMessagesAsRead = async (msgs) => {
-    const unreadMessages = msgs.filter(
-      msg => msg.user._id !== user.uid && !msg.read
-    );
-
-    if (unreadMessages.length > 0) {
-      const batch = [];
-      unreadMessages.forEach(msg => {
-        const messageRef = doc(db, 'conversations', conversationId, 'messages', msg._id);
-        batch.push(updateDoc(messageRef, { read: true }));
-      });
-      
-      try {
-        await Promise.all(batch);
-        // Update conversation's unread count
-        const conversationRef = doc(db, 'conversations', conversationId);
-        await updateDoc(conversationRef, {
-          [`unreadCount.${user.uid}`]: 0,
-          lastUpdated: serverTimestamp()
-        });
-      } catch (error) {
-        console.error('Error marking messages as read:', error);
-      }
+  // Mark messages as read (via context, optimistic)
+  const handleMarkRead = useCallback((msgs) => {
+    if (!user?.uid) return;
+    const unreadIds = (msgs || [])
+      .filter((m) => m.user?._id !== user.uid && !m.read)
+      .map((m) => m._id);
+    if (unreadIds.length) {
+      try { markMessagesAsRead(unreadIds); } catch {}
     }
-  };
+  }, [user?.uid, markMessagesAsRead]);
 
   // Handle sending a new message
   const onSend = useCallback(async (newMessages = []) => {
@@ -102,50 +87,14 @@ export default function ChatScreen() {
       Alert.alert('Sign in required', 'Please sign in to send messages.');
       return;
     }
-
-    const message = newMessages[0];
-    const messageData = {
-      _id: message._id,
-      text: message.text,
-      createdAt: serverTimestamp(),
-      user: {
-        _id: user.uid,
-        name: user.displayName || '',
-        avatar: user.photoURL
-      },
-      read: false
-    };
-
+    const m = newMessages[0];
     try {
-      // Add message to Firestore
-      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-      await addDoc(messagesRef, messageData);
-      
-      // Update conversation's last message
-      const conversationRef = doc(db, 'conversations', conversationId);
-      await updateDoc(conversationRef, {
-        lastMessage: {
-          text: message.text,
-          sentAt: serverTimestamp()
-        },
-        lastUpdated: serverTimestamp(),
-        [`unreadCount.${recipientId}`]: (await getDoc(conversationRef)).data()?.unreadCount?.[recipientId] + 1 || 1
-      });
-      
-      // Update local state
-      setMessages(previousMessages => 
-        GiftedChat.append(previousMessages, [{
-          ...messageData,
-          createdAt: new Date(),
-          sent: true
-        }])
-      );
+      await sendMessage(m.text || '');
     } catch (error) {
       console.error('Error sending message:', error);
-      // Show error to user
       Alert.alert('Error', 'Failed to send message. Please try again.');
     }
-  }, [conversationId, recipientId, user]);
+  }, [user, sendMessage]);
 
   // Handle typing indicator
   const onInputTextChanged = useCallback((text) => {
@@ -157,7 +106,7 @@ export default function ChatScreen() {
     // Set a timeout to indicate user stopped typing
     typingTimeoutRef.current = setTimeout(() => {
       // Update typing status in Firestore
-      // This would require a separate collection for typing indicators
+      // TODO: Implement typing indicator via backend if needed
     }, 1000);
   }, []);
 

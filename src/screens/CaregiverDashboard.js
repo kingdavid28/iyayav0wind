@@ -1,44 +1,143 @@
 "use client"
 
-import React, { useState } from "react"
-import { View, Text, ScrollView, Pressable, Dimensions, Image, Modal, TextInput } from "react-native"
-import { Card, Searchbar, Chip, Button } from "react-native-paper"
-import { Ionicons, MaterialCommunityIcons, FontAwesome } from "@expo/vector-icons"
+import { Ionicons } from '@expo/vector-icons'
+import { useFocusEffect, useNavigation } from "@react-navigation/native"
+import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from "expo-linear-gradient"
-import { styles } from "./styles/CaregiverDashboard.styles"
+import React, { useCallback, useEffect, useState } from "react"
+import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native"
+import { Button, Card, Chip, Searchbar } from "react-native-paper"
+import Toast from "../components/Toast"
+import { applicationsAPI, authAPI, bookingsAPI, caregiversAPI, jobsAPI, uploadsAPI } from "../config/api"
+import { API_CONFIG } from '../config/constants'
 import { useAuth } from "../contexts/AuthContext"
+import { styles } from "./styles/CaregiverDashboard.styles"
+
+// Local quick tiles
+function QuickStat({ icon, value, label, color = '#2563EB', bgColor = '#EFF6FF' }) {
+  return (
+    <View style={[styles.quickTile, { backgroundColor: '#fff' }]}>
+      <View style={[styles.quickIconWrap, { backgroundColor: bgColor }]}>
+        <Ionicons name={icon} size={18} color={color} />
+      </View>
+      <Text style={styles.quickValue}>{value ?? '-'}</Text>
+      <Text style={styles.quickLabel}>{label}</Text>
+    </View>
+  )
+}
+
+function QuickAction({ icon, label, color = '#2563EB', bgColor = '#EFF6FF', onPress, gradientColors }) {
+  const colors = gradientColors || ['#60a5fa', '#6366f1']
+  return (
+    <Pressable onPress={onPress} style={styles.quickActionTile} accessibilityRole="button" accessibilityLabel={label}>
+      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickActionGradient}>
+        <View style={styles.quickActionIconWrap}>
+          <Ionicons name={icon} size={20} color="#ffffff" />
+        </View>
+        <Text style={[styles.quickActionLabel, { color: '#ffffff' }]}>{label}</Text>
+      </LinearGradient>
+    </Pressable>
+  )
+}
 
 const { width } = Dimensions.get("window")
 
 export default function CaregiverDashboard({ onLogout }) {
-  const { signOut } = useAuth()
+  const navigation = useNavigation()
+  const { user, signOut } = useAuth()
+  const isTablet = width >= 768
+  const isAndroid = Platform.OS === 'android'
+  // Grid layout sizing for Jobs tab (keeps cards same width with gap & padding)
+  const sectionHorizontalPadding = 16
+  const gridGap = 16
+  // On Android, prefer a single-column layout for larger cards
+  const columns = isTablet ? 3 : (isAndroid ? 1 : 2)
+  const containerWidth = width - sectionHorizontalPadding * 2
+  const gridCardWidth = Math.floor((containerWidth - gridGap * (columns - 1)) / columns)
+  // On Android single-column, let cards auto-size by content for better look
+  const gridCardHeight = isAndroid ? undefined : 280
   const [activeTab, setActiveTab] = useState("dashboard")
   const [searchQuery, setSearchQuery] = useState("")
   const [editProfileModalVisible, setEditProfileModalVisible] = useState(false)
-  const [profileName, setProfileName] = useState("Sarah Johnson")
+  const [profileName, setProfileName] = useState("Ana Dela Cruz")
   const [profileHourlyRate, setProfileHourlyRate] = useState("25")
   const [profileExperience, setProfileExperience] = useState("5+ years")
+  const [selectedBooking, setSelectedBooking] = useState(null)
+  const [showBookingDetails, setShowBookingDetails] = useState(false)
+  const [selectedJob, setSelectedJob] = useState(null)
+  const [showJobApplication, setShowJobApplication] = useState(false)
+  const [applications, setApplications] = useState([])
+  const [showJobDetails, setShowJobDetails] = useState(false)
+  const [selectedApplication, setSelectedApplication] = useState(null)
+  const [showApplicationDetails, setShowApplicationDetails] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  // Toast state
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
+  const showToast = (message, type = 'success') => setToast({ visible: true, message, type })
 
-  const profile = {
-    name: "Sarah Johnson",
+  // Default profile as fallback - rich mock data for better UX
+  const defaultProfile = {
+    name: "Ana Dela Cruz",
     rating: 4.9,
     reviews: 127,
     hourlyRate: 25,
     experience: "5+ years",
     specialties: ["Toddlers", "Meal Prep", "Light Housekeeping"],
+    skills: ["Toddlers", "Meal Prep", "Light Housekeeping"],
     certifications: ["CPR Certified", "First Aid", "Child Development"],
     backgroundCheck: "Verified",
     completedJobs: 234,
-    responseRate: "98%"
+    responseRate: "98%",
+    ageCareRanges: ["0-2 years", "3-5 years"],
+    languages: ["English", "Filipino"],
+    emergencyContacts: [
+      { name: "Maria Santos", relationship: "Sister", phone: "+63 917 123 4567" }
+    ],
+    verification: {
+      profileComplete: true,
+      identityVerified: true,
+      certificationsVerified: true,
+      referencesVerified: true,
+      trustScore: 95,
+      badges: ["Top Rated", "Background Verified", "CPR Certified"]
+    },
+    availability: {
+      flexible: true,
+      days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      weeklySchedule: {
+        Monday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
+        Tuesday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
+        Wednesday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
+        Thursday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
+        Friday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
+        Saturday: { available: false, timeSlots: [] },
+        Sunday: { available: false, timeSlots: [] }
+      }
+    },
+    bio: "Experienced and caring childcare provider with over 5 years of experience. I specialize in toddler care and creating engaging activities for children. CPR and First Aid certified.",
+    location: "Cebu City, Philippines"
   }
 
+  // Open edit modal with current profile values
+  const openEditProfileModal = () => {
+    try {
+      setProfileName(profile?.name || '')
+      setProfileHourlyRate(String(profile?.hourlyRate ?? ''))
+      setProfileExperience(profile?.experience || '')
+    } catch (_) {}
+    setEditProfileModalVisible(true)
+  }
+
+  const [profile, setProfile] = useState(defaultProfile)
+
+  // Mock jobs fallback
   const mockJobs = [
     {
       id: 1,
       title: "Full-time Nanny for 2 Children",
-      family: "The Johnson Family",
-      location: "Manhattan, NY",
-      distance: "2.1 miles away",
+      family: "The Dela Cruz Family",
+      location: "Cebu City",
+      distance: "3.4 km away",
       hourlyRate: 28,
       schedule: "Monday-Friday, 8AM-6PM",
       requirements: ["CPR certified", "Experience with toddlers", "Non-smoker"],
@@ -50,9 +149,9 @@ export default function CaregiverDashboard({ onLogout }) {
     {
       id: 2,
       title: "Weekend Babysitter Needed",
-      family: "The Smith Family",
-      location: "Brooklyn, NY",
-      distance: "3.5 miles away",
+      family: "The Santos Family",
+      location: "Cebu City",
+      distance: "5.6 km away",
       hourlyRate: 22,
       schedule: "Weekends, flexible hours",
       requirements: ["Infant experience", "References required"],
@@ -63,11 +162,406 @@ export default function CaregiverDashboard({ onLogout }) {
     }
   ]
 
+  // Initialize with some sample applications (similar to web design)
+  const initialApplications = [
+    {
+      id: 1,
+      jobId: 2,
+      jobTitle: "Weekend Babysitter Needed",
+      family: "The Santos Family",
+      status: "accepted",
+      appliedDate: "2023-05-10",
+      hourlyRate: 25
+    },
+    {
+      id: 2,
+      jobId: 1,
+      jobTitle: "Full-time Nanny for 2 Children",
+      family: "The Dela Cruz Family",
+      status: "pending",
+      appliedDate: "2023-05-15",
+      hourlyRate: 28
+    }
+  ]
+
+  // State for jobs and bookings with mock defaults
+  const [jobs, setJobs] = useState(mockJobs)
+  const [bookings, setBookings] = useState([
+    {
+      id: 1,
+      family: "The Dela Cruz Family",
+      date: "2023-06-01",
+      time: "09:00 - 17:00",
+      status: "confirmed",
+      children: 2,
+      location: "IT Park, Cebu City"
+    },
+    {
+      id: 2,
+      family: "The Santos Family",
+      date: "2023-06-05",
+      time: "18:00 - 22:00",
+      status: "pending",
+      children: 1,
+      location: "Lahug, Cebu City"
+    }
+  ])
+
+  // Load profile data function
+  const loadProfile = async () => {
+    try {
+      console.log('🔍 Loading caregiver profile in dashboard...');
+      const isCaregiver = (user?.role === 'caregiver');
+      
+      // Only call caregiver endpoint if role is caregiver; otherwise use auth profile
+      const response = isCaregiver
+        ? await caregiversAPI.getMyProfile()
+        : await authAPI.getProfile();
+      
+      console.log('📋 Dashboard profile response:', response);
+      
+      // Handle different response structures
+      const p = response?.caregiver || response?.data?.caregiver || response?.provider || response || {};
+      console.log('📊 Profile data extracted:', p);
+      
+      // Force refresh by adding a timestamp to the image URL to prevent caching
+      const imageUrlWithTimestamp = (url) => {
+        if (!url) return null;
+        return url.includes('?') 
+          ? `${url}&t=${Date.now()}` 
+          : `${url}?t=${Date.now()}`;
+      };
+      
+      if (p && (p.name || p.hourlyRate || p.experience)) {
+        setProfile((prev) => ({
+          ...prev,
+          name: p.name || p.userId?.name || prev.name,
+          hourlyRate: p.hourlyRate || p.rate || prev.hourlyRate,
+          experience: typeof p.experience?.years === 'number' ? `${p.experience.years}+ years` : 
+                     (typeof p.experience === 'number' ? `${p.experience}+ years` : 
+                     (p.experience || prev.experience)),
+          skills: p.skills || prev.skills || prev.specialties,
+          bio: p.bio || prev.bio,
+          rating: p.rating || prev.rating,
+          reviews: p.reviewCount || p.reviews || prev.reviews,
+          imageUrl: (() => {
+            const img = p.profileImage || p.imageUrl || p.avatarUrl || p.image || p.photoUrl || p.userId?.profileImage || prev.imageUrl;
+            console.log('🖼️ Raw image URL from API:', img);
+            
+            // Handle null/undefined image
+            if (!img) return null;
+            
+            // Convert relative URLs to absolute URLs
+            let fullUrl = img;
+            if (img.startsWith('/')) {
+              fullUrl = `${API_CONFIG.BASE_URL.replace('/api', '')}${img}`;
+              console.log('🔗 Converted to absolute URL:', fullUrl);
+            }
+            
+            // Add timestamp to prevent caching
+            const finalUrl = fullUrl.includes('?') 
+              ? `${fullUrl}&t=${Date.now()}` 
+              : `${fullUrl}?t=${Date.now()}`;
+              
+            console.log('🔗 Final image URL:', finalUrl);
+            return finalUrl;
+          })(),
+        }))
+        console.log('✅ Profile updated in dashboard');
+      }
+    } catch (e) {
+      console.error('❌ Error loading profile in dashboard:', e);
+      // keep default profile
+    }
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      
+      const refreshData = async () => {
+        try {
+          // Load profile data
+          await loadProfile();
+          
+          // Load other data
+          await Promise.all([
+            // Fetch jobs with graceful fallback
+            (async () => {
+              try {
+                const res = await jobsAPI.getAvailableJobs();
+                const apiJobs = Array.isArray(res?.jobs) ? res.jobs : [];
+                if (apiJobs.length && isActive) {
+                  setJobs(apiJobs.map(j => ({
+                    id: j._id || j.id,
+                    title: j.title || '',
+                    family: j.employerName || 'Family',
+                    location: j.location || '',
+                    distance: j.distance ? `${j.distance} km away` : '',
+                    hourlyRate: j.hourlyRate || 0,
+                    schedule: j.schedule || '',
+                    requirements: j.requirements || [],
+                    postedDate: j.postedDate || new Date().toISOString(),
+                    urgent: j.urgent || false,
+                    children: Array.isArray(j.children) ? j.children.length : (j.children || 0),
+                    ages: j.ages || "",
+                  })));
+                }
+              } catch (e) {
+                console.error('Error fetching jobs:', e);
+                // keep existing jobs on error
+              }
+            })(),
+            
+            // Fetch applications if caregiver
+            (async () => {
+              const isCaregiver = (user?.role === 'caregiver');
+              if (!isCaregiver) return;
+              
+              try {
+                const res = await applicationsAPI.getMyApplications();
+                const list = Array.isArray(res?.applications) ? res.applications : Array.isArray(res) ? res : [];
+                if (list.length && isActive) {
+                  setApplications(list.map(a => ({
+                    id: a._id || a.id || Date.now(),
+                    jobId: a.jobId || a.job?._id || a.job?.id,
+                    jobTitle: a.jobTitle || a.job?.title || "",
+                    family: a.family || a.job?.employerName || "",
+                    status: a.status || "pending",
+                    appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
+                    hourlyRate: a.hourlyRate || a.expectedRate || undefined,
+                  })));
+                }
+              } catch (e) {
+                console.error('Error fetching applications:', e);
+                // keep existing applications on error
+              }
+            })(),
+            
+            // Fetch bookings if caregiver
+            (async () => {
+              const isCaregiver = (user?.role === 'caregiver');
+              if (!isCaregiver) return;
+              
+              try {
+                const res = await bookingsAPI.getMy();
+                const list = Array.isArray(res?.bookings) ? res.bookings : Array.isArray(res) ? res : [];
+                if (list.length && isActive) {
+                  setBookings(list.map((b, idx) => ({
+                    id: b._id || b.id || idx + 1,
+                    family: b.family || b.customerName || "Family",
+                    date: b.date || b.startDate || new Date().toISOString(),
+                    time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ""),
+                    status: b.status || "pending",
+                    children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
+                    location: b.address || b.location || "",
+                  })));
+                }
+              } catch (e) {
+                console.error('Error fetching bookings:', e);
+                // keep existing bookings on error
+              }
+            })()
+          ]);
+        } catch (error) {
+          console.error('Error refreshing dashboard data:', error);
+        }
+      };
+      
+      // Initial load
+      refreshData();
+      
+      // Set up interval to refresh every 30 seconds while screen is focused
+      const intervalId = setInterval(refreshData, 30000);
+      
+      // Cleanup function
+      return () => {
+        isActive = false;
+        clearInterval(intervalId);
+      };
+    }, [user?.id]) // Only recreate if user ID changes
+  );
+
+  // Initial data load with mock data
+  useEffect(() => {
+    setApplications(initialApplications);
+    
+    // Initial data fetch
+    const fetchInitialData = async () => {
+      try {
+        // Load profile data
+        await loadProfile();
+        
+        // Load jobs
+        const jobsRes = await jobsAPI.getAvailableJobs();
+        const apiJobs = Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [];
+        if (apiJobs.length) {
+          setJobs(apiJobs.map(j => ({
+            id: j._id || j.id,
+            title: j.title || j.name || "Care Job",
+            family: j.employerName || j.family || "Family",
+            location: j.location || "",
+            distance: j.distance ? `${j.distance} km away` : "",
+            hourlyRate: j.rate || j.salary || 0,
+            schedule: j.workingHours || j.schedule || "",
+            requirements: Array.isArray(j.requirements) ? j.requirements : [],
+            postedDate: j.postedDate || j.postedTime || new Date().toISOString(),
+            urgent: j.urgent || false,
+            children: Array.isArray(j.children) ? j.children.length : (j.children || 0),
+            ages: j.ages || "",
+          })));
+        }
+      } catch (error) {
+        console.error('Error in initial data fetch:', error);
+      }
+    };
+    
+    fetchInitialData();
+  }, []);
+
+  // Fetch applications and bookings when component mounts or user role changes
+  useEffect(() => {
+    // Fetch applications (caregiver-only); skip if not caregiver
+    const fetchApplications = async () => {
+      const isCaregiver = (user?.role === 'caregiver');
+      if (!isCaregiver) return;
+      
+      try {
+        const res = await applicationsAPI.getMyApplications();
+        const list = Array.isArray(res?.applications) ? res.applications : Array.isArray(res) ? res : [];
+        if (list.length) {
+          const normalized = list.map((a) => ({
+            id: a._id || a.id || Date.now(),
+            jobId: a.jobId || a.job?._id || a.job?.id,
+            jobTitle: a.jobTitle || a.job?.title || "",
+            family: a.family || a.job?.employerName || "",
+            status: a.status || "pending",
+            appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
+            hourlyRate: a.hourlyRate || a.expectedRate || undefined,
+          }));
+          setApplications(normalized);
+        }
+      } catch (e) {
+        console.error('Error fetching applications:', e);
+        // keep initial mock applications
+      }
+    };
+
+    // Fetch bookings (caregiver-only); skip if not caregiver
+    const fetchBookings = async () => {
+      const isCaregiver = (user?.role === 'caregiver');
+      if (!isCaregiver) return;
+      
+      try {
+        const res = await bookingsAPI.getMy();
+        const list = Array.isArray(res?.bookings) ? res.bookings : Array.isArray(res) ? res : [];
+        if (list.length) {
+          const normalized = list.map((b, idx) => ({
+            id: b._id || b.id || idx + 1,
+            family: b.family || b.customerName || "Family",
+            date: b.date || b.startDate || new Date().toISOString(),
+            time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ""),
+            status: b.status || "pending",
+            children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
+            location: (() => {
+              try {
+                // If location is a string, return it directly
+                if (typeof b.location === 'string') return b.location;
+                if (typeof b.address === 'string') return b.address;
+                
+                // Handle location/address as object
+                const locationObj = b.location || b.address || {};
+                
+                // Try to build a readable address from common location object properties
+                if (locationObj.formattedAddress) return locationObj.formattedAddress;
+                if (locationObj.street && locationObj.city) {
+                  return `${locationObj.street}, ${locationObj.city}`;
+                }
+                if (locationObj.street) return locationObj.street;
+                if (locationObj.city) return locationObj.city;
+                
+                // If we have coordinates, return them as a fallback
+                if (locationObj.coordinates) {
+                  const [lat, lng] = locationObj.coordinates;
+                  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                }
+                
+                // Last resort: log the object for debugging
+                console.log('Location object:', JSON.stringify(locationObj, null, 2));
+                return 'Location not specified';
+              } catch (e) {
+                console.error('Error processing location:', e);
+                return 'Location not available';
+              }
+            })(),
+          }));
+          setBookings(normalized);
+        }
+      } catch (e) {
+        console.error('Error fetching bookings:', e);
+        // keep mock bookings
+      }
+    };
+
+    // Execute both fetches
+    fetchApplications();
+    fetchBookings();
+  }, [user?.role]);
+
+  // Open application modal for a selected job
+  const handleJobApplication = (job) => {
+    setSelectedJob(job)
+    setShowJobApplication(true)
+  }
+
+  // Open details modal for a selected job
+  const handleViewJob = (job) => {
+    setSelectedJob(job)
+    setShowJobDetails(true)
+  }
+
+  // Open details modal for a selected application
+  const handleViewApplication = (application) => {
+    setSelectedApplication(application)
+    setShowApplicationDetails(true)
+  }
+
+  // Placeholder message handler (could navigate to Messages screen in full app)
+  const handleMessageFamily = (application) => {
+    setShowApplicationDetails(false)
+    // Navigate to Messages screen
+    try { navigation.navigate('Messages') } catch (_) {}
+  }
+
+  // Submit application: add to applications state and close modal
+  const handleApplicationSubmit = async ({ jobId, jobTitle, family }) => {
+    const matchedJob = jobs.find((j) => j.id === jobId)
+    // Optimistic local application
+    const optimistic = {
+      id: Date.now(),
+      jobId,
+      jobTitle,
+      family,
+      status: "pending",
+      appliedDate: new Date().toISOString(),
+      hourlyRate: matchedJob ? matchedJob.hourlyRate : undefined
+    }
+    try {
+      await applicationsAPI.apply({ jobId, coverLetter: "" })
+    } catch (e) {
+      // Backend failed; keep optimistic local record
+    }
+    setApplications((prev) => [optimistic, ...prev])
+    setShowJobApplication(false)
+    setSelectedJob(null)
+    setActiveTab("applications")
+  }
+
   const mockApplications = [
     {
       id: 1,
       jobTitle: "Full-time Nanny for 2 Children",
-      family: "The Johnson Family",
+      family: "The Dela Cruz Family",
       status: "pending",
       appliedDate: "2023-05-15",
       hourlyRate: 28
@@ -75,37 +569,140 @@ export default function CaregiverDashboard({ onLogout }) {
     {
       id: 2,
       jobTitle: "Weekend Babysitter",
-      family: "The Smith Family",
+      family: "The Santos Family",
       status: "accepted",
       appliedDate: "2023-05-10",
       hourlyRate: 25
     }
   ]
 
-  const mockBookings = [
-    {
-      id: 1,
-      family: "The Johnson Family",
-      date: "2023-06-01",
-      time: "09:00 - 17:00",
-      status: "confirmed",
-      children: 2,
-      location: "Manhattan, NY"
-    },
-    {
-      id: 2,
-      family: "The Smith Family",
-      date: "2023-06-05",
-      time: "18:00 - 22:00",
-      status: "pending",
-      children: 1,
-      location: "Brooklyn, NY"
-    }
-  ]
+  // Note: bookings now come from state with mock fallback
 
-  const handleSaveProfile = () => {
-    // Save profile logic here
-    setEditProfileModalVisible(false)
+  // Pick image, upload, and save to profile
+  const handleChangeProfilePhoto = async () => {
+    try {
+      const isCaregiver = ['caregiver', 'provider'].includes(String(user?.role || '').toLowerCase())
+      // Ask permission (iOS specific; Android auto if manifest ok)
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photo library to change profile picture.')
+        return
+      }
+      // Launch picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      })
+      if (result.canceled) return
+      const asset = result.assets?.[0]
+      if (!asset?.base64) {
+        Alert.alert('Unable to read image', 'Please try a different photo.')
+        return
+      }
+      setUploadingImage(true)
+      const mimeType = asset.type === 'video' ? 'video/mp4' : (asset.mimeType || 'image/jpeg')
+      // Upload base64 to backend generic uploads
+      const uploadRes = await uploadsAPI.base64Upload({
+        imageBase64: `data:${mimeType};base64,${asset.base64}`,
+        mimeType,
+        folder: 'providers',
+        name: `avatar_${Date.now()}`,
+      })
+      let imageUrl = uploadRes?.url || uploadRes?.location || uploadRes?.secure_url
+      if (!imageUrl) throw new Error('Upload did not return a URL')
+      let finalUrl = imageUrl
+
+      // Persist to caregiver profile if caregiver; else to auth profile
+      try {
+        if (isCaregiver) {
+          await caregiversAPI.updateMyProfile({ imageUrl })
+        } else {
+          // for non-caregivers, prefer dedicated auth image endpoint
+          const authRes = await authAPI.uploadProfileImageBase64(`data:${mimeType};base64,${asset.base64}`, mimeType)
+          const authUrl = authRes?.data?.url || authRes?.url
+          if (authUrl) finalUrl = authUrl
+        }
+      } catch (e) {
+        const status = e?.response?.status
+        if (status === 403 || status === 404) {
+          // Fallback to auth profile if provider endpoint is forbidden/missing
+          try {
+            const authRes = await authAPI.uploadProfileImageBase64(`data:${mimeType};base64,${asset.base64}`, mimeType)
+            const authUrl = authRes?.data?.url || authRes?.url
+            if (authUrl) finalUrl = authUrl
+          } catch (inner) {
+            console.warn('Auth image upload failed:', inner?.response?.status || inner?.message)
+          }
+        } else {
+          console.warn('Save profile image failed:', status || e?.message)
+        }
+      }
+
+      // Try to refresh profile to get authoritative image URL from server
+      try {
+        const fresh = await authAPI.getProfile()
+        const serverUrl = fresh?.imageUrl || fresh?.avatarUrl || fresh?.photoUrl || fresh?.profileImage || fresh?.data?.imageUrl || fresh?.data?.avatarUrl || fresh?.data?.photoUrl || fresh?.data?.profileImage
+        if (serverUrl) {
+          // Convert relative URLs to absolute URLs
+          finalUrl = serverUrl.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${serverUrl}` : serverUrl;
+        }
+      } catch (_) {}
+
+      // Update UI with final URL
+      setProfile((prev) => ({ ...prev, imageUrl: finalUrl }))
+      showToast('Photo updated successfully.', 'success')
+    } catch (e) {
+      console.error('Change profile photo failed:', e?.message || e)
+      Alert.alert('Upload failed', e?.message || 'Could not upload image. Please try again.')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    try {
+      console.log(' Saving profile from dashboard...');
+      const isCaregiver = ['caregiver', 'provider'].includes(String(user?.role || '').toLowerCase())
+      const numericRate = Number(profileHourlyRate)
+      const payload = {
+        name: profileName,
+        hourlyRate: Number.isFinite(numericRate) ? numericRate : undefined,
+        rate: Number.isFinite(numericRate) ? numericRate : undefined,
+        experience: profileExperience,
+      }
+      
+      console.log(' Dashboard payload:', payload);
+      
+      if (isCaregiver) {
+        try {
+          const response = await caregiversAPI.updateMyProfile(payload)
+          console.log(' Dashboard update response:', response);
+        } catch (e) {
+          const status = e?.response?.status
+          if (status === 404) {
+            // Profile doesn't exist; create it
+            await caregiversAPI.createProfile(payload)
+          } else {
+            throw e
+          }
+        }
+      } else {
+        // Auth profile likely only accepts basic fields
+        await authAPI.updateProfile({ name: payload.name })
+      }
+      
+      // Reload profile to ensure UI shows latest data
+      await loadProfile()
+      
+      showToast('Profile changes saved.', 'success')
+      setEditProfileModalVisible(false)
+    } catch (e) {
+      console.error(' Save profile failed:', e?.message || e)
+      Alert.alert('Save failed', e?.message || 'Could not save profile. Please try again.')
+    }
   }
 
   const renderEditProfileModal = () => (
@@ -158,19 +755,233 @@ export default function CaregiverDashboard({ onLogout }) {
     </Modal>
   )
 
+  // Render Toast
+  const renderToast = () => (
+    <Toast
+      visible={toast.visible}
+      message={toast.message}
+      type={toast.type}
+      onHide={() => setToast((t) => ({ ...t, visible: false }))}
+    />
+  )
+
+  // Parent-style header with logout and actions
+  const renderHeader = () => (
+    <View style={styles.parentLikeHeaderContainer}>
+      <LinearGradient
+        colors={["#5bbafa", "#b672ff"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.parentLikeHeaderGradient}
+      >
+        <View style={styles.headerTop}>
+          <View style={[styles.logoContainer, { flexDirection: 'column', alignItems: 'center' }]}>
+            <Image source={require('../../assets/icon.png')} style={[styles.logoImage, { marginBottom: 6 }]} />
+            
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>I am a Caregiver</Text>
+            </View>
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.headerButton} onPress={() => navigation.navigate('Messages')}>
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color="#FFFFFF" />
+            </Pressable>
+            <Pressable style={styles.headerButton} onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}>
+              <Ionicons name="person-outline" size={22} color="#FFFFFF" />
+            </Pressable>
+            <Pressable style={styles.headerButton} onPress={onLogout || signOut}>
+              <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </View>
+      </LinearGradient>
+    </View>
+  )
+
+  // Parent-style horizontal top navigation for caregiver tabs
+  const renderTopNav = () => (
+    <View style={styles.navContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
+          { id: 'jobs', label: 'Jobs', icon: 'briefcase' },
+          { id: 'applications', label: 'Applications', icon: 'document-text' },
+          { id: 'bookings', label: 'Bookings', icon: 'calendar' },
+          { id: 'messages', label: 'Messages', icon: 'chatbubble-ellipses' },
+        ].map((tab) => {
+          const active = activeTab === tab.id
+          const onPress = () => {
+            if (tab.id === 'messages') {
+              try { navigation.navigate('Messages') } catch (_) {}
+            } else {
+              setActiveTab(tab.id)
+            }
+          }
+          const iconColor = active ? '#3b83f5' : '#6B7280'
+          return (
+            <Pressable
+              key={tab.id}
+              onPress={onPress}
+              style={[
+                styles.navTab,
+                active ? styles.navTabActive : null,
+              ]}
+            >
+              <Ionicons name={tab.icon} size={18} color={iconColor} />
+              <Text style={[styles.navTabText, active ? styles.navTabTextActive : null]}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
+    </View>
+  )
+
   return (
     <View style={styles.container}>
+      {renderHeader()}
+      {renderTopNav()}
       <View style={styles.header}>
         <View style={styles.profileHeader}>
           <View style={styles.profileImageContainer}>
-            <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e1e4e8' }]}>
-              <Ionicons name="person" size={60} color="#6B7280" />
-            </View>
+            <Pressable onPress={async () => { await handleChangeProfilePhoto() }} accessibilityLabel="Change profile photo" accessibilityRole="button">
+              {profile.imageUrl ? (
+                <Image 
+                  source={{ uri: profile.imageUrl }} 
+                  style={[styles.profileImage, { backgroundColor: '#f3f4f6' }]}
+                  onError={(error) => {
+                    console.log('❌ Image load error:', error.nativeEvent.error);
+                    console.log('🔗 Failed URL:', profile.imageUrl);
+                  }}
+                  onLoad={() => console.log('✅ Image loaded successfully:', profile.imageUrl)}
+                />
+              ) : (
+                <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e1e4e8' }]}>
+                  <Ionicons name="person" size={60} color="#6B7280" />
+                </View>
+              )}
+              <View style={{ position: 'absolute', right: 6, bottom: 6, backgroundColor: '#111827AA', borderRadius: 14, padding: 6 }}>
+                {uploadingImage ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="camera" size={16} color="#fff" />
+                )}
+              </View>
+            </Pressable>
             {profile.backgroundCheck === "Verified" && (
               <View style={styles.verifiedBadge}>
                 <Ionicons name="checkmark" size={12} color="#fff" />
               </View>
             )}
+
+      {/* Application Details Modal */}
+      {showApplicationDetails && selectedApplication && (
+        <Modal
+          visible={showApplicationDetails}
+          onRequestClose={() => setShowApplicationDetails(false)}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
+            <Card style={styles.editProfileModal}>
+              <Card.Content>
+                <Text style={styles.editProfileTitle}>{selectedApplication.jobTitle}</Text>
+                <Text style={styles.profileSectionText}>{selectedApplication.family}</Text>
+                <View style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="calendar" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>Applied: {new Date(selectedApplication.appliedDate).toLocaleDateString()}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>${selectedApplication.hourlyRate}/hr</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="information-circle" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>Status: {selectedApplication.status}</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Button mode="text" onPress={() => setShowApplicationDetails(false)}>Close</Button>
+                  {selectedApplication.status === 'accepted' && (
+                    <Button 
+                      mode="contained" 
+                      style={{ marginLeft: 8 }}
+                      onPress={() => handleMessageFamily(selectedApplication)}
+                    >
+                      Message Family
+                    </Button>
+                  )}
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        </Modal>
+      )}
+
+      {/* Job Details Modal */}
+      {showJobDetails && selectedJob && (
+        <Modal
+          visible={showJobDetails}
+          onRequestClose={() => {
+            setShowJobDetails(false)
+            setSelectedJob(null)
+          }}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
+            <Card style={styles.editProfileModal}>
+              <Card.Content>
+                <Text style={styles.editProfileTitle}>{selectedJob.title}</Text>
+                <View style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="home" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>{selectedJob.family}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="location" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>{selectedJob.location} • {selectedJob.distance}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="time" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>{selectedJob.schedule}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>${selectedJob.hourlyRate}/hr</Text>
+                  </View>
+                  {Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={[styles.sectionSubtitle, { marginBottom: 6 }]}>Requirements</Text>
+                      {selectedJob.requirements.map((req, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                          <Text style={styles.profileSectionText}>{req}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Button mode="text" onPress={() => { setShowJobDetails(false); setSelectedJob(null) }}>Close</Button>
+                  <Button
+                    mode="contained"
+                    style={{ marginLeft: 8 }}
+                    onPress={() => {
+                      setShowJobDetails(false)
+                      handleJobApplication(selectedJob)
+                    }}
+                  >
+                    Apply Now
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        </Modal>
+      )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile.name}</Text>
@@ -186,65 +997,14 @@ export default function CaregiverDashboard({ onLogout }) {
           </View>
           <Pressable
             style={styles.editProfileButton}
-            onPress={() => setEditProfileModalVisible(true)}
+            onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}
           >
             <Ionicons name="create-outline" size={20} color="#4B5563" />
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.tabs}>
-        <Pressable
-          style={[styles.tab, activeTab === "dashboard" && styles.activeTab]}
-          onPress={() => setActiveTab("dashboard")}
-        >
-          <Ionicons
-            name="grid"
-            size={20}
-            color={activeTab === "dashboard" ? "#2563eb" : "#6B7280"}
-          />
-          <Text style={[styles.tabText, activeTab === "dashboard" && styles.activeTabText]}>
-            Dashboard
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === "jobs" && styles.activeTab]}
-          onPress={() => setActiveTab("jobs")}
-        >
-          <Ionicons
-            name="briefcase"
-            size={20}
-            color={activeTab === "jobs" ? "#2563eb" : "#6B7280"}
-          />
-          <Text style={[styles.tabText, activeTab === "jobs" && styles.activeTabText]}>Jobs</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === "applications" && styles.activeTab]}
-          onPress={() => setActiveTab("applications")}
-        >
-          <Ionicons
-            name="document-text"
-            size={20}
-            color={activeTab === "applications" ? "#2563eb" : "#6B7280"}
-          />
-          <Text style={[styles.tabText, activeTab === "applications" && styles.activeTabText]}>
-            Applications
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === "bookings" && styles.activeTab]}
-          onPress={() => setActiveTab("bookings")}
-        >
-          <Ionicons
-            name="calendar"
-            size={20}
-            color={activeTab === "bookings" ? "#2563eb" : "#6B7280"}
-          />
-          <Text style={[styles.tabText, activeTab === "bookings" && styles.activeTabText]}>
-            Bookings
-          </Text>
-        </Pressable>
-      </View>
+      {/* Top nav replaces old tabs */}
 
       <ScrollView style={styles.content}>
         <Searchbar
@@ -259,27 +1019,43 @@ export default function CaregiverDashboard({ onLogout }) {
 
         {activeTab === "dashboard" && (
           <View>
-            <View style={styles.statsRow}>
-              <StatCard
-                icon="briefcase"
-                value={profile.completedJobs}
-                label="Jobs Completed"
-                color="#3B82F6"
-                bgColor="#EFF6FF"
+            {/* Quick stats 2x2 grid */}
+            <View style={styles.quickGrid}>
+              <QuickStat icon="star" value={profile.rating} label="Rating" color="#F59E0B" bgColor="#FFFBEB" />
+              <QuickStat icon="checkmark-done" value={profile.completedJobs} label="Jobs Done" color="#10B981" bgColor="#ECFDF5" />
+              <QuickStat icon="cash" value={`$${profile.hourlyRate}`} label="Rate" color="#2563EB" bgColor="#EFF6FF" />
+              <QuickStat icon="chatbubble-ellipses" value={profile.responseRate} label={"Response"} color="#8B5CF6" bgColor="#F5F3FF" />
+            </View>
+
+            {/* Quick actions 2x2 grid */}
+            <View style={styles.actionGrid}>
+              <QuickAction
+                icon="search"
+                label="Find Jobs"
+                color="#ffffff"
+                gradientColors={["#3B82F6", "#2563EB"]}
+                onPress={() => setActiveTab('jobs')}
               />
-              <StatCard
-                icon="star"
-                value={profile.rating}
-                label="Rating"
-                color="#F59E0B"
-                bgColor="#FFFBEB"
+              <QuickAction
+                icon="calendar"
+                label="Bookings"
+                color="#ffffff"
+                gradientColors={["#22C55E", "#16A34A"]}
+                onPress={() => setActiveTab('bookings')}
               />
-              <StatCard
+              <QuickAction
                 icon="chatbubble-ellipses"
-                value={profile.responseRate}
-                label="Response Rate"
-                color="#10B981"
-                bgColor="#ECFDF5"
+                label="Messages"
+                color="#ffffff"
+                gradientColors={["#A78BFA", "#8B5CF6"]}
+                onPress={() => { try { navigation.navigate('Messages') } catch(_) {} }}
+              />
+              <QuickAction
+                icon="document-text"
+                label="Applications"
+                color="#ffffff"
+                gradientColors={["#fb7185", "#ef4444"]}
+                onPress={() => setActiveTab('applications')}
               />
             </View>
 
@@ -291,10 +1067,63 @@ export default function CaregiverDashboard({ onLogout }) {
                 </Pressable>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-                {mockJobs.slice(0, 3).map((job) => (
-                  <JobCard key={job.id} job={job} showActions={true} />
+                {(jobs || []).slice(0, 3).map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    showActions={true}
+                    onApply={handleJobApplication}
+                    onLearnMore={handleViewJob}
+                    hasApplied={(id) => applications.some((a) => a.jobId === id)}
+                    jobCardStyle={styles.jobCardHorizontal}
+                  />
                 ))}
               </ScrollView>
+            </View>
+
+            {/* Enhanced Profile Wizard Promotion Card */}
+            <View style={styles.section}>
+              <Card style={[styles.promotionCard, { backgroundColor: '#f0f9ff', borderColor: '#3b82f6' }]}>
+                <Card.Content>
+                  <View style={styles.promotionHeader}>
+                    <View style={styles.promotionIcon}>
+                      <Ionicons name="star" size={20} color="#3b82f6" />
+                    </View>
+                    <View style={styles.promotionContent}>
+                      <Text style={styles.promotionTitle}>Complete Your Enhanced Profile</Text>
+                      <Text style={styles.promotionDescription}>
+                        Add documents, certifications, and portfolio to get more bookings
+                      </Text>
+                    </View>
+                  </View>
+                  <Button
+                    mode="contained"
+                    onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}
+                    style={[styles.promotionButton, { backgroundColor: '#3b82f6' }]}
+                    labelStyle={{ color: '#ffffff' }}
+                    icon="arrow-right"
+                  >
+                    Complete Profile
+                  </Button>
+                </Card.Content>
+              </Card>
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recent Applications</Text>
+                <Pressable onPress={() => setActiveTab("applications")}>
+                  <Text style={styles.seeAllText}>View All</Text>
+                </Pressable>
+              </View>
+              {applications.slice(0, 2).map((application) => (
+                <ApplicationCard 
+                  key={application.id} 
+                  application={application}
+                  onViewDetails={handleViewApplication}
+                  onMessage={handleMessageFamily}
+                />
+              ))}
             </View>
 
             <View style={styles.section}>
@@ -304,8 +1133,16 @@ export default function CaregiverDashboard({ onLogout }) {
                   <Text style={styles.seeAllText}>See All</Text>
                 </Pressable>
               </View>
-              {mockBookings.slice(0, 2).map((booking) => (
-                <BookingCard key={booking.id} booking={booking} />
+              {bookings.slice(0, 2).map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  onMessage={() => setActiveTab("dashboard")}
+                  onViewDetails={() => {
+                    setSelectedBooking(booking)
+                    setShowBookingDetails(true)
+                  }}
+                />
               ))}
             </View>
           </View>
@@ -331,17 +1168,43 @@ export default function CaregiverDashboard({ onLogout }) {
               </Chip>
             </View>
 
-            {mockJobs.map((job) => (
-              <JobCard key={job.id} job={job} showActions={true} />
-            ))}
+            {jobs && jobs.length > 0 ? (
+              <View style={[styles.jobsGrid, columns === 1 && { flexDirection: 'column' }]}>
+                {jobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    showActions={true}
+                    onApply={handleJobApplication}
+                    onLearnMore={handleViewJob}
+                    hasApplied={(id) => applications.some((a) => a.jobId === id)}
+                    jobCardStyle={columns === 1 ? { width: '100%', ...(gridCardHeight ? { height: gridCardHeight } : {}) } : { width: gridCardWidth, height: gridCardHeight }}
+                    gridMode
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="briefcase" size={48} color="#9CA3AF" />
+                <Text style={styles.emptyStateText}>No jobs available</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Please check back later or adjust your filters
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
         {activeTab === "applications" && (
           <View style={styles.section}>
-            {mockApplications.length > 0 ? (
-              mockApplications.map((application) => (
-                <ApplicationCard key={application.id} application={application} />
+            {applications.length > 0 ? (
+              applications.map((application) => (
+                <ApplicationCard 
+                  key={application.id} 
+                  application={application}
+                  onViewDetails={handleViewApplication}
+                  onMessage={handleMessageFamily}
+                />
               ))
             ) : (
               <View style={styles.emptyState}>
@@ -378,9 +1241,17 @@ export default function CaregiverDashboard({ onLogout }) {
               </Chip>
             </View>
 
-            {mockBookings.length > 0 ? (
-              mockBookings.map((booking) => (
-                <BookingCard key={booking.id} booking={booking} />
+            {bookings.length > 0 ? (
+              bookings.map((booking) => (
+                <BookingCard
+                  key={booking.id}
+                  booking={booking}
+                  onMessage={() => setActiveTab("dashboard")}
+                  onViewDetails={() => {
+                    setSelectedBooking(booking)
+                    setShowBookingDetails(true)
+                  }}
+                />
               ))
             ) : (
               <View style={styles.emptyState}>
@@ -395,16 +1266,76 @@ export default function CaregiverDashboard({ onLogout }) {
         )}
       </ScrollView>
 
-      <Button
-        mode="contained"
-        onPress={onLogout || signOut}
-        style={styles.logoutButton}
-        labelStyle={styles.logoutButtonText}
-      >
-        Logout
-      </Button>
+      {/* Logout button moved to header actions */}
 
       {renderEditProfileModal()}
+
+      {/* Booking Details Modal */}
+      {showBookingDetails && selectedBooking && (
+        <Modal
+          visible={showBookingDetails}
+          onRequestClose={() => setShowBookingDetails(false)}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
+            <Card style={styles.editProfileModal}>
+              <Card.Content>
+                <Text style={styles.editProfileTitle}>{selectedBooking.family}</Text>
+                <Text style={styles.profileSectionText}>Children: {selectedBooking.children}</Text>
+                <Text style={styles.profileSectionText}>Date: {selectedBooking.date}</Text>
+                <Text style={styles.profileSectionText}>Time: {selectedBooking.time}</Text>
+                <Text style={styles.profileSectionText}>Location: {selectedBooking.location}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Button mode="text" onPress={() => setShowBookingDetails(false)}>Close</Button>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        </Modal>
+      )}
+
+      {/* Job Application Modal */}
+      {showJobApplication && selectedJob && (
+        <Modal
+          visible={showJobApplication}
+          onRequestClose={() => {
+            setShowJobApplication(false)
+            setSelectedJob(null)
+          }}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
+            <Card style={styles.editProfileModal}>
+              <Card.Content>
+                <Text style={styles.editProfileTitle}>Apply: {selectedJob.title}</Text>
+                <TextInput
+                  placeholder="Cover letter (optional)"
+                  style={styles.editProfileInput}
+                  multiline
+                />
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                  <Button mode="text" onPress={() => { setShowJobApplication(false); setSelectedJob(null) }}>Cancel</Button>
+                  <Button
+                    mode="contained"
+                    style={{ marginLeft: 8 }}
+                    onPress={() => handleApplicationSubmit({
+                      jobId: selectedJob.id,
+                      jobTitle: selectedJob.title,
+                      family: selectedJob.family,
+                    })}
+                  >
+                    Submit
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        </Modal>
+      )}
+
+      {renderToast()}
     </View>
   )
 }
@@ -421,13 +1352,17 @@ function StatCard({ icon, value, label, color, bgColor }) {
   )
 }
 
-function JobCard({ job, showActions = true }) {
+function JobCard({ job, showActions = true, onApply, hasApplied, onLearnMore, jobCardStyle, gridMode = false }) {
+  // Determine if already applied
+  const applied = typeof hasApplied === 'function' ? hasApplied(job.id) : false
+  // Limit content when in grid mode to maintain consistent card height
+  const maxRequirementChips = gridMode ? 2 : 3
   return (
-    <Card style={styles.jobCard}>
+    <Card style={[styles.jobCard, jobCardStyle]}>
       <Card.Content>
         <View style={styles.jobHeader}>
           <View>
-            <Text style={styles.jobTitle}>{job.title}</Text>
+            <Text style={styles.jobTitle} numberOfLines={gridMode ? 2 : undefined}>{job.title}</Text>
             <View style={styles.jobMeta}>
               <Ionicons name="people" size={16} color="#6B7280" />
               <Text style={styles.jobMetaText}>
@@ -456,14 +1391,14 @@ function JobCard({ job, showActions = true }) {
         </View>
 
         <View style={styles.requirementsContainer}>
-          {job.requirements.slice(0, 3).map((req, index) => (
+          {job.requirements.slice(0, maxRequirementChips).map((req, index) => (
             <View key={index} style={styles.requirementTag}>
               <Text style={styles.requirementText}>{req}</Text>
             </View>
           ))}
-          {job.requirements.length > 3 && (
+          {job.requirements.length > maxRequirementChips && (
             <Text style={styles.moreRequirementsText}>
-              +{job.requirements.length - 3} more
+              +{job.requirements.length - maxRequirementChips} more
             </Text>
           )}
         </View>
@@ -476,18 +1411,27 @@ function JobCard({ job, showActions = true }) {
                 mode="outlined" 
                 style={styles.secondaryButton}
                 labelStyle={styles.secondaryButtonText}
-                onPress={() => {}}
+                onPress={() => onLearnMore && onLearnMore(job)}
               >
                 Learn More
               </Button>
-              <Button 
-                mode="contained" 
-                style={styles.primaryButton}
-                labelStyle={styles.primaryButtonText}
-                onPress={() => {}}
-              >
-                Apply Now
-              </Button>
+              {applied ? (
+                <View style={[styles.appliedBadge]}>
+                  <View style={styles.appliedBadgeContent}>
+                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginRight: 6 }} />
+                    <Text style={styles.appliedBadgeText}>Applied</Text>
+                  </View>
+                </View>
+              ) : (
+                <Button 
+                  mode="contained" 
+                  style={styles.primaryButton}
+                  labelStyle={styles.primaryButtonText}
+                  onPress={() => onApply && onApply(job)}
+                >
+                  Apply Now
+                </Button>
+              )}
             </View>
           </View>
         )}
@@ -496,7 +1440,7 @@ function JobCard({ job, showActions = true }) {
   )
 }
 
-function ApplicationCard({ application }) {
+function ApplicationCard({ application, onViewDetails, onMessage }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'accepted':
@@ -562,7 +1506,7 @@ function ApplicationCard({ application }) {
             mode="outlined" 
             style={styles.applicationButton}
             labelStyle={styles.applicationButtonText}
-            onPress={() => {}}
+            onPress={() => onViewDetails && onViewDetails(application)}
           >
             View Details
           </Button>
@@ -571,7 +1515,7 @@ function ApplicationCard({ application }) {
               mode="contained" 
               style={[styles.applicationButton, { marginLeft: 8 }]}
               labelStyle={styles.applicationButtonText}
-              onPress={() => {}}
+              onPress={() => onMessage && onMessage(application)}
             >
               Message Family
             </Button>
@@ -582,7 +1526,7 @@ function ApplicationCard({ application }) {
   )
 }
 
-function BookingCard({ booking }) {
+function BookingCard({ booking, onMessage, onViewDetails }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'confirmed':
@@ -638,7 +1582,19 @@ function BookingCard({ booking }) {
               {booking.children} {booking.children === 1 ? 'child' : 'children'}
             </Text>
             <Ionicons name="location" size={16} color="#6B7280" style={styles.bookingDetailIcon} />
-            <Text style={styles.bookingDetailText}>{booking.location}</Text>
+            <Pressable 
+              onPress={() => {
+                if (booking.location) {
+                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.location)}`;
+                  Linking.openURL(mapsUrl).catch(err => {
+                    console.error('Error opening maps:', err);
+                    Alert.alert('Error', 'Could not open maps. Please check if you have a maps app installed.');
+                  });
+                }
+              }}
+            >
+              <Text style={[styles.bookingDetailText, { textDecorationLine: 'underline', color: '#2563EB' }]}>{booking.location}</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -647,7 +1603,7 @@ function BookingCard({ booking }) {
             mode="outlined" 
             style={styles.bookingButton}
             labelStyle={styles.bookingButtonText}
-            onPress={() => {}}
+            onPress={onViewDetails}
           >
             View Details
           </Button>
@@ -655,7 +1611,7 @@ function BookingCard({ booking }) {
             mode="contained" 
             style={[styles.bookingButton, { marginLeft: 8 }]}
             labelStyle={styles.bookingButtonText}
-            onPress={() => {}}
+            onPress={onMessage}
           >
             Message
           </Button>

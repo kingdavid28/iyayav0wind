@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, Linking, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, Alert, Image, Platform, StyleSheet } from 'react-native';
 import { Calendar, Clock, DollarSign, MapPin, Phone, Mail, MessageCircle, Navigation, Star, Baby, AlertCircle, CheckCircle, X } from 'lucide-react-native';
 import PropTypes from 'prop-types';
 
@@ -29,23 +29,23 @@ export function BookingDetailsModal({
 
   const enhancedBooking = {
     ...booking,
-    location: booking.location || "Manhattan, NY",
-    address: booking.address || "123 Park Avenue, New York, NY 10016",
-    contactPhone: booking.contactPhone || "(555) 123-4567",
-    contactEmail: booking.contactEmail || "johnson.family@email.com",
+    location: booking.location || "Cebu City",
+    address: booking.address || "123 Osmeña Blvd, Cebu City, 6000 Cebu",
+    contactPhone: booking.contactPhone || "0917 123 4567",
+    contactEmail: booking.contactEmail || "delacruz.family@email.ph",
     totalHours: booking.totalHours || 4,
     totalAmount: booking.totalAmount || (booking.hourlyRate * 4),
     requirements: booking.requirements || ["CPR Certified", "Background Check", "Non-smoker"],
     childrenDetails: booking.childrenDetails || [
       {
-        name: "Emma",
+        name: "Maya",
         age: 3,
         specialInstructions: "Loves puzzles and quiet activities",
         allergies: "None",
         preferences: "Story time before nap"
       },
       {
-        name: "Jack", 
+        name: "Miguel", 
         age: 5,
         specialInstructions: "Needs help with homework",
         allergies: "Peanuts",
@@ -53,8 +53,8 @@ export function BookingDetailsModal({
       }
     ],
     emergencyContact: booking.emergencyContact || {
-      name: "Dr. Sarah Johnson",
-      phone: "(555) 987-6543",
+      name: "Dra. Ana Dela Cruz",
+      phone: "0918 987 6543",
       relation: "Mother"
     }
   };
@@ -78,7 +78,7 @@ export function BookingDetailsModal({
 
   return (
     <View className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <View className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+      <View className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden" style={styles.card}>
         {/* Header */}
         <View className="flex flex-row items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
           <View className="flex flex-row items-center">
@@ -306,7 +306,7 @@ export function BookingDetailsModal({
             </Pressable>
           )}
 
-          {(enhancedBooking.status === 'pending' || enhancedBooking.status === 'confirmed') && (
+          {(enhancedBooking.status === 'pending_confirmation' || enhancedBooking.status === 'confirmed') && (
             <Pressable
               onPress={() => {
                 Alert.alert("Booking Cancelled", "The booking has been cancelled");
@@ -364,5 +364,23 @@ BookingDetailsModal.propTypes = {
 BookingDetailsModal.defaultProps = {
   booking: {}
 };
+
+const styles = StyleSheet.create({
+  card: Platform.select({
+    web: {
+      boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+    },
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+    },
+    android: {
+      elevation: 8,
+    },
+    default: {},
+  }),
+});
 
 export default BookingDetailsModal;

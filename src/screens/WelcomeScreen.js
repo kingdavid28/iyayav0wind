@@ -1,17 +1,20 @@
+import React from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   Pressable, 
-  Image, 
+  Image,  // Uncommented this import
   Platform, 
   ScrollView 
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { auth } from '../config/firebase';
+import { useNavigation, CommonActions } from "@react-navigation/native";
+import { useAuth } from "../contexts/AuthContext";
+import { useApp } from "../context/AppContext";
+import { AlignCenter } from 'lucide-react-native';
 
 /**
  * WelcomeScreen displays the landing page for the Iyaya app.
@@ -21,6 +24,34 @@ import { auth } from '../config/firebase';
 export default function WelcomeScreen() {
   const navigation = useNavigation();
   const isWeb = Platform.OS === 'web';
+  const { user } = useAuth();
+  const { state } = useApp();
+  const isLoggedIn = !!user || !!state?.isAuthenticated;
+  const role = user?.role || state?.user?.role || state?.userProfile?.role;
+  
+  // Debug: log auth state when it changes
+  React.useEffect(() => {
+    try {
+      console.log('[Welcome] user:', !!user, user ? { email: user.email, role: user.role } : null, 'AppContext.isAuthenticated:', !!state?.isAuthenticated, 'role:', role);
+    } catch(_) {}
+  }, [user, state?.isAuthenticated, role]);
+
+  // If logged in, immediately reset to the correct dashboard based on role
+  React.useEffect(() => {
+    if (!isLoggedIn) return;
+    const target = role === 'caregiver' ? 'CaregiverDashboard' : 'ParentDashboard';
+    try {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: target }],
+        })
+      );
+    } catch (e) {
+      try { console.warn('[Welcome] reset navigation failed, falling back to navigate', e?.message || e); } catch(_) {}
+      try { navigation.dispatch(CommonActions.navigate({ name: target })); } catch(_) {}
+    }
+  }, [isLoggedIn, role, navigation]);
 
   // Gradient colors reused throughout the component
   const backgroundGradient = ["#fce8f4", "#e0f2fe", "#f3e8ff"];
@@ -40,9 +71,18 @@ export default function WelcomeScreen() {
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
         >
+          {/* Debug Auth Status Banner */}
+          {__DEV__ && (
+            <View style={{ padding: 8, alignItems: 'center' }}>
+              <Text style={{ color: '#6b7280' }}>
+                {isLoggedIn ? `Logged in${user?.email ? ` as ${user.email}` : ''}${user?.role ? ` (${user.role})` : ''}` : 'Logged out'}
+              </Text>
+            </View>
+          )}
+
           {/* Header Section */}
-          <View style={styles.header} accessibilityRole="header">
-            <View style={styles.logoContainer} accessibilityLabel="Iyaya logo" accessibilityRole="image">
+          <View style={styles.header}>
+            <View style={styles.logoContainer} accessibilityLabel="Iyaya logo">
               <LinearGradient 
                 colors={logoGradient}
                 style={styles.logoBackground}
@@ -56,15 +96,15 @@ export default function WelcomeScreen() {
               </LinearGradient>
             </View>
 
-            <Text style={styles.tagline} accessibilityRole="text">Connecting families with trusted caregivers</Text>
-            <Text style={styles.subtitle} accessibilityRole="text">
+            <Text style={styles.tagline}>Connecting families with trusted caregivers</Text>
+            <Text style={styles.subtitle}>
               Find the perfect caregiver for your child or discover amazing families to work with.{"\n"}
               Safe, secure, and built with love.
             </Text>
           </View>
 
           {/* Role Selection Cards */}
-          <View style={styles.cardsContainer} accessibilityRole="list">
+          <View style={styles.cardsContainer}>
             {/* Parent Card */}
             <Pressable
               style={({ pressed }) => [
@@ -72,12 +112,23 @@ export default function WelcomeScreen() {
                 styles.parentCard,
                 pressed && styles.cardPressed
               ]}
-              onPress={() => navigation.navigate('ParentAuth')}
+              onPress={() => {
+                try { console.log('[Welcome] Parent card pressed. user?', !!user, 'isLoggedIn', isLoggedIn); } catch(_) {}
+                try {
+                  if (isLoggedIn) {
+                    navigation.dispatch(CommonActions.navigate({ name: 'ParentDashboard' }));
+                  } else {
+                    navigation.dispatch(CommonActions.navigate({ name: 'ParentAuth' }));
+                  }
+                } catch (e) {
+                  try { console.error('[Welcome] Parent navigation error:', e?.message || e); } catch(_) {}
+                }
+              }}
               android_ripple={{ color: "#fce7f3" }}
               accessibilityRole="button"
               accessibilityLabel="I'm a Parent. Find trusted caregivers for your little ones. Get Started."
             >
-              <View style={styles.cardContent} accessibilityRole="listitem">
+              <View style={styles.cardContent}>
                 <LinearGradient 
                   colors={parentGradient}
                   style={[styles.iconContainer, styles.parentIconContainer]}
@@ -85,8 +136,8 @@ export default function WelcomeScreen() {
                   <Ionicons name="happy-outline" size={40} color="#db2777" accessibilityLabel="Parent icon" />
                 </LinearGradient>
 
-                <Text style={styles.cardTitle} accessibilityRole="text">I'm a Parent</Text>
-                <Text style={styles.cardDescription} accessibilityRole="text">
+                <Text style={styles.cardTitle}>I'm a Parent</Text>
+                <Text style={styles.cardDescription}>
                   Find trusted caregivers for your little ones.{"\n"}
                   Browse profiles, read reviews, and book{"\n"}
                   services with confidence.
@@ -106,12 +157,23 @@ export default function WelcomeScreen() {
                 styles.caregiverCard,
                 pressed && styles.cardPressed
               ]}
-              onPress={() => navigation.navigate('CaregiverAuth')}
+              onPress={() => {
+                try { console.log('[Welcome] Caregiver card pressed. user?', !!user, 'isLoggedIn', isLoggedIn); } catch(_) {}
+                try {
+                  if (isLoggedIn) {
+                    navigation.dispatch(CommonActions.navigate({ name: 'CaregiverDashboard' }));
+                  } else {
+                    navigation.dispatch(CommonActions.navigate({ name: 'CaregiverAuth' }));
+                  }
+                } catch (e) {
+                  try { console.error('[Welcome] Caregiver navigation error:', e?.message || e); } catch(_) {}
+                }
+              }}
               android_ripple={{ color: "#e0f2fe" }}
               accessibilityRole="button"
-              accessibilityLabel="I'm a Caregiver. Join our community of trusted caregivers. Get Started."
+              accessibilityLabel="I'm a Child Caregiver. Join our community of trusted caregivers. Get Started."
             >
-              <View style={styles.cardContent} accessibilityRole="listitem">
+              <View style={styles.cardContent}>
                 <LinearGradient 
                   colors={caregiverGradient}
                   style={[styles.iconContainer, styles.caregiverIconContainer]}
@@ -119,8 +181,8 @@ export default function WelcomeScreen() {
                   <Ionicons name="person-outline" size={40} color="#2563eb" accessibilityLabel="Caregiver icon" />
                 </LinearGradient>
 
-                <Text style={styles.cardTitle} accessibilityRole="text">I'm a Caregiver</Text>
-                <Text style={styles.cardDescription} accessibilityRole="text">
+                <Text style={styles.cardTitle}>I'm a Child Caregiver</Text>
+                <Text style={styles.cardDescription}>
                   Join our community of trusted caregivers.{"\n"}
                   Create your profile, showcase your skills,{"\n"}
                   and connect with families.
@@ -135,7 +197,7 @@ export default function WelcomeScreen() {
           </View>
 
           {/* Features Section */}
-          <View style={styles.featuresContainer} accessibilityRole="list">
+          <View style={styles.featuresContainer}>
             {[
               {
                 icon: "checkmark-circle-outline",
@@ -159,12 +221,12 @@ export default function WelcomeScreen() {
                 description: "Built by parents, for parents and caregivers"
               }
             ].map((feature, index) => (
-              <View key={index} style={styles.feature} accessibilityRole="listitem">
-                <View style={[styles.featureIcon, { backgroundColor: feature.bgColor }]} accessibilityRole="image"> 
+              <View key={index} style={styles.feature}>
+                <View style={[styles.featureIcon, { backgroundColor: feature.bgColor }]}> 
                   <Ionicons name={feature.icon} size={24} color={feature.color} accessibilityLabel={feature.title + ' icon'} />
                 </View>
-                <Text style={styles.featureTitle} accessibilityRole="text">{feature.title}</Text>
-                <Text style={styles.featureDescription} accessibilityRole="text">{feature.description}</Text>
+                <Text style={styles.featureTitle}>{feature.title}</Text>
+                <Text style={styles.featureDescription}>{feature.description}</Text>
               </View>
             ))}
           </View>
@@ -279,51 +341,51 @@ const styles = StyleSheet.create({
     }),
     alignSelf: Platform.select({
       web: 'center',
-      default: undefined,
+      default: 'center',
     }),
   },
   card: {
-  flex: Platform.select({
-    web: 1,
-    default: undefined
-  }),
-  width: Platform.select({
-    web: undefined,
-    default: '100%'
-  }),
-  backgroundColor: "rgba(255, 255, 255, 0.99)", // Changed from 0.7 to 0.99
-  borderRadius: 24,
-  padding: Platform.select({
-    web: 54,
-    default: 24 // Reduced padding for mobile
-  }),
-  shadowColor: "#000",
-  shadowOffset: { 
-    width: 0, 
-    height: Platform.select({
-      web: 4,
-      default: 2 // Smaller shadow on mobile
-    }) 
+    flex: Platform.select({
+      web: 1,
+      default: undefined
+    }),
+    width: Platform.select({
+      web: undefined,
+      default: '100%'
+    }),
+    backgroundColor: "rgba(255, 255, 255, 0.99)",
+    borderRadius: 24,
+    padding: Platform.select({
+      web: 54,
+      default: 24
+    }),
+    shadowColor: "#000",
+    shadowOffset: { 
+      width: 0, 
+      height: Platform.select({
+        web: 4,
+        default: 2
+      }) 
+    },
+    shadowOpacity: Platform.select({
+      web: 0.1,
+      default: 0.05
+    }),
+    shadowRadius: Platform.select({
+      web: 12,
+      default: 8
+    }),
+    elevation: Platform.select({
+      web: 8,
+      default: 0
+    }),
+    minHeight: Platform.select({
+      web: 320,
+      default: 280
+    }),
+    borderWidth: 2,
+    overflow: 'hidden',
   },
-  shadowOpacity: Platform.select({
-    web: 0.1,
-    default: 0.05 // Lighter shadow on mobile
-  }),
-  shadowRadius: Platform.select({
-    web: 12,
-    default: 8 // Tighter shadow on mobile
-  }),
-  elevation: Platform.select({
-    web: 8,
-    default: 0 // Remove elevation on Android
-  }),
-  minHeight: Platform.select({
-    web: 320,
-    default: 280 // Adjusted for better mobile display
-  }),
-  borderWidth: 2,
-  overflow: 'hidden',
-},
   cardPressed: {
     transform: [{ scale: 0.98 }],
   },
@@ -412,46 +474,46 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563eb",
   },
   featuresContainer: {
-  flexDirection: Platform.select({
-    web: 'row',
-    default: 'column'
-  }),
-  justifyContent: 'space-between',
-  gap: 16,
-  marginTop: Platform.select({
-    web: 'auto',
-    default: 20
-  }),
-  width: '100%', // Ensure full width
-  paddingHorizontal: Platform.select({
-    web: 0,
-    default: 16
-  }),
-  maxWidth: Platform.select({
-    web: 1200,
-    default: undefined,
-  }),
-  alignSelf: Platform.select({
-    web: 'center',
-    default: undefined,
-  }),
-},
-feature: {
-  alignItems: 'center',
-  paddingHorizontal: 8,
-  flex: Platform.select({
-    web: 1,
-    default: undefined
-  }),
-  width: Platform.select({
-    web: undefined,
-    default: '100%'
-  }),
-  marginBottom: Platform.select({
-    web: 0,
-    default: 16
-  }),
-},
+    flexDirection: Platform.select({
+      web: 'row',
+      default: 'column'
+    }),
+    justifyContent: 'space-between',
+    gap: 16,
+    marginTop: Platform.select({
+      web: 'auto',
+      default: 20
+    }),
+    width: '100%',
+    paddingHorizontal: Platform.select({
+      web: 0,
+      default: 16
+    }),
+    maxWidth: Platform.select({
+      web: 1200,
+      default: undefined,
+    }),
+    alignSelf: Platform.select({
+      web: 'center',
+      default: undefined,
+    }),
+  },
+  feature: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    flex: Platform.select({
+      web: 1,
+      default: undefined
+    }),
+    width: Platform.select({
+      web: undefined,
+      default: '100%'
+    }),
+    marginBottom: Platform.select({
+      web: 0,
+      default: 16
+    }),
+  },
   featureIcon: {
     width: 60,
     height: 60,

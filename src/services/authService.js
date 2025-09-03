@@ -1,147 +1,138 @@
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-} from "firebase/auth"
-import { auth } from "../config/firebase"
-import { logger } from "../utils/logger"
-import AsyncStorage from "@react-native-async-storage/async-storage"
-import { STORAGE_KEYS } from "../config/constants"
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { authAPI } from "../config/api";
+import { STORAGE_KEYS } from "../config/constants";
+import { logger } from "../utils/logger";
 
 class AuthService {
   // Authentication Methods
   async login(email, password) {
     try {
-      logger.info("Attempting login for:", email)
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const token = await userCredential.user.getIdToken()
-      
+      logger.info("Attempting login for:", email);
+      const res = await authAPI.login({ email, password });
+      const token = res?.token;
+      if (!token) throw new Error("Login failed: no token returned");
+
       // Store token and user info
-      await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token)
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, email)
-      
-      logger.info("Login successful")
-      return { user: userCredential.user, token }
+      await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, email);
+
+      logger.info("Login successful");
+      // Fetch profile for downstream consumers
+      let profile = null;
+      try {
+        profile = await authAPI.getProfile();
+      } catch (_) {}
+      return { user: profile, token };
     } catch (error) {
-      logger.error("Login failed:", error)
-      throw this.handleAuthError(error)
+      logger.error("Login failed:", error);
+      throw this.handleAuthError(error);
     }
   }
 
   async register(userData) {
     try {
-      const { email, password, name } = userData
-      logger.info("Attempting registration for:", email)
-
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-      logger.info("Registration successful")
-
-      return { user: userCredential.user, profile: { name, email } }
+      const { email } = userData;
+      logger.info("Attempting registration for:", email);
+      const res = await authAPI.register(userData);
+      const token = res?.token;
+      if (token) await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      let profile = null;
+      try {
+        profile = await authAPI.getProfile();
+      } catch (_) {}
+      logger.info("Registration successful");
+      return { user: profile, token };
     } catch (error) {
-      logger.error("Registration failed:", error)
-      throw this.handleAuthError(error)
+      logger.error("Registration failed:", error);
+      throw this.handleAuthError(error);
     }
   }
 
   async logout() {
     try {
-      console.log("🚪 AuthService: Starting logout...")
-      
+      console.log("🚪 AuthService: Starting logout...");
+
       // Clear all auth data first
-      await this.clearAuthData()
+      await this.clearAuthData();
 
-      // Then sign out from Firebase
-      const user = auth.currentUser
-      if (user) {
-        console.log("👤 Current user:", user.email)
-        await signOut(auth)
-        console.log("✅ Firebase signOut completed")
-      } else {
-        console.log("ℹ️ No user currently signed in")
-      }
-
-      logger.info("Logout successful")
+      logger.info("Logout successful");
     } catch (error) {
-      console.error("❌ AuthService logout error:", error.message || JSON.stringify(error));
-      logger.error("Logout failed:", error)
+      console.error(
+        "❌ AuthService logout error:",
+        error.message || JSON.stringify(error)
+      );
+      logger.error("Logout failed:", error);
 
       // Don't throw error - allow logout to continue
       // throw this.handleAuthError(error)
     }
   }
 
-  async resetPassword(email) {
-    try {
-      await sendPasswordResetEmail(auth, email)
-      logger.info("Password reset email sent")
-    } catch (error) {
-      logger.error("Password reset failed:", error)
-      throw this.handleAuthError(error)
-    }
+  async resetPassword(_email) {
+    logger.warn("resetPassword is not implemented for JWT backend");
   }
 
   // Auth State Management
   onAuthStateChanged(callback) {
-    return onAuthStateChanged(auth, callback)
+    // No Firebase listener; immediately invoke with a simple user object if token exists
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        if (cancelled) return;
+        if (token) {
+          let profile = null;
+          try {
+            profile = await authAPI.getProfile();
+          } catch (_) {}
+          callback(profile);
+        } else {
+          callback(null);
+        }
+      } catch (_) {
+        callback(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }
 
   getCurrentUser() {
-    return auth.currentUser
+    return null;
   }
 
   async getCurrentToken() {
     try {
       // First try to get token from storage
-      const storedToken = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
+      let storedToken = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
       if (storedToken) {
-        // Verify token is still valid
-        try {
-          // Simple check if token is a valid JWT
-          if (storedToken.split('.').length === 3) {
-            return storedToken
-          }
-        } catch (e) {
-          console.log('Invalid token format, will refresh')
-        }
+        return storedToken;
       }
 
-      // If no stored token or invalid, try to get fresh one
-      const user = auth.currentUser
-      if (user) {
-        const token = await user.getIdToken(true) // Force refresh
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token)
-        return token
-      }
-      
-      return null
+      return null;
     } catch (error) {
-      logger.error("Error getting token:", error)
-      await this.clearAuthData()
-      return null
+      logger.error("Error getting token:", error);
+      await this.clearAuthData();
+      return null;
     }
   }
 
   async clearAuthData() {
     try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN)
-      await AsyncStorage.removeItem(STORAGE_KEYS.USER_EMAIL)
+      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      await AsyncStorage.removeItem(STORAGE_KEYS.USER_EMAIL);
+      // Also clear shim token if present
+      try {
+        await AsyncStorage.removeItem("@shim_id_token");
+      } catch (_) {}
     } catch (error) {
-      logger.error("Error clearing auth data:", error)
+      logger.error("Error clearing auth data:", error);
     }
   }
 
-  // Add refreshToken method to avoid errors
   async refreshToken() {
-    try {
-      const user = auth.currentUser
-      if (!user) throw new Error("No user logged in")
-      return await user.getIdToken(true) // Force refresh
-    } catch (error) {
-      logger.error("Failed to refresh token:", error)
-      throw error
-    }
+    return null;
   }
 
   // Error Handling
@@ -152,11 +143,63 @@ class AuthService {
       "auth/email-already-in-use": "An account with this email already exists",
       "auth/weak-password": "Password should be at least 6 characters",
       "auth/invalid-email": "Invalid email address",
-    }
+    };
 
-    const message = errorMap[error.code] || error.message || "Authentication failed"
-    return new Error(message)
+    const code = error?.code || error?.response?.status;
+    const message =
+      errorMap[code] ||
+      error?.response?.data?.message ||
+      error?.message ||
+      "Authentication failed";
+    return new Error(message);
   }
 }
 
-export const authService = new AuthService()
+export const authService = new AuthService();
+
+export const login = async (email, password) => {
+  try {
+    const response = await apiService.post(
+      "/auth/login",
+      { email, password },
+      {
+        timeout: API_CONFIG.TIMEOUT.AUTH,
+        maxRetries: 1, // Only retry once for login
+      }
+    );
+    return response;
+  } catch (error) {
+    logger.error("Login failed:", {
+      error: error.message,
+      code: error.code,
+      timeout: error.timeout,
+    });
+    throw error;
+  }
+};
+
+export const getProfile = async () => {
+  try {
+    const response = await api.get("/auth/profile", {
+      timeout: 60000, // 60 second timeout
+      retries: 2, // Allow 2 retries
+    });
+
+    return {
+      success: true,
+      data: response.data,
+    };
+  } catch (error) {
+    console.error("Get profile API error:", {
+      message: error.message,
+      code: error.code,
+      timeout: error.timeout,
+    });
+
+    return {
+      success: false,
+      error: error.message,
+      isTimeout: error.code === "ECONNABORTED",
+    };
+  }
+};

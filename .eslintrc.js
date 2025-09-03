@@ -1,39 +1,27 @@
 module.exports = {
-  extends: [
-    'universe/native',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:prettier/recommended',
-  ],
-  parser: '@typescript-eslint/parser',
-  plugins: ['@typescript-eslint', 'react', 'react-hooks', 'prettier'],
   root: true,
-  rules: {
-    'prettier/prettier': 'error',
-    'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn',
-    'react/prop-types': 'off', // We use TypeScript for prop validation
-    'react/display-name': 'off',
-    '@typescript-eslint/explicit-function-return-type': 'off',
-    '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-    'no-console': ['warn', { allow: ['warn', 'error'] }],
+  extends: ["@react-native", "eslint:recommended", "plugin:react/recommended"],
+  parser: "@babel/eslint-parser",
+  parserOptions: {
+    ecmaVersion: 2021,
+    sourceType: "module",
+    ecmaFeatures: {
+      jsx: true,
+    },
   },
   settings: {
-    'import/resolver': {
-      typescript: {},
-      node: {
-        extensions: ['.js', '.jsx', '.ts', '.tsx'],
-      },
+    react: {
+      version: "detect",
     },
   },
-  overrides: [
-    {
-      files: ['*.ts', '*.tsx'],
-      rules: {
-        '@typescript-eslint/no-shadow': ['error'],
-        'no-shadow': 'off',
-        'no-undef': 'off',
-      },
-    },
-  ],
+  env: {
+    node: true,
+    browser: true,
+    "react-native/react-native": true,
+  },
+  rules: {
+    "react/prop-types": "off",
+    "react/display-name": "off",
+    "no-console": ["warn", { allow: ["warn", "error"] }],
+  },
 };

@@ -1,5 +1,14 @@
-import { ERROR_CODES } from "../config/constants"
 import { logger } from "./logger"
+
+// Error codes constants
+export const ERROR_CODES = {
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTH_ERROR: 'AUTH_ERROR',
+  PERMISSION_ERROR: 'PERMISSION_ERROR',
+  SERVER_ERROR: 'SERVER_ERROR',
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+};
 
 class ErrorHandler {
   process(error) {

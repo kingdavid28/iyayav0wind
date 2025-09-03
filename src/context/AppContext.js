@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useReducer, useEffect } from "react"
+import { createContext, useContext, useReducer, useEffect, useRef } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { STORAGE_KEYS } from "../config/constants"
 import { authService } from "../services/authService"
@@ -8,6 +8,7 @@ import { userService } from "../services/userService"
 import { logger } from "../utils/logger"
 import { Alert } from "react-native"
 import jobService from '../services/jobService';
+import { useAuth } from "../contexts/AuthContext"
 
 // Initial State
 const initialState = {
@@ -52,6 +53,9 @@ const initialState = {
     general: null,
   },
 }
+
+// Normalize backend role naming to what the app expects
+const normalizeRole = (role) => (role === 'client' ? 'parent' : role)
 
 // Action Types
 export const ACTION_TYPES = {
@@ -191,6 +195,13 @@ const AppContext = createContext()
 // Provider Component
 const AppProvider = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState)
+  // Dev-only toggle to allow auto-mock auth in Expo Go / dev
+  const ALLOW_UNVERIFIED = (process?.env?.EXPO_PUBLIC_ALLOW_UNVERIFIED === 'true') || (__DEV__ === true)
+  // New: explicit flag to enable/disable dev auto-mock login
+  const DEV_AUTOMOCK = (process?.env?.EXPO_PUBLIC_DEV_AUTOMOCK === 'true')
+  const devMockApplied = useRef(false)
+  // Bridge: consume JWT-based auth from AuthContext
+  const { user: authUser, loading: authLoading } = useAuth()
 
   // Helper function for error handling
   const handleError = (key, error) => {
@@ -215,6 +226,37 @@ const AppProvider = ({ children }) => {
     }
     init()
   }, [])
+
+  // Mirror AuthContext user into AppContext so isAuthenticated aligns with JWT auth
+  useEffect(() => {
+    if (authLoading) return
+    if (authUser) {
+      const normalized = authUser?.role ? { ...authUser, role: normalizeRole(authUser.role) } : authUser
+      dispatch({ type: ACTION_TYPES.SET_USER, payload: normalized })
+      dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: normalized })
+    } else {
+      // When JWT auth signs out, reflect here as well
+      dispatch({ type: ACTION_TYPES.LOGOUT })
+    }
+  }, [authUser, authLoading])
+
+  // Dev-only: Auto-mock user to unblock navigation in Expo Go when allowed
+  useEffect(() => {
+    if (devMockApplied.current) return
+    // Only apply auto-mock when explicitly enabled
+    if (!DEV_AUTOMOCK) return
+    if (!ALLOW_UNVERIFIED) return
+    if (state.isAuthenticated) return
+
+    const mockUser = {
+      uid: "dev-mock-uid",
+      email: "dev@example.com",
+      displayName: "Dev User",
+    }
+    dispatch({ type: ACTION_TYPES.SET_USER, payload: mockUser })
+    dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: { uid: mockUser.uid, role: "parent", name: mockUser.displayName } })
+    devMockApplied.current = true
+  }, [DEV_AUTOMOCK, ALLOW_UNVERIFIED, state.isAuthenticated])
 
   const initializeApp = async () => {
     try {
@@ -255,6 +297,11 @@ const AppProvider = ({ children }) => {
   }
 
   const initializeAuthListener = () => {
+    // If AuthContext is managing JWT auth, skip Firebase-style listener
+    if (authUser) {
+      dispatch({ type: ACTION_TYPES.SET_AUTH_LOADING, payload: false })
+      return () => {}
+    }
     return authService.onAuthStateChanged(async (user) => {
       try {
         dispatch({ type: ACTION_TYPES.SET_USER, payload: user })
@@ -264,7 +311,13 @@ const AppProvider = ({ children }) => {
         if (user && token && (!state.userProfile || state.userProfile.uid !== user.uid)) {
           try {
             const profile = await userService.getProfile(user.uid)
-            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: profile })
+            const normalizedProfile = profile ? { ...profile, role: normalizeRole(profile.role) } : null
+            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: normalizedProfile })
+            // Merge role and name into user for downstream consumers (Navigator, jobService)
+            if (normalizedProfile) {
+              const mergedUser = { ...user, role: normalizedProfile.role, displayName: normalizedProfile.name }
+              dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser })
+            }
           } catch (error) {
             logger.warn("Failed to load user profile:", error)
             dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: null })
@@ -286,8 +339,12 @@ const AppProvider = ({ children }) => {
         })
         dispatch({ type: ACTION_TYPES.CLEAR_ERROR, payload: "auth" })
 
-        const user = await authService.login(email, password)
-        return user
+        const result = await authService.login(email, password)
+        // Immediately set user so UI can react (Expo Go shim may not re-emit auth state)
+        if (result?.user) {
+          dispatch({ type: ACTION_TYPES.SET_USER, payload: result.user })
+        }
+        return result.user
       } catch (error) {
         handleError("auth", error)
         throw error
@@ -308,12 +365,16 @@ const AppProvider = ({ children }) => {
         dispatch({ type: ACTION_TYPES.CLEAR_ERROR, payload: "auth" })
 
         const result = await authService.register(userData)
+        // Set user immediately on successful registration
+        if (result?.user) {
+          dispatch({ type: ACTION_TYPES.SET_USER, payload: result.user })
+        }
 
         try {
           await userService.createProfile(result.user.uid, {
             name: userData.name,
             email: userData.email,
-            role: userData.role || "nanny",
+            role: userData.role || "parent",
           })
         } catch (profileError) {
           logger.warn("Failed to create backend profile:", profileError)
@@ -431,7 +492,7 @@ const AppProvider = ({ children }) => {
         // Update userProfile in state
         dispatch({
           type: ACTION_TYPES.SET_USER_PROFILE,
-          payload: result.data,
+          payload: result?.data ? { ...result.data, role: normalizeRole(result.data.role) } : result.data,
         });
         return result.data;
       } catch (error) {
@@ -471,7 +532,7 @@ const AppProvider = ({ children }) => {
 
         dispatch({
           type: ACTION_TYPES.SET_USER_PROFILE,
-          payload: updatedProfile,
+          payload: updatedProfile ? { ...updatedProfile, role: normalizeRole(updatedProfile.role) } : updatedProfile,
         })
         return updatedProfile
       } catch (error) {

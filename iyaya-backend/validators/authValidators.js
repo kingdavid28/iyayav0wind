@@ -53,7 +53,7 @@ exports.registerValidations = [
   ...passwordRequirements,
   
   body('userType')
-    .isIn(['client', 'provider', 'admin']).withMessage('Invalid user type')
+    .isIn(['parent', 'caregiver', 'admin']).withMessage('Invalid user type')
     .bail(),
   
   body('name')
@@ -83,7 +83,7 @@ exports.loginValidations = [
     .bail(),
     
   body('userType')
-    .isIn(['client', 'provider', 'admin']).withMessage('Invalid user type')
+    .isIn(['parent', 'caregiver', 'admin']).withMessage('Invalid user type')
     .bail()
 ];
 

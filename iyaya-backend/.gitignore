@@ -84,3 +84,6 @@ EMAIL_USERNAME=rere.centno.swu@phinmaed.com
 EMAIL_PASSWORD=kNooCkk@0228
 EMAIL_FROM=no-reply@iyaya.com
 # ======================
+GOOGLE_APPLICATION_CREDENTIALS=iyaya-backend/serviceAccountKey.json
+# or
+FIREBASE_SERVICE_ACCOUNT_PATH=iyaya-backend/serviceAccountKey.json

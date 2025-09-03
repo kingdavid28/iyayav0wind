@@ -1,11 +1,25 @@
-// src/components/forms/ProfileForm.js
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Button, Divider, Text, useTheme } from 'react-native-paper';
+import { 
+  View, 
+  StyleSheet, 
+  ScrollView, 
+  Alert, 
+  TouchableOpacity 
+} from 'react-native';
+import { 
+  Button, 
+  Divider, 
+  Text, 
+  useTheme, 
+  TextInput, 
+  IconButton, 
+  ActivityIndicator 
+} from 'react-native-paper';
 import { validator } from '../../utils/validator';
 import ValidatedInput from './ValidatedInput';
 import DocumentUpload from './DocumentUpload';
 import { Rating } from 'react-native-ratings';
+import { searchLocation, formatLocation } from '../../utils/locationUtils';
 
 const ProfileForm = ({ onSubmit, initialValues = {}, isCaregiver = false }) => {
   const theme = useTheme();
@@ -14,6 +28,7 @@ const ProfileForm = ({ onSubmit, initialValues = {}, isCaregiver = false }) => {
     lastName: initialValues.lastName || '',
     email: initialValues.email || '',
     phone: initialValues.phone || '',
+    location: initialValues.location || null,
     documents: initialValues.documents || {
       id: '',
       policeClearance: '',
@@ -22,10 +37,23 @@ const ProfileForm = ({ onSubmit, initialValues = {}, isCaregiver = false }) => {
     rating: initialValues.rating || 0,
     skills: initialValues.skills || [],
     bio: initialValues.bio || '',
+    verificationStatus: initialValues.verificationStatus || 'unverified'
   });
   
   const [editingRating, setEditingRating] = useState(false);
   const [tempRating, setTempRating] = useState(formData.rating);
+  const [locationSearch, setLocationSearch] = useState(
+    initialValues.location ? formatLocation(initialValues.location) : ''
+  );
+  const [searchTimeout, setSearchTimeout] = useState(null);
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+
+  useEffect(() => {
+    // Initialize location search text if location exists
+    if (initialValues.location) {
+      setLocationSearch(formatLocation(initialValues.location));
+    }
+  }, [initialValues.location]);
 
   const handleSubmit = () => {
     try {
@@ -37,6 +65,11 @@ const ProfileForm = ({ onSubmit, initialValues = {}, isCaregiver = false }) => {
       
       if (isCaregiver) {
         validator.validateBio(formData.bio);
+        
+        // Validate location for caregivers
+        if (!formData.location) {
+          throw new Error('Please enter your location');
+        }
         
         // If caregiver is submitting for verification, check documents
         if (formData.verificationStatus !== 'verified') {
@@ -93,6 +126,37 @@ const ProfileForm = ({ onSubmit, initialValues = {}, isCaregiver = false }) => {
     }));
   };
 
+  const handleLocationSearch = async (searchText) => {
+    setLocationSearch(searchText);
+    
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    if (!searchText.trim()) {
+      setFormData(prev => ({ ...prev, location: null }));
+      return;
+    }
+    
+    const timeout = setTimeout(async () => {
+      try {
+        setIsSearchingLocation(true);
+        const locationData = await searchLocation(searchText);
+        setFormData(prev => ({
+          ...prev,
+          location: locationData
+        }));
+      } catch (error) {
+        console.error('Location search failed:', error);
+        Alert.alert('Location Error', 'Failed to find location. Please try again.');
+      } finally {
+        setIsSearchingLocation(false);
+      }
+    }, 1000);
+    
+    setSearchTimeout(timeout);
+  };
+
   const updateField = (field) => (value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -142,6 +206,33 @@ const ProfileForm = ({ onSubmit, initialValues = {}, isCaregiver = false }) => {
           <>
             <Divider style={styles.divider} />
             <Text style={styles.sectionTitle}>Professional Information</Text>
+            
+            {/* Location Input */}
+            <View style={styles.locationContainer}>
+              <Text style={styles.label}>Location</Text>
+              <ValidatedInput
+                label="Address"
+                value={locationSearch}
+                onChangeText={handleLocationSearch}
+                placeholder="Enter your address"
+                loading={isSearchingLocation}
+              />
+              {formData.location && (
+                <View style={styles.locationDisplay}>
+                  <Text style={styles.locationText}>
+                    {formatLocation(formData.location)}
+                  </Text>
+                  <IconButton 
+                    icon="close" 
+                    size={16} 
+                    onPress={() => {
+                      setFormData(prev => ({ ...prev, location: null }));
+                      setLocationSearch('');
+                    }}
+                  />
+                </View>
+              )}
+            </View>
             
             <ValidatedInput
               label="Bio"
@@ -267,8 +358,6 @@ const ProfileForm = ({ onSubmit, initialValues = {}, isCaregiver = false }) => {
           mode="contained" 
           onPress={handleSubmit}
           style={styles.submitButton}
-          loading={formData.isSubmitting}
-          disabled={formData.isSubmitting}
         >
           {isCaregiver && formData.verificationStatus === 'pending' 
             ? 'Submit for Verification' 
@@ -285,7 +374,7 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 16,
-    paddingBottom: 40, // Extra padding at the bottom for better scrolling
+    paddingBottom: 40,
   },
   sectionTitle: {
     fontSize: 18,
@@ -393,6 +482,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     padding: 8,
   },
+  locationContainer: {
+    marginBottom: 20,
+  },
+  locationDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+  },
+  locationText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1976d2',
+  }
 });
 
 export default ProfileForm;

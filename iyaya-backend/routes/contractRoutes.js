@@ -5,7 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const { checkUserType } = require('../middleware/authorization');
 const {
   createContractValidator,
-  clientIdValidator,
+  parentIdValidator,
   contractIdValidator,
   statusUpdateValidator
 } = require('../validators/contractValidators');
@@ -38,7 +38,7 @@ const contractLimiter = rateLimit({
  *     Contract:
  *       type: object
  *       required:
- *         - providerId
+ *         - caregiverId
  *         - serviceId
  *         - terms
  *         - price
@@ -46,6 +46,9 @@ const contractLimiter = rateLimit({
  *         clientId:
  *           type: string
  *           description: ID of the client (auto-set from auth)
+ *         caregiverId:
+ *           type: string
+ *           description: ID of the caregiver
  *         providerId:
  *           type: string
  *           description: ID of the provider
@@ -116,7 +119,7 @@ const contractLimiter = rateLimit({
 router.post(
   '/',
   authenticate,
-  checkUserType('client'),
+  checkUserType('parent'),
   contractLimiter,
   createContractValidator,
   contractController.createContract
@@ -124,15 +127,15 @@ router.post(
 
 /**
  * @swagger
- * /api/contracts/client/{clientId}:
+ * /api/contracts/parent/{parentId}:
  *   get:
- *     summary: Get contracts for a specific client
+ *     summary: Get contracts for a specific parent
  *     tags: [Contracts]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: clientId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: string
@@ -145,31 +148,31 @@ router.post(
  *         description: Filter by contract status
  *     responses:
  *       200:
- *         description: List of client contracts
+ *         description: List of parent contracts
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ContractList'
  *       400:
- *         description: Invalid client ID or status
+ *         description: Invalid parent ID or status
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden (can only view own contracts)
  */
 router.get(
-  '/client/:clientId',
+  '/parent/:parentId',
   authenticate,
   contractLimiter,
-  clientIdValidator,
-  contractController.getClientContracts
+  parentIdValidator,
+  contractController.getParentContracts
 );
 
 /**
  * @swagger
- * /api/contracts/provider:
+ * /api/contracts/caregiver:
  *   get:
- *     summary: Get contracts for the current provider
+ *     summary: Get contracts for the current caregiver
  *     tags: [Contracts]
  *     security:
  *       - bearerAuth: []
@@ -182,7 +185,7 @@ router.get(
  *         description: Filter by contract status
  *     responses:
  *       200:
- *         description: List of provider contracts
+ *         description: List of caregiver contracts
  *         content:
  *           application/json:
  *             schema:
@@ -192,14 +195,14 @@ router.get(
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden (provider access only)
+ *         description: Forbidden (caregiver access only)
  */
 router.get(
-  '/provider/:id',
+  '/caregiver/:id',
   authenticate,
-  checkUserType('provider'),
+  checkUserType('caregiver'),
   contractLimiter,
-  contractController.getProviderContracts
+  contractController.getCaregiverContracts
 );
 
 /**

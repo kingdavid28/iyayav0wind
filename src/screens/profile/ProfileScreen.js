@@ -5,8 +5,6 @@ import { useNavigation } from '@react-navigation/native';
 import { userService } from '../../services/userService';
 import ProfileForm from '../../components/forms/ProfileForm';
 import { useAuth } from '../../contexts/AuthContext';
-import { storage } from '../../config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const ProfileScreen = () => {
   const theme = useTheme();

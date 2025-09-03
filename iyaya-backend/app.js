@@ -1,3 +1,4 @@
+
 require('dotenv').config({ path: './.env' });
 const express = require('express');
 const cors = require('cors');
@@ -18,60 +19,84 @@ const app = express();
 // ============================================
 // Fixed rate limiter configuration (previous values were too large)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes (was 1500*6000*100000)
-  max: 100, // limit each IP to 100 requests per windowMs (was 1000000)
-  message: {
-    success: false,
-    error: 'Too many requests, please try again later'
-  },
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per windowMs
+  message: { success: false, error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.user?.role === 'admin'
+  skip: (req) => process.env.NODE_ENV === 'development' || (req.user?.role === 'admin') || (req.originalUrl?.startsWith('/api/messages')),
+  keyGenerator: (req, res) => {
+    // Use express-rate-limit's built-in IPv6 handling
+    return rateLimit.ipKeyGenerator(req, res);
+  }
+});
+
+// Dedicated limiter for messages endpoints: higher cap and key per authenticated user
+const messagesLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 2000, // allow frequent polling without tripping limits
+  message: { success: false, error: 'Too many message requests, please slow down temporarily' },
+  standardHeaders: true,
+  keyGenerator: (req, res) => {
+    // Use user ID if authenticated, otherwise fall back to IP with IPv6 handling
+    if (req.user?.id) return req.user.id;
+    const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
+    // Use express-rate-limit's built-in IPv6 handling
+    return rateLimit.ipKeyGenerator(req, res);
+  },
+  legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV === 'development', // Skip rate limiting in development
 });
 
 app.use('/api', limiter);
 
-// CORS Configuration
-const allowedHeaders = [
-  'Content-Type',
-  'Authorization',
-  'X-Device-ID',
-  'x-client-time',
-  'app-version',
-  'X-Request-ID',
-  'X-Refresh-Token',
-  'X-Requested-With',
-  'Accept',
-  'Origin',
-  'User-Agent',
-  'x-app-instance',
-  'platform'
-];
+// Parse CORS origins from environment variable
+const corsOrigins = process.env.CORS_ORIGIN ? 
+  process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : 
+  ['http://localhost:19006', 'http://127.0.0.1:19006', 'http://192.168.1.10:19006'];
 
-// Enhanced CORS configuration with better error handling
+// CORS Configuration
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
     // Check if origin is in allowed list or wildcard is present
-    if (config.cors.origin.includes('*') || config.cors.origin.includes(origin)) {
+    if (corsOrigins.includes('*') || corsOrigins.includes(origin)) {
       return callback(null, true);
     }
     
     // Format the error message consistently
     const error = new Error(`Origin ${origin} not allowed by CORS`);
     error.status = 403;
+    console.warn(`CORS blocked: ${origin}`);
     callback(error);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders,
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'x-device-id',
+    'x-app-version',
+    'x-auth-token',
+    'platform'
+  ],
   exposedHeaders: ['Authorization', 'X-Refresh-Token', 'X-Request-ID'],
   credentials: true,
   optionsSuccessStatus: 204,
   maxAge: 86400
 };
-console.log('Allowed CORS origins:', config.cors.origin);
+
+// Apply CORS middleware
+console.log('CORS Configuration:', {
+  origins: corsOrigins,
+  methods: corsOptions.methods,
+  allowedHeaders: corsOptions.allowedHeaders
+});
+
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
@@ -80,13 +105,27 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:'],
-      connectSrc: ["'self'", ...config.cors.origin]
-    }
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
+      imgSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      // Add any additional CSP directives here
+    },
   },
-  crossOriginResourcePolicy: { policy: "same-site" }
+  crossOriginResourcePolicy: { policy: "same-site" },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  dnsPrefetchControl: { allow: false },
+  frameguard: { action: 'deny' },
+  hidePoweredBy: true,
+  hsts: { maxAge: 15552000, includeSubDomains: true },
+  ieNoOpen: true,
+  noSniff: true,
+  xssFilter: true
 }));
 
 app.use(mongoSanitize());
@@ -112,18 +151,18 @@ const mountRoutes = () => {
   apiRouter.use('/auth', require('./routes/authRoutes'));
 
   // Protected Routes
-  apiRouter.use('/providers', authenticate, require('./routes/providerRoutes'));
+  // Caregivers: public search/details + authenticated profile endpoints are enforced inside the router
+  apiRouter.use('/caregivers', require('./routes/caregiverRoutes'));
+  apiRouter.use('/profile', require('./routes/profileRoutes'));
   apiRouter.use('/contracts', authenticate, require('./routes/contractRoutes'));
   apiRouter.use('/bookings', authenticate, require('./routes/bookingRoutes'));
-  apiRouter.use('/jobs', authenticate, require('./routes/jobsRoutes'));
-  apiRouter.use('/applications', authenticate, require('./routes/applicationsRoutes'));
+  apiRouter.use('/jobs', require('./routes/jobsRoutes'));
+  apiRouter.use('/applications', require('./routes/applicationsRoutes'));
+  apiRouter.use('/uploads', authenticate, require('./routes/uploadsRoutes'));
+  // Apply authenticate BEFORE messagesLimiter so keyGenerator can use req.user
+  apiRouter.use('/messages', authenticate, messagesLimiter, require('./routes/messagesRoutes'));
 
-  // Admin Routes
-  apiRouter.use('/admin',
-    authenticate,
-    authorize(['admin']),
-    require('./routes/adminRoutes')
-  );
+  // Admin Routes removed
   
   // Use /api exclusively as the base path
   app.use('/api', apiRouter);
@@ -135,11 +174,9 @@ mountRoutes();
 // Health Check
 // ============================================
 const authController = require('./controllers/auth');
-
-const firebaseAuth = require('./middleware/firebaseAuth');
-app.get('/api/auth/profile', firebaseAuth, (req, res) => {
-  res.json({ user: req.user });
-});
+// Use the standard authenticate middleware so we resolve Firebase or JWT and
+// then delegate to the controller which returns a normalized profile shape
+app.get('/api/auth/profile', authenticate, authController.getCurrentUser);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({

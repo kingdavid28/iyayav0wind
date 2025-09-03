@@ -1,6 +1,8 @@
 // services/auditService.js
 const db = require('../models');
 const { AuditLog } = db;
+const AUDIT_ENABLED = process.env.AUDIT_ENABLED === 'true';
+let warnedAuditUnavailable = false;
 
 const auditService = {
   /**
@@ -82,7 +84,14 @@ const auditService = {
   }) => {
     try {
       if (!AuditLog?.create) {
-        throw new Error('AuditLog model not available');
+        // If auditing is disabled, silently skip to avoid noisy logs in dev
+        if (!AUDIT_ENABLED) return null;
+        // If auditing is enabled but model isn't wired, warn once
+        if (!warnedAuditUnavailable) {
+          console.warn('[AUDIT_WARN] AuditLog model not available; skipping DB write for action:', action);
+          warnedAuditUnavailable = true;
+        }
+        return null;
       }
 
       return await AuditLog.create({

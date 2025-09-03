@@ -15,6 +15,8 @@ class ErrorResponse extends Error {
     
     // Core error properties
     this.statusCode = statusCode || 500;
+    // Alias for middleware that expects `err.status`
+    this.status = this.statusCode;
     this.code = code || this.generateErrorCode();
     this.validationErrors = validationErrors;
     this.metadata = metadata;

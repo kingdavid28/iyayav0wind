@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { Text, TextInput, Button, useTheme, IconButton } from 'react-native-paper';
 import { Rating } from 'react-native-ratings';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadBytes, ref as storageRef, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../../config/firebase';
+import { uploadsAPI } from '../../config/api';
+
+// Platform-specific FileSystem import
+const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
 
 const ReviewForm = ({ onSubmit, initialRating = 0, onCancel }) => {
   const theme = useTheme();
@@ -54,25 +56,32 @@ const ReviewForm = ({ onSubmit, initialRating = 0, onCancel }) => {
 
     try {
       setIsSubmitting(true);
-      
-      // Upload images first if any
+      setUploadProgress(0);
+
+      // Upload images first if any via backend uploads API
       let uploadedImageUrls = [];
-      
       if (images.length > 0) {
-        const uploadPromises = images.map(async (uri, index) => {
-          const response = await fetch(uri);
-          const blob = await response.blob();
-          const fileName = `review_${Date.now()}_${index}.jpg`;
-          const fileRef = storageRef(storage, `review_images/${fileName}`);
-          
-          await uploadBytes(fileRef, blob);
-          const downloadURL = await getDownloadURL(fileRef);
-          return downloadURL;
-        });
+        if (Platform.OS === 'web' || !FileSystem) {
+          console.warn('Image upload not supported on web platform');
+          Alert.alert('Upload Error', 'Image upload is not supported on web platform');
+          setIsSubmitting(false);
+          return;
+        }
         
+        const uploadPromises = images.map(async (uri, index) => {
+          const imageBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+          const mimeType = uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+          const name = `review_${Date.now()}_${index}`;
+          const folder = 'review_images';
+          const res = await uploadsAPI.base64Upload({ imageBase64, mimeType, folder, name });
+          if (!res?.success || !res?.url) throw new Error('Upload failed');
+          // simple progress approximation
+          setUploadProgress(Math.round(((index + 1) / images.length) * 100));
+          return res.url;
+        });
         uploadedImageUrls = await Promise.all(uploadPromises);
       }
-      
+
       // Submit review with image URLs
       await onSubmit({
         rating,

@@ -113,7 +113,8 @@ verifyMethods(authController, [
   'logout', 
   'refreshToken',
   'getCurrentUser',
-  'updateChildren'
+  'updateChildren',
+  'updateRole'
 ], 'auth');
 
 verifyMethods(validation, [
@@ -150,9 +151,17 @@ const authLimiter = createLimiter({
 });
 
 const strictLimiter = createLimiter({
-  max: 3,
-  windowMs: 60 * 60 * 1000, // 1 hour
+  // In development, allow generous retries to avoid blocking during testing
+  max: process.env.NODE_ENV === 'production' ? 3 : 1000,
+  windowMs: process.env.NODE_ENV === 'production' ? (60 * 60 * 1000) : (60 * 1000),
   message: 'Too many attempts on sensitive endpoint' 
+});
+
+// More permissive limiter for frequent profile reads (mobile apps poll this)
+const profileLimiter = createLimiter({
+  max: 200, // allow many reads within the window
+  windowMs: 15 * 60 * 1000,
+  message: 'Too many profile requests, please slow down temporarily'
 });
 
 // 5. Security middleware stack
@@ -207,14 +216,14 @@ router.post('/refresh-token',
 );
 
 router.get('/me',
-  authLimiter,
+  profileLimiter,
   authenticate,
   authController.getCurrentUser
 );
 
 // Alias for legacy/frontend compatibility
 router.get('/profile',
-  authLimiter,
+  profileLimiter,
   authenticate,
   authController.getCurrentUser
 );
@@ -223,6 +232,12 @@ router.get('/profile',
 router.put('/profile',
   authenticate,
   authController.updateProfile
+);
+
+// Persist selected role for the authenticated user
+router.patch('/role',
+  authenticate,
+  authController.updateRole
 );
 
 // Upload profile image via base64

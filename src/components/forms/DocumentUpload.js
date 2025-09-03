@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Button, Text, IconButton } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadBytes, ref as storageRef, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../config/firebase';
+import { uploadsAPI } from '../../config/api';
+
+// Platform-specific FileSystem import
+const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
 
 const DocumentUpload = ({ label, documentType, onUploadComplete, initialUri = '' }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -38,37 +40,27 @@ const DocumentUpload = ({ label, documentType, onUploadComplete, initialUri = ''
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      const fileName = `${documentType}_${Date.now()}.jpg`;
-      const fileRef = storageRef(storage, `verification_documents/${fileName}`);
-      
-      const uploadTask = uploadBytes(fileRef, blob);
-      
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error('Upload error:', error);
-          throw new Error('Upload failed. Please try again.');
-        },
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            setDocumentUri(downloadURL);
-            onUploadComplete(downloadURL, documentType);
-          } catch (error) {
-            console.error('Error getting download URL:', error);
-            throw new Error('Failed to get download URL.');
-          } finally {
-            setIsUploading(false);
-          }
-        }
-      );
+      // Read file as base64 (skip on web)
+      let imageBase64 = '';
+      if (Platform.OS !== 'web' && FileSystem) {
+        imageBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      } else {
+        // For web, we'll need to handle file reading differently
+        console.warn('FileSystem not available on web platform');
+        Alert.alert('Upload Error', 'File upload is not supported on web platform');
+        return;
+      }
+      // Best-effort mime type guess
+      const mimeType = uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+      const name = `${documentType}_${Date.now()}`;
+      const folder = 'verification_documents';
+
+      const res = await uploadsAPI.base64Upload({ imageBase64, mimeType, folder, name });
+      if (!res?.success || !res?.url) throw new Error('Upload failed');
+      setUploadProgress(100);
+      setDocumentUri(res.url);
+      onUploadComplete(res.url, documentType);
+      setIsUploading(false);
     } catch (error) {
       console.error('Upload error:', error);
       Alert.alert('Upload Failed', error.message || 'Failed to upload document. Please try again.');

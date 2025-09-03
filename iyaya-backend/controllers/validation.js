@@ -6,7 +6,8 @@ const register = {
     email: Joi.string().required().email(),
     password: Joi.string().required().custom(password),
     name: Joi.string().required(),
-    role: Joi.string().valid('user', 'admin', 'provider'),
+    // Accept frontend role aliases; controller will normalize to internal values
+    role: Joi.string().valid('user', 'admin', 'provider', 'client', 'parent', 'caregiver', 'nanny'),
   }),
 };
 

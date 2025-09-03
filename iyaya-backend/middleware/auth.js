@@ -1,11 +1,45 @@
 const jwt = require('jsonwebtoken');
-const admin = require('firebase-admin');
 const { jwtSecret } = require('../config/auth');
 const User = require('../models/User');
 
-// Enhanced authentication middleware that handles both Firebase ID tokens and custom JWT
+// Authentication middleware: JWT-only (Firebase Admin removed)
 const authenticate = async (req, res, next) => {
   try {
+    // Dev-only bypass to help Expo Go flows without a real token
+    if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_BYPASS === 'true' && req.header('X-Dev-Bypass') === '1') {
+      console.log('🔧 Dev bypass activated');
+      const incoming = (req.header('X-Dev-Role') || 'parent').toLowerCase();
+      console.log('🔧 Dev bypass role:', incoming);
+      
+      // Map app-facing roles to internal roles
+      const mapped = incoming === 'caregiver' || incoming === 'provider'
+        ? { role: 'caregiver', userType: 'caregiver' }
+        : { role: 'parent', userType: 'parent' }; // Fixed: use 'parent' instead of 'client'
+      
+      req.user = {
+        id: 'dev-bypass-uid',
+        mongoId: 'dev-bypass-mongo-id',
+        role: mapped.role,
+        userType: mapped.userType,
+        email: 'dev-bypass@example.com',
+        bypass: true,
+      };
+      
+      console.log('🔧 Dev bypass user created:', req.user);
+      
+      try {
+        // Optionally map to an existing user if present
+        const dbUser = await User.findOne({ email: req.user.email.toLowerCase() }).select('_id role userType');
+        if (dbUser) {
+          req.user.mongoId = dbUser._id;
+          if (dbUser.role) req.user.role = dbUser.role;
+          if (dbUser.userType) req.user.userType = dbUser.userType;
+          console.log('🔧 Dev bypass mapped to DB user:', dbUser._id);
+        }
+      } catch (_) {}
+      return next();
+    }
+
     // Get and validate authorization header
     const authHeader = req.header('Authorization');
     
@@ -25,54 +59,52 @@ const authenticate = async (req, res, next) => {
       });
     }
 
+    // Verify as custom JWT (HS256)
     try {
-      // First try to verify as Firebase ID token
-      const firebaseUser = await admin.auth().verifyIdToken(token);
-      
-      req.user = {
-        id: firebaseUser.uid,
-        role: firebaseUser.role || 'user', // Default role if not set
-        email: firebaseUser.email,
-        firebase: true // Flag to indicate this is a Firebase-authenticated user
-      };
+      const decoded = jwt.verify(token, jwtSecret, {
+        algorithms: ['HS256'],
+        ignoreExpiration: false
+      });
 
-      // Attempt to map Firebase UID to our Mongo User _id
-      try {
-        const dbUser = await User.findOne({ firebaseUid: firebaseUser.uid }).select('_id role');
-        if (dbUser) {
-          req.user.mongoId = dbUser._id;
-          // Prefer backend role if present
-          if (dbUser.role) req.user.role = dbUser.role;
+      // Map JWT token roles to correct userType
+      let userType = decoded.role || 'user';
+      if (decoded.role === 'provider') {
+        userType = 'caregiver';
+      } else if (decoded.role === 'caregiver') {
+        userType = 'caregiver';
+      } else if (decoded.role === 'client') {
+        // For legacy tokens with 'client' role, check actual user profile
+        try {
+          const User = require('../models/User');
+          const user = await User.findById(decoded.id).select('role userType');
+          if (user && (user.role === 'caregiver' || user.userType === 'provider')) {
+            userType = 'caregiver';
+          } else {
+            userType = 'parent';
+          }
+        } catch (dbError) {
+          console.error('Error checking user profile for role mapping:', dbError);
+          userType = 'parent'; // fallback
         }
-      } catch (mapErr) {
-        console.error('User mapping error:', mapErr.message);
+      } else if (decoded.role === 'parent') {
+        userType = 'parent';
       }
-      
+
+      req.user = {
+        id: decoded.id,
+        role: decoded.role || 'user',
+        userType: userType,
+        ...(decoded.email && { email: decoded.email })
+      };
+      // For custom JWTs that carry Mongo id, expose it as mongoId
+      if (decoded.id) {
+        req.user.mongoId = decoded.id;
+      }
+
       return next();
-    } catch (firebaseError) {
-      // If Firebase verification fails, try as custom JWT
-      try {
-        const decoded = jwt.verify(token, jwtSecret, {
-          algorithms: ['HS256'],
-          ignoreExpiration: false
-        });
-        
-        req.user = {
-          id: decoded.id,
-          role: decoded.role || 'user',
-          ...(decoded.email && { email: decoded.email })
-        };
-        // For custom JWTs that carry Mongo id, expose it as mongoId
-        if (decoded.id) {
-          req.user.mongoId = decoded.id;
-        }
-        
-        return next();
-      } catch (jwtError) {
-        console.error('JWT verification failed:', jwtError);
-        // If both verifications fail, return error
-        throw new Error('Invalid token');
-      }
+    } catch (jwtError) {
+      console.error('JWT verification failed:', jwtError);
+      throw new Error('Invalid token');
     }
   } catch (err) {
     console.error('Authentication error:', err.name, err.message);

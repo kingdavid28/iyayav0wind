@@ -22,24 +22,25 @@ const validate = (validations) => {
 
 // Contract creation validation
 const createContractValidator = validate([
-  body('clientId')
+  body('parentId')
     .optional() // Will be set from auth middleware
     .custom((value) => {
       if (value && !isValidObjectId(value)) {
-        throw new Error('Invalid client ID format');
+        throw new Error('Invalid parent ID format');
       }
       return true;
     }),
   
-  body('providerId')
+  body('caregiverId')
     .trim()
-    .notEmpty().withMessage('Provider ID is required')
+    .notEmpty().withMessage('Caregiver ID is required')
     .custom((value) => {
       if (!isValidObjectId(value)) {
-        throw new Error('Invalid provider ID format');
+        throw new Error('Invalid caregiver ID format');
       }
       return true;
     }),
+  
   
   body('serviceId')
     .trim()
@@ -73,6 +74,19 @@ const createContractValidator = validate([
     .isIn(['pending', 'active', 'completed', 'cancelled']).withMessage('Invalid initial status')
 ]);
 
+// Parent ID validation
+const parentIdValidator = validate([
+  param('parentId')
+    .trim()
+    .notEmpty().withMessage('Parent ID is required')
+    .custom((value) => {
+      if (!isValidObjectId(value)) {
+        throw new Error('Invalid parent ID format');
+      }
+      return true;
+    }),
+]);
+
 // Client ID validation
 const clientIdValidator = validate([
   param('clientId')
@@ -87,7 +101,7 @@ const clientIdValidator = validate([
   
   query('status')
     .optional()
-    .isIn(['pending', 'active', 'completed', 'cancelled']).withMessage('Invalid status filter')
+    .isIn(['pending', 'active', 'completed', 'cancelled', 'approved', 'rejected', 'in_progress']).withMessage('Invalid status filter')
 ]);
 
 // Contract ID validation
@@ -114,7 +128,7 @@ const statusUpdateValidator = validate([
 
 module.exports = {
   createContractValidator,
-  clientIdValidator,
+  parentIdValidator,
   contractIdValidator,
   statusUpdateValidator
 };

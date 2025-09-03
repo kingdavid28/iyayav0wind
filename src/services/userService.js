@@ -5,6 +5,35 @@ import { validator } from "../utils/validator"
 import { API_CONFIG, VALIDATION } from "../config/constants"
 
 class UserService {
+  // Create/Upsert profile for the authenticated user
+  async createProfile(userId, profile) {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required')
+      }
+
+      if (!profile || typeof profile !== 'object') {
+        throw new Error('Profile data must be an object')
+      }
+
+      logger.info(`Creating profile for user: ${userId}`)
+      // Use auth API to upsert current user's profile (server derives user from token)
+      const updated = await authAPI.updateProfile(profile)
+
+      // Update cache
+      try {
+        await apiService.setCachedData(`profile:${userId}`, updated)
+      } catch (cacheError) {
+        logger.warn('Failed to cache created profile', cacheError)
+      }
+
+      return updated
+    } catch (error) {
+      logger.error('Failed to create profile:', error)
+      throw error
+    }
+  }
+
   // Update children for parent user
   async updateChildren(children, userId) {
     try {
@@ -52,8 +81,10 @@ class UserService {
   // Profile Management
   async getProfile(userId, forceRefresh = false) {
     try {
+      // userId is kept for cache key compatibility, but fetching uses auth profile
       if (!userId) {
-        throw new Error('User ID is required')
+        // Do not block: some flows may not have ID handy; we'll still fetch auth profile
+        logger.warn('getProfile called without userId; proceeding to fetch /auth/profile')
       }
       
       const cacheKey = `profile:${userId}`
@@ -70,22 +101,22 @@ class UserService {
         }
       }
 
-      logger.info(`Fetching profile for user: ${userId}`)
-      const response = await api.get(`/users/${userId}`)
+      logger.info(`Fetching authenticated profile (auth/profile) for user: ${userId || 'unknown'}`)
+      const data = await authAPI.getProfile()
       
       // Basic response validation
-      if (!response || typeof response !== 'object') {
+      if (!data || typeof data !== 'object') {
         throw new Error('Invalid profile data received from server')
       }
       
       // Cache the profile data
       try {
-        await apiService.setCachedData(cacheKey, response.data)
+        await apiService.setCachedData(cacheKey, data)
       } catch (cacheError) {
         logger.warn('Failed to cache profile data', cacheError)
       }
       
-      return response.data
+      return data
     } catch (error) {
       logger.error("Failed to get user profile:", error)
       throw error

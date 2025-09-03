@@ -1,7 +1,5 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { db } from '../config/firebase';
-import { doc, updateDoc, arrayUnion, collection, addDoc, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -45,26 +43,11 @@ const handleNotificationResponse = (response) => {
   return data;
 };
 
-// Send a push notification to a specific user
-const sendPushNotification = async (userId, title, body, data = {}) => {
+// Send a push notification to a specific user (stub; backend should handle distribution)
+const sendPushNotification = async (_userId, title, body, data = {}) => {
   try {
-    // In a real app, you would use a cloud function to send push tokens
-    // This is a simplified version that stores the notification in Firestore
-    const notificationRef = doc(db, 'users', userId);
-    await updateDoc(notificationRef, {
-      notifications: arrayUnion({
-        title,
-        body,
-        data,
-        read: false,
-        createdAt: new Date().toISOString(),
-      }),
-    });
-    
-    // For local testing
-    if (__DEV__) {
-      await schedulePushNotification(title, body, data);
-    }
+    // For local testing only
+    await schedulePushNotification(title, body, data);
   } catch (error) {
     console.error('Error sending notification:', error);
   }
@@ -93,68 +76,18 @@ export {
   initNotifications,
 };
 
-// In-app messaging service
+// In-app messaging service (placeholder; to be replaced with backend REST + Socket.IO)
 const messageService = {
-  // Send a message
-  sendMessage: async (senderId, receiverId, content, jobId = null) => {
-    try {
-      const messageRef = collection(db, 'messages');
-      const newMessage = {
-        senderId,
-        receiverId,
-        content,
-        jobId,
-        read: false,
-        createdAt: new Date().toISOString(),
-      };
-      
-      await addDoc(messageRef, newMessage);
-      
-      // Send push notification for new message
-      await sendPushNotification(
-        receiverId,
-        'New Message',
-        `You have a new message about ${jobId ? 'a job' : 'your application'}`,
-        { type: 'message', jobId, senderId }
-      );
-      
-      return newMessage;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
-    }
+  sendMessage: async (_senderId, _receiverId, _content, _jobId = null) => {
+    console.warn('messageService.sendMessage: backend integration pending');
+    return null;
   },
-  
-  // Mark message as read
-  markAsRead: async (messageId) => {
-    try {
-      const messageRef = doc(db, 'messages', messageId);
-      await updateDoc(messageRef, {
-        read: true,
-        readAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error('Error marking message as read:', error);
-      throw error;
-    }
+  markAsRead: async (_messageId) => {
+    console.warn('messageService.markAsRead: backend integration pending');
   },
-  
-  // Listen for new messages
-  subscribeToMessages: (userId, callback) => {
-    const messagesQuery = query(
-      collection(db, 'messages'),
-      where('receiverId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
-    
-    return onSnapshot(messagesQuery, (snapshot) => {
-      const messages = [];
-      snapshot.forEach((doc) => {
-        messages.push({ id: doc.id, ...doc.data() });
-      });
-      callback(messages);
-    });
+  subscribeToMessages: (_userId, _callback) => {
+    console.warn('messageService.subscribeToMessages: backend integration pending');
+    return () => {};
   },
 };
 

@@ -4,90 +4,157 @@ A React Native app built with Expo that connects nannies with families looking f
 
 ## Features
 
-### For Nannies:
-- Browse available job postings
-- Filter jobs by location, salary, and requirements
-- Apply to jobs with one tap
-- Track application status
-- Chat with potential employers
-- Manage profile and availability
+### For Parents
+- **Job Posting**: Create detailed job listings with date/time requirements
+- **Caregiver Search**: Browse and filter available caregivers
+- **Booking System**: Schedule childcare services with conflict detection
+- **Children Management**: Manage child profiles with date of birth tracking
+- **Real-time Messaging**: Chat with caregivers
+- **Payment Confirmation**: Upload payment proof and track transactions
 
-### For Employers:
-- Post job listings
-- Browse available nannies
-- Filter nannies by experience and skills
-- Send messages and invitations
-- Manage applications and hiring process
-- Track job posting performance
+### For Caregivers
+- **Job Search**: Browse available jobs with advanced filtering
+- **Application Management**: Apply to jobs and track application status
+- **Availability Management**: Set working hours and time preferences
+- **Booking Management**: View and manage confirmed bookings
+- **Profile Management**: Complete profile with skills and certifications
+- **Real-time Messaging**: Communicate with parents
+
+### Shared Features
+- **Authentication System**: Secure login/registration for both user types
+- **Profile Management**: Complete user profiles with photo upload
+- **Real-time Notifications**: Stay updated on bookings and messages
+- **Responsive Design**: Optimized for both iOS and Android
 
 ## Tech Stack
 
 - **Frontend**: React Native with Expo
-- **Authentication**: Firebase Auth
-- **Database**: MongoDB (local setup)
-- **Navigation**: React Navigation
-- **UI Components**: React Native Paper
-- **Chat**: React Native Gifted Chat
-- **Icons**: Expo Vector Icons
+- **Backend**: Node.js with Express
+- **Database**: MongoDB with Mongoose
+- **Authentication**: JWT tokens with AsyncStorage
+- **Real-time**: Socket.IO for messaging
+- **UI Components**: 
+  - React Native Paper
+  - Expo Vector Icons
+  - Custom Date/Time Pickers
+  - Lucide React Native Icons
+- **Navigation**: React Navigation v6
+- **State Management**: React Context API
+- **Form Handling**: Custom validation utilities
+- **Image Handling**: Expo Image Picker with base64 upload
 
-## Setup Instructions
+## App Architecture
+
+### Navigation Structure
+```
+App
+├── Welcome Screen
+├── Authentication
+│   ├── Parent Auth
+│   └── Caregiver Auth
+├── Parent Dashboard
+│   ├── Job Posting
+│   ├── Caregiver Search
+│   ├── Booking Management
+│   ├── Children Management
+│   └── Messages
+└── Caregiver Dashboard
+    ├── Job Search
+    ├── Application Management
+    ├── Availability Management
+    ├── Booking Management
+    └── Messages
+```
+
+### Key Components
+- **CustomDateTimePicker**: Consistent date/time input with iOS modal support
+- **TimePicker**: Custom time selection with AM/PM and 24-hour formats
+- **LoadingSpinner**: Reusable loading states
+- **ErrorBoundary**: Error handling and recovery
+
+## Getting Started
 
 ### Prerequisites
 - Node.js (v16 or higher)
+- npm or yarn
 - Expo CLI (`npm install -g @expo/cli`)
-- MongoDB (local installation)
-- Firebase project setup
+- MongoDB (local or MongoDB Atlas)
 
-### Installation
+### Quick Start
 
-1. Clone the repository:
-\`\`\`bash
+1. **Clone and Install**
+```bash
 git clone <repository-url>
-cd iyaya-app
-\`\`\`
-
-2. Install dependencies:
-\`\`\`bash
+cd iyayav0CleanStart
 npm install
-\`\`\`
+```
 
-3. Configure Firebase:
-   - Create a Firebase project
-   - Enable Authentication (Email/Password)
-   - Update `src/config/firebase.js` with your Firebase config
+2. **Backend Setup**
+```bash
+cd iyaya-backend
+npm install
+cp .env.example .env
+# Configure your MongoDB connection and JWT secret in .env
+```
 
-4. Set up MongoDB:
-   - Install MongoDB locally
-   - Create a database named `iyaya`
-   - Set up collections: `users`, `jobs`, `applications`, `messages`
+3. **Start Backend Server**
+```bash
+# From iyaya-backend directory
+node app.js
+# Or use the provided batch file from root:
+start-backend.bat
+```
 
-5. Start the development server:
-\`\`\`bash
-npm start
-\`\`\`
+4. **Start Expo Development Server**
+```bash
+# From root directory
+npx expo start
+```
 
-6. Run on device:
-   - Install Expo Go app on your phone
-   - Scan the QR code from the terminal
+5. **Run on Device/Simulator**
+- Scan QR code with Expo Go app (Android/iOS)
+- Press 'i' for iOS Simulator
+- Press 'a' for Android Emulator
 
 ## Project Structure
 
-\`\`\`
-src/
-├── config/
-│   ├── firebase.js      # Firebase configuration
-│   └── api.js          # API endpoints and axios setup
-├── screens/
-│   ├── SplashScreen.js
-│   ├── LoginScreen.js
-│   ├── RegisterScreen.js
-│   ├── RoleSelectionScreen.js
-│   ├── NannyHomeScreen.js
-│   ├── EmployerHomeScreen.js
-│   ├── CreateJobScreen.js
-│   ├── NannyListScreen.js
-│   ├── ProfileScreen.js
-│   ├── ChatScreen.js
+```
+iyayav0CleanStart/
+├── src/
+│   ├── components/
+│   │   ├── DateTimePicker/     # Custom date picker component
+│   │   ├── TimePicker/         # Custom time picker component
+│   │   └── ErrorBoundary/      # Error handling component
+│   ├── screens/
+│   │   ├── ParentDashboard/    # Parent-specific screens
+│   │   ├── profile/            # Profile management screens
+│   │   └── styles/             # Screen-specific styles
+│   ├── contexts/
+│   │   ├── AuthContext.js      # Authentication state
+│   │   ├── MessagingContext.js # Real-time messaging
+│   │   └── ThemeContext.js     # App theming
+│   ├── services/
+│   │   ├── jobsService.js      # Job-related API calls
+│   │   ├── bookingService.js   # Booking management
+│   │   ├── messagingService.js # Messaging API
+│   │   └── profileService.js   # Profile management
+│   ├── utils/
+│   │   ├── auth.js             # Authentication utilities
+│   │   ├── validation.js       # Form validation
+│   │   ├── errorHandler.js     # Error handling
+│   │   └── logger.js           # Logging utilities
+│   └── config/
+│       ├── api.js              # API configuration
+│       └── constants.js        # App constants
+├── iyaya-backend/
+│   ├── controllers/            # API route handlers
+│   ├── models/                 # MongoDB schemas
+│   ├── middleware/             # Authentication & validation
+│   ├── routes/                 # API routes
+│   └── config/                 # Database & environment config
+├── assets/                     # Images, fonts, icons
+└── docs/                       # Documentation
+```
 │   ├── ApplicationsScreen.js
 │   └── JobDetailsScreen.js
 └── components/          # Reusable components (if needed)

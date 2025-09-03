@@ -19,12 +19,13 @@ import {
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { auth } from '../config/firebase';
-import { providersAPI, authAPI } from '../config/api';
+import { useAuth } from '../contexts/AuthContext';
+import { jobsAPI, applicationsAPI, bookingsAPI, caregiversAPI, authAPI, uploadsAPI } from "../config/api";
 import { API_CONFIG } from '../config/constants';
 import { styles } from './styles/CaregiverDashboard.styles';
 
 const EditCaregiverProfile = ({ navigation, route }) => {
+  const { user } = useAuth();
   const { profile } = route.params || {};
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -60,29 +61,37 @@ const EditCaregiverProfile = ({ navigation, route }) => {
   // Load profile from backend REST
   const loadProfile = async () => {
     try {
-      if (!auth.currentUser) return;
+      if (!user) return;
 
       setLoading(true);
-      const res = await providersAPI.getMyProfile();
-      // Normalize backend response to formData shape if necessary
-      const profileData = res?.provider || res || {};
+      console.log('🔍 Loading caregiver profile...');
+      const res = await caregiversAPI.getMyProfile();
+      console.log('📋 Profile API response:', res);
+      
+      // Handle different response structures
+      const profileData = res?.caregiver || res?.data?.caregiver || res?.provider || res || {};
+      console.log('📊 Profile data extracted:', profileData);
+      
       setFormData((prev) => ({
         ...prev,
         name: profileData.name || profileData.fullName || prev.name,
-        email: profileData.email || prev.email,
-        phone: profileData.phone || profileData.contactNumber || prev.phone,
+        email: profileData.email || profileData.userId?.email || prev.email,
+        phone: profileData.phone || profileData.contactNumber || profileData.userId?.phone || prev.phone,
         bio: profileData.bio || profileData.about || prev.bio,
-        experience: String(profileData.experience ?? prev.experience ?? ''),
+        experience: String(profileData.experience?.years ?? profileData.experience ?? prev.experience ?? ''),
         hourlyRate: String(profileData.hourlyRate ?? profileData.rate ?? prev.hourlyRate ?? ''),
         skills: Array.isArray(profileData.skills) ? profileData.skills : (prev.skills || []),
         certifications: Array.isArray(profileData.certifications) ? profileData.certifications : (prev.certifications || []),
         profileImage: (() => {
-          const img = profileData.profileImage || profileData.avatar || prev.profileImage;
-          return img && img.startsWith('/') ? `${API_CONFIG.BASE_URL}${img}` : img;
+          const img = profileData.profileImage || profileData.avatar || profileData.userId?.profileImage || prev.profileImage;
+          return img && img.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${img}` : img;
         })(),
       }));
+      
+      console.log('✅ Profile data loaded and formatted');
     } catch (error) {
-      console.error('Error loading profile:', error);
+      console.error('❌ Error loading profile:', error);
+      console.error('❌ Error details:', error.response?.data || error.message);
       showSnackbar('Failed to load profile');
     } finally {
       setLoading(false);
@@ -166,7 +175,7 @@ const EditCaregiverProfile = ({ navigation, route }) => {
 
         const resp = await authAPI.uploadProfileImageBase64(dataUrl, mimeType);
         const url = resp?.data?.url || resp?.url;
-        const absoluteUrl = url && url.startsWith('/') ? `${API_CONFIG.BASE_URL}${url}` : url;
+        const absoluteUrl = url && url.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${url}` : url;
 
         setFormData(prev => ({ ...prev, profileImage: absoluteUrl || prev.profileImage }));
         showSnackbar('Profile image updated');
@@ -182,12 +191,13 @@ const EditCaregiverProfile = ({ navigation, route }) => {
   // Save profile via backend REST
   const saveProfile = async () => {
     try {
-      if (!auth.currentUser) {
+      if (!user) {
         showSnackbar('You must be logged in to save changes');
         return;
       }
       
       setLoading(true);
+      console.log('💾 Saving profile changes...');
 
       // Build payload expected by backend
       const payload = {
@@ -202,13 +212,23 @@ const EditCaregiverProfile = ({ navigation, route }) => {
         profileImage: formData.profileImage || undefined,
       };
 
-      await providersAPI.updateMyProfile(payload);
+      console.log('📤 Payload being sent:', payload);
+      const response = await caregiversAPI.updateMyProfile(payload);
+      console.log('📥 Update response:', response);
       
       showSnackbar('Profile updated successfully');
-      navigation.goBack();
+      
+      // Reload profile data to ensure UI shows latest changes
+      await loadProfile();
+      
+      // Navigate back after a short delay to show the success message
+      setTimeout(() => {
+        navigation.goBack();
+      }, 1500);
       
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('❌ Error updating profile:', error);
+      console.error('❌ Error details:', error.response?.data || error.message);
       showSnackbar('Failed to update profile');
     } finally {
       setLoading(false);
@@ -283,7 +303,7 @@ const EditCaregiverProfile = ({ navigation, route }) => {
         />
         
         <TextInput
-          label="Hourly Rate ($/hr)"
+          label="Hourly Rate (₱/hr)"
           value={formData.hourlyRate}
           onChangeText={(text) => handleChange('hourlyRate', text)}
           style={styles.input}
@@ -312,7 +332,7 @@ const EditCaregiverProfile = ({ navigation, route }) => {
         />
         
         {/* Skills */}
-        <Text style={styles.sectionTitle}>Skills</Text>
+        <Text style={styles.label}>Skills</Text>
         <View style={styles.tagsContainer}>
           {formData.skills?.map((skill, index) => (
             <Chip 
@@ -327,6 +347,7 @@ const EditCaregiverProfile = ({ navigation, route }) => {
         </View>
         <View style={{ flexDirection: 'row', marginTop: 8 }}>
           <TextInput
+            label="New Skill"
             value={newSkill}
             onChangeText={setNewSkill}
             placeholder="Add a skill"
@@ -361,6 +382,7 @@ const EditCaregiverProfile = ({ navigation, route }) => {
         </View>
         <View style={{ flexDirection: 'row', marginTop: 8, marginBottom: 24 }}>
           <TextInput
+            label="New Certification"
             value={newCertification}
             onChangeText={setNewCertification}
             placeholder="Add a certification"

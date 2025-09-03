@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -23,46 +23,30 @@ import {
   X, 
   Image as ImageIcon,
   ChevronDown,
-  Clock
+  ChevronRight,
+  Clock,
+  Check,
+  CheckCheck
 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import mime from 'mime';
-import { 
-  collection, 
-  doc, 
-  serverTimestamp, 
-  setDoc, 
-  updateDoc, 
-  increment, 
-  writeBatch,
-  query,
-  where,
-  getDocs,
-  orderBy,
-  limit,
-  getDoc
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../config/firebase';
+import { Platform } from 'react-native';
+
+// Platform-specific FileSystem import
+const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
+// Firebase removed
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  subscribeToConversation,
-  sendMessage as sendMessageService,
-  markMessagesAsRead,
-  uploadFile as uploadFileService,
-  searchMessages as searchMessagesService
-} from '../services/chatService';
+import { useMessaging } from '../contexts/MessagingContext';
 
 const MAX_FILE_SIZE_MB = 10;
 
 export default function EnhancedChatScreen() {
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const route = useRoute();
   const navigation = useNavigation();
-  const { conversationId, recipientId, recipientName } = route.params;
+  const { conversationId, recipientId, recipientName } = route.params || {};
   
   // State management
   const [messages, setMessages] = useState([]);
@@ -79,142 +63,101 @@ export default function EnhancedChatScreen() {
   // Refs
   const giftedChatRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const { messages: ctxMessages, setActiveConversation, getOrCreateConversation, sendMessage, markMessagesAsRead, activeConversation, otherTyping, startTyping, stopTyping } = useMessaging();
 
-  // Load messages and subscribe to updates
+  // Init conversation and map context messages
   useEffect(() => {
-    if (!conversationId) return;
+    const init = async () => {
+      try {
+        if (conversationId) {
+          setActiveConversation({ id: conversationId, participants: [currentUser?.uid, recipientId].filter(Boolean) });
+        } else if (recipientId) {
+          await getOrCreateConversation(recipientId);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    init();
+  }, [conversationId, recipientId, currentUser?.uid, setActiveConversation, getOrCreateConversation]);
 
-    const handleMessagesUpdate = (messagesData) => {
-      // Transform messages for GiftedChat
-      const formattedMessages = messagesData.map(msg => ({
-        _id: msg._id,
-        text: msg.text || '',
-        createdAt: msg.createdAt,
+  const mappedMessages = useMemo(() => {
+    return (ctxMessages || [])
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
+      .map((m) => ({
+        _id: m.id || m._id,
+        text: m.content || m.text || '',
+        createdAt: m.createdAt ? new Date(m.createdAt) : (m.created_at ? new Date(m.created_at) : new Date()),
         user: {
-          _id: msg.senderId,
-          name: msg.senderName || 'User',
-          avatar: msg.senderAvatar
+          _id: m.senderId || m.sender_id,
+          name: m.senderName || m.sender_name || 'User',
+          avatar: m.senderAvatar || m.sender_avatar,
         },
-        sent: msg.status === 'sent',
-        received: msg.status === 'delivered',
-        read: !!msg.readBy?.[currentUser.uid],
-        pending: msg.status === 'sending',
-        image: msg.file?.type?.startsWith('image/') ? msg.file.url : undefined,
-        file: !msg.file?.type?.startsWith('image/') ? {
-          name: msg.file?.name || 'File',
-          type: msg.file?.type,
-          url: msg.file?.url
-        } : undefined
+        sent: true,
+        received: !!m.delivered || !!m.received,
+        read: !!m.read,
+        attachments: [],
       }));
-      
-      setMessages(formattedMessages);
-      
-      // Mark messages as read
-      const unreadMessages = messagesData.filter(
-        msg => msg.senderId !== currentUser.uid && !msg.readBy?.[currentUser.uid]
-      );
-      
-      if (unreadMessages.length > 0) {
-        markMessagesAsRead(conversationId, currentUser.uid, unreadMessages.map(msg => msg._id));
-      }
-      
-      setIsLoading(false);
-    };
-    
-    // Subscribe to conversation updates
-    unsubscribeRef.current = subscribeToConversation(conversationId, handleMessagesUpdate);
-    
-    // Cleanup subscription on unmount
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
-    };
-  }, [conversationId, currentUser.uid]);
+  }, [ctxMessages]);
+
+  useEffect(() => {
+    setMessages(mappedMessages);
+  }, [mappedMessages]);
   
   // Handle sending a message with attachments
   const onSend = useCallback(async (newMessages = []) => {
-    if ((newMessages.length === 0 && attachments.length === 0) || isSending) return;
-    
-    setIsSending(true);
-    const messageText = newMessages[0]?.text || '';
-    
+    if (isSending) return;
+    const messageText = newMessages?.[0]?.text || '';
+    if (!messageText.trim() && attachments.length === 0) return;
     try {
-      // Upload attachments if any
-      let uploadedAttachments = [];
-      
+      setIsSending(true);
+      // Prepare attachments as base64 payloads
+      let prepared = [];
       if (attachments.length > 0) {
-        for (const attachment of attachments) {
+        if (Platform.OS === 'web' || !FileSystem) {
+          console.warn('File attachments not supported on web platform');
+          Alert.alert('Upload Error', 'File attachments are not supported on web platform');
+          return;
+        }
+        
+        const arr = [];
+        for (const a of attachments) {
           try {
-            const response = await fetch(attachment.uri);
-            const blob = await response.blob();
-            const fileRef = ref(storage, `attachments/${Date.now()}_${attachment.name}`);
-            await uploadBytes(fileRef, blob);
-            
-            const downloadURL = await getDownloadURL(fileRef);
-            uploadedAttachments.push({
-              url: downloadURL,
-              name: attachment.name,
-              type: attachment.type,
-              size: attachment.size
-            });
-          } catch (error) {
-            console.error('Error uploading attachment:', error);
-            Alert.alert('Error', `Failed to upload ${attachment.name}. Please try again.`);
-            return;
+            const base64 = await FileSystem.readAsStringAsync(a.uri, { encoding: FileSystem.EncodingType.Base64 });
+            arr.push({ base64, mimeType: a.type || 'application/octet-stream', name: a.name || 'file' });
+          } catch (e) {
+            console.warn('Failed to read attachment base64:', e?.message || e);
           }
         }
+        prepared = arr;
       }
-      
-      // Send message with or without attachments
-      await sendMessageService({
-        conversationId,
-        senderId: currentUser.uid,
-        text: messageText,
-        attachments: uploadedAttachments,
-        recipientId
-      });
-      
-      // Clear attachments after sending
-      setAttachments([]);
+
+      await sendMessage({ text: messageText.trim(), attachments: prepared });
       setShowAttachments(false);
-      
-      // Update search results if there's an active search
-      if (searchQuery) {
-        try {
-          const results = await searchMessagesService(conversationId, searchQuery);
-          setSearchResults(results);
-        } catch (error) {
-          console.error('Error updating search results:', error);
-        }
-      }
-      
+      setAttachments([]);
     } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message. Please try again.');
     } finally {
       setIsSending(false);
     }
-  }, [conversationId, currentUser.uid, recipientId, isSending, attachments, searchQuery]);
+  }, [isSending, attachments.length, sendMessage]);
   
   // Handle message search
-  const handleSearch = useCallback(async (query) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    
+  const handleSearch = useCallback((query) => {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) { setSearchResults([]); return; }
+    setIsSearching(true);
     try {
-      setIsSearching(true);
-      const results = await searchMessagesService(conversationId, query);
+      const results = (ctxMessages || [])
+        .filter((m) => (m.text || m.content || '').toLowerCase().includes(q))
+        .map((m) => ({ id: m.id || m._id, text: m.text || m.content || '', senderId: m.senderId || m.sender_id, createdAt: m.createdAt || m.created_at }));
       setSearchResults(results);
-    } catch (error) {
-      console.error('Error searching messages:', error);
-      Alert.alert('Error', 'Failed to search messages. Please try again.');
     } finally {
       setIsSearching(false);
     }
-  }, [conversationId]);
+  }, [ctxMessages]);
   
   // Handle search input changes with debounce
   useEffect(() => {
@@ -239,15 +182,13 @@ export default function EnhancedChatScreen() {
     // Set a new timeout to indicate typing stopped
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      // Here you would typically update the typing status in Firestore
-      // For now, we'll just log it
-      console.log('User stopped typing');
+      stopTyping?.();
     }, 2000);
     
     // Only set typing to true if it wasn't already
     if (!isTyping) {
       setIsTyping(true);
-      console.log('User is typing...');
+      startTyping?.();
     }
   }, [isTyping]);
 
@@ -299,13 +240,16 @@ export default function EnhancedChatScreen() {
         const newAttachments = [];
         
         for (const doc of selectedDocs) {
-          // Check file size
-          const fileInfo = await FileSystem.getInfoAsync(doc.uri);
-          const fileSizeMB = fileInfo.size / (1024 * 1024);
-          
-          if (fileSizeMB > MAX_FILE_SIZE_MB) {
-            Alert.alert('File too large', `File size exceeds ${MAX_FILE_SIZE_MB}MB limit.`);
-            continue;
+          // Check file size (skip on web)
+          let fileInfo = { size: 0 };
+          if (Platform.OS !== 'web' && FileSystem) {
+            fileInfo = await FileSystem.getInfoAsync(doc.uri);
+            const fileSizeMB = fileInfo.size / (1024 * 1024);
+            
+            if (fileSizeMB > MAX_FILE_SIZE_MB) {
+              Alert.alert('File too large', `File size exceeds ${MAX_FILE_SIZE_MB}MB limit.`);
+              continue;
+            }
           }
           
           newAttachments.push({
@@ -686,7 +630,7 @@ export default function EnhancedChatScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {recipientName}
           </Text>
-          {isTyping && (
+          {otherTyping && (
             <Text style={styles.typingText}>typing...</Text>
           )}
         </View>
@@ -717,11 +661,6 @@ export default function EnhancedChatScreen() {
         textInputProps={{
           maxLength: 2000,
           returnKeyType: 'send',
-          onSubmitEditing: () => {
-            if (attachments.length > 0 || (props.text && props.text.trim().length > 0)) {
-              onSend([{ text: props.text, user: { _id: currentUser.uid } }]);
-            }
-          }
         }}
         listViewProps={{
           keyboardDismissMode: showSearch ? 'on-drag' : 'none',

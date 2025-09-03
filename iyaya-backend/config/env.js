@@ -93,7 +93,25 @@ module.exports = {
   },
 
   cors: {
-    origin: parseCorsOrigins(process.env.CORS_ORIGIN),
+    origin: (origin, callback) => {
+      const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is in allowed list or wildcard is present
+      if (allowedOrigins.includes('*') || allowedOrigins.some(o => 
+        origin === o || 
+        new URL(origin).hostname === new URL(o).hostname
+      )) {
+        return callback(null, true);
+      }
+      
+      // Format the error message consistently
+      const error = new Error(`Origin ${origin} not allowed by CORS`);
+      error.status = 403;
+      console.warn(`CORS blocked: ${origin}`);
+      callback(error);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [

@@ -320,7 +320,7 @@ class Validator {
 
     if (profile.hourlyRate !== undefined) {
       if (profile.hourlyRate < VALIDATION.HOURLY_RATE_MIN || profile.hourlyRate > VALIDATION.HOURLY_RATE_MAX) {
-        errors.push(`Hourly rate must be between $${VALIDATION.HOURLY_RATE_MIN} and $${VALIDATION.HOURLY_RATE_MAX}`)
+        errors.push(`Hourly rate must be between ₱${VALIDATION.HOURLY_RATE_MIN} and ₱${VALIDATION.HOURLY_RATE_MAX}`)
       }
     }
 
@@ -355,7 +355,7 @@ class Validator {
 
     if (!isPartial || job.salary !== undefined) {
       if (!job.salary || job.salary < VALIDATION.HOURLY_RATE_MIN || job.salary > VALIDATION.HOURLY_RATE_MAX) {
-        errors.push(`Hourly rate must be between $${VALIDATION.HOURLY_RATE_MIN} and $${VALIDATION.HOURLY_RATE_MAX}`)
+        errors.push(`Hourly rate must be between ₱${VALIDATION.HOURLY_RATE_MIN} and ₱${VALIDATION.HOURLY_RATE_MAX}`)
       }
     }
 
