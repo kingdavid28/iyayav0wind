@@ -25,18 +25,17 @@ export default function WelcomeScreen() {
   const navigation = useNavigation();
   const isWeb = Platform.OS === 'web';
   const { user } = useAuth();
-  const { state } = useApp();
-  const isLoggedIn = !!user || !!state?.isAuthenticated;
-  const role = user?.role || state?.user?.role || state?.userProfile?.role;
+  const isLoggedIn = !!user;
+  const role = user?.role;
   
   // Debug: log auth state when it changes
   React.useEffect(() => {
     try {
-      console.log('[Welcome] user:', !!user, user ? { email: user.email, role: user.role } : null, 'AppContext.isAuthenticated:', !!state?.isAuthenticated, 'role:', role);
+      console.log('[Welcome] user:', !!user, user ? { email: user.email, role: user.role } : null, 'isLoggedIn:', isLoggedIn, 'role:', role);
     } catch(error) {
       console.warn('Welcome screen log error:', error);
     }
-  }, [user, state?.isAuthenticated, role]);
+  }, [user, role]);
 
   // If logged in, immediately reset to the correct dashboard based on role
   React.useEffect(() => {

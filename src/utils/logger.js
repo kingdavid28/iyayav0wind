@@ -9,13 +9,20 @@ export const logger = {
     console.log(`[INFO] ${message}`, ...args);
   },
   error: (message, ...args) => {
-    console.error(`[ERROR] ${message}`, ...args);
-    // Also show alert in development
-    if (__DEV__) {
-      console.warn('ERROR OCCURRED:', message);
+    // Filter out empty error objects to reduce noise
+    const filteredArgs = args.filter(arg => {
+      if (typeof arg === 'object' && arg !== null) {
+        return Object.keys(arg).length > 0;
+      }
+      return arg !== undefined && arg !== null;
+    });
+    
+    // Only log if there are actual error details
+    if (filteredArgs.length > 0) {
+      console.error(message, ...filteredArgs);
     }
   },
   warn: (message, ...args) => {
-    console.warn(`[WARN] ${message}`, ...args);
+    console.warn(`🟡 WARN: ${message}`, ...args);
   }
 };

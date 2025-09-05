@@ -63,6 +63,20 @@ router.get('/requests/pending',
   privacyController.getPendingRequests
 );
 
+// Get sent information requests
+router.get('/requests/sent',
+  rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }), // 100 requests per 15 minutes
+  async (req, res) => {
+    try {
+      // Mock response - replace with actual database logic
+      const requests = [];
+      res.json({ requests });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get sent requests' });
+    }
+  }
+);
+
 // Get privacy notifications
 router.get('/notifications',
   rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }), // 100 requests per 15 minutes

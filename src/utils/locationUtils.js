@@ -115,3 +115,6 @@ export const formatLocationForDisplay = (location) => {
   
   return parts.join(', ');
 };
+
+// Use the centralized address formatting utility
+export { formatAddress } from './addressUtils';

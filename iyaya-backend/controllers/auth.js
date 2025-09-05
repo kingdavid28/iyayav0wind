@@ -442,15 +442,19 @@ exports.login = async (req, res, next) => {
   try {
     // Check for user
     const user = await User.findOne({ email }).select('+password');
+    console.log('🔍 Login attempt for:', email, 'User found:', !!user);
 
     if (!user) {
+      console.log('❌ User not found in database for email:', email);
       return next(new ErrorResponse('Invalid credentials', 401));
     }
 
     // Check if password matches
     const isMatch = await user.comparePassword(password);
+    console.log('🔐 Password match for', email, ':', isMatch);
 
     if (!isMatch) {
+      console.log('❌ Invalid password for user:', email);
       return next(new ErrorResponse('Invalid credentials', 401));
     }
 
@@ -465,6 +469,7 @@ exports.login = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
+    console.log('✅ Login successful for user:', email, 'ID:', user._id);
     res.status(200).json({
       success: true,
       token: accessToken

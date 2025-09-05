@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import { useAuth } from '../../contexts/AuthContext';
 import { caregiversAPI, jobsAPI, authAPI, bookingsAPI } from '../../config/api';
+import { formatAddress } from '../../utils/addressUtils';
 import { styles } from '../styles/ParentDashboard.styles';
 // Privacy components temporarily disabled due to backend API not implemented
 // import PrivacyProvider from '../../components/Privacy/PrivacyManager';
@@ -709,6 +710,7 @@ const ParentDashboard = () => {
         profileImage={profileImage}
         profileContact={profileContact}
         profileLocation={profileLocation}
+        setActiveTab={setActiveTab}
       />
       
       <NavigationTabs 

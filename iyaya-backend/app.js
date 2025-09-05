@@ -166,6 +166,9 @@ const mountRoutes = () => {
   // Apply authenticate BEFORE messagesLimiter so keyGenerator can use req.user
   apiRouter.use('/messages', authenticate, messagesLimiter, require('./routes/messagesRoutes'));
   apiRouter.use('/privacy', require('./routes/privacy'));
+  apiRouter.use('/notifications', require('./routes/notificationRoutes'));
+  apiRouter.use('/payments', require('./routes/paymentRoutes'));
+  apiRouter.use('/data', require('./routes/dataRoutes'));
 
   // Admin Routes removed
   

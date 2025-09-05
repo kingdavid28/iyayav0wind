@@ -12,7 +12,21 @@ export const ERROR_CODES = {
 
 class ErrorHandler {
   process(error) {
-    // Enhanced error logging
+    // Skip processing completely empty errors to reduce noise
+    if (!error || (typeof error === 'object' && Object.keys(error).length === 0)) {
+      // Return minimal error without logging
+      return {
+        code: ERROR_CODES.UNKNOWN_ERROR,
+        title: "Unexpected Error",
+        message: "An unexpected error occurred.",
+        userMessage: "Something unexpected happened. Please try again.",
+        recoverable: true,
+        retryable: true,
+        originalError: null,
+      };
+    }
+    
+    // Enhanced error logging only for valid errors
     logger.error("Processing error:", {
       error,
       type: typeof error,
@@ -21,11 +35,7 @@ class ErrorHandler {
       message: error?.message,
       stack: error?.stack
     });
-    
-    // Handle empty or invalid error objects
-    if (!error || (typeof error === 'object' && Object.keys(error).length === 0)) {
-      return this.createUnknownError(new Error('Empty error object received'));
-    }
+
 
     // Determine error type and create standardized error object
     if (this.isNetworkError(error)) {
@@ -159,11 +169,11 @@ class ErrorHandler {
     return {
       code: ERROR_CODES.UNKNOWN_ERROR,
       title: "Unexpected Error",
-      message: error.message || "An unexpected error occurred.",
+      message: error?.message || "An unexpected error occurred.",
       userMessage: "Something unexpected happened. Please try again.",
       recoverable: true,
       retryable: true,
-      originalError: error,
+      originalError: error || null,
     }
   }
 

@@ -110,9 +110,13 @@ const appReducer = (state, action) => {
       return { ...state, userProfile: action.payload }
 
     case ACTION_TYPES.LOGOUT:
+      console.log('[AppContext] LOGOUT action - clearing all auth state')
       return {
         ...initialState,
         authLoading: false,
+        isAuthenticated: false, // Explicitly set to false
+        user: null, // Explicitly set to null
+        userProfile: null, // Explicitly set to null
         theme: state.theme,
         language: state.language,
         isOnboardingComplete: state.isOnboardingComplete, // Preserve onboarding state
@@ -230,12 +234,14 @@ const AppProvider = ({ children }) => {
   // Mirror AuthContext user into AppContext so isAuthenticated aligns with JWT auth
   useEffect(() => {
     if (authLoading) return
+    
     if (authUser) {
       const normalized = authUser?.role ? { ...authUser, role: normalizeRole(authUser.role) } : authUser
       dispatch({ type: ACTION_TYPES.SET_USER, payload: normalized })
       dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: normalized })
     } else {
-      // When JWT auth signs out, reflect here as well
+      // When JWT auth signs out, immediately clear AppContext state
+      console.log('[AppContext] AuthUser is null, dispatching LOGOUT')
       dispatch({ type: ACTION_TYPES.LOGOUT })
     }
   }, [authUser, authLoading])

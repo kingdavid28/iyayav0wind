@@ -10,10 +10,18 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
+  const [hasLoggedOut, setHasLoggedOut] = useState(false);
 
   // Check authentication status on app start
   const checkAuthStatus = async () => {
     try {
+      // Don't auto-login if user has explicitly logged out
+      if (hasLoggedOut) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+      
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
       if (token) {
         try {
@@ -34,22 +42,34 @@ export const AuthProvider = ({ children }) => {
             throw new Error('Invalid profile response');
           }
         } catch (e) {
-          // Token may be invalid/expired or network timeout
-          console.log("Token invalid or network timeout, removing from storage:", e.message);
+          // Only process non-empty errors
+          if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
+            console.log("Token invalid or network timeout, removing from storage:", e.message);
+            // Don't set error for network timeouts - just continue without auth
+            if (!e.message?.includes('timeout') && !e.message?.includes('Authentication required') && !e.message?.includes('No auth token found')) {
+              setError(e?.message || "Authentication check failed");
+            }
+          }
+          // Clear invalid token
           await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
           setUser(null);
-          
-          // Don't set error for network timeouts - just continue without auth
-          if (!e.message.includes('timeout') && !e.message.includes('Authentication required')) {
-            setError(e?.message || "Authentication check failed");
+          // If user was deleted, prevent auto-retry
+          if (e?.message === 'User no longer exists') {
+            setHasLoggedOut(true);
           }
         }
+      } else {
+        // No token found, user is not authenticated
+        setUser(null);
       }
     } catch (e) {
-      console.log("Auth check error:", e.message);
-      // Only set error for critical issues, not network problems
-      if (!e.message.includes('timeout') && !e.message.includes('Network')) {
-        setError(e?.message || "Failed to check authentication status");
+      // Only process non-empty errors
+      if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
+        console.log("Auth check error:", e.message);
+        // Only set error for critical issues, not network problems
+        if (!e.message?.includes('timeout') && !e.message?.includes('Network') && !e.message?.includes('No auth token found')) {
+          setError(e?.message || "Failed to check authentication status");
+        }
       }
     } finally {
       setIsLoading(false);
@@ -64,9 +84,11 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
+      setHasLoggedOut(false);
       
+      console.log('🔐 Attempting login with:', { email, baseURL: 'http://192.168.1.10:3000/api' });
       const res = await authAPI.login({ email, password });
-      console.log('Login response:', res);
+      console.log('✅ Login response:', res);
       
       if (res?.token) {
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
@@ -89,7 +111,12 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: true, user: profile };
     } catch (err) {
-      console.error('Login error:', err);
+      console.log('❌ Login error details:', {
+        message: err?.message,
+        status: err?.response?.status,
+        data: err?.response?.data,
+        code: err?.code
+      });
       const errorMessage = err?.response?.data?.message || err?.message || "Login failed";
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -102,6 +129,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
+      setHasLoggedOut(false);
       
       const res = await authAPI.register(userData);
       console.log('Signup response:', res);
@@ -126,7 +154,6 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: true, user: profile };
     } catch (err) {
-      console.error('Signup error:', err);
       const errorMessage = err?.response?.data?.message || err?.message || "Signup failed";
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -137,14 +164,33 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
+      console.log('🚪 Starting signOut process...');
       setIsLoading(true);
-      await authAPI.logout();
+      
+      // Try to call logout API, but don't fail if it doesn't work
+      try {
+        await authAPI.logout();
+        console.log('✅ API logout successful');
+      } catch (apiError) {
+        console.log('⚠️ API logout failed, continuing with local logout:', apiError.message);
+      }
+      
     } catch (err) {
-      console.log('Logout error', err);
+      console.log('❌ Logout error:', err);
     } finally {
-      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      // Always clear local storage and user state
+      try {
+        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        console.log('✅ Token removed from storage');
+      } catch (storageError) {
+        console.log('⚠️ Failed to remove token:', storageError);
+      }
+      
       setUser(null);
+      setError(null);
+      setHasLoggedOut(true);
       setIsLoading(false);
+      console.log('✅ SignOut completed - user cleared');
     }
   };
 

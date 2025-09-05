@@ -33,6 +33,7 @@ import {
 } from 'lucide-react-native';
 import CustomDateTimePicker from '../../../components/DateTimePicker';
 import TimePicker from '../../../components/TimePicker';
+import { formatAddress } from '../../../utils/addressUtils';
 
 const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visible }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -654,8 +655,8 @@ const BookingDetailsModal = ({
                 <View style={styles.contactItem}>
                   <MapPin size={20} color="#6b7280" />
                   <View>
-                    <Text style={styles.contactTitle}>{enhancedBooking.location}</Text>
-                    <Text style={styles.contactDetail}>{enhancedBooking.address}</Text>
+                    <Text style={styles.contactTitle}>{formatAddress(enhancedBooking.location)}</Text>
+                    <Text style={styles.contactDetail}>{formatAddress(enhancedBooking.address)}</Text>
                   </View>
                 </View>
                 <View style={styles.contactItem}>

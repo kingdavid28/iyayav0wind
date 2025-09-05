@@ -18,10 +18,10 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     // Simple error logging without any processing
-    console.error('🔴 ACTUAL ERROR:', error);
-    console.error('🔴 ERROR MESSAGE:', error?.message);
-    console.error('🔴 ERROR STACK:', error?.stack);
-    console.error('🔴 COMPONENT STACK:', errorInfo?.componentStack);
+    console.error('ACTUAL ERROR:', error);
+    console.error('ERROR MESSAGE:', error?.message);
+    console.error('ERROR STACK:', error?.stack);
+    console.error('COMPONENT STACK:', errorInfo?.componentStack);
     
     // Simple fallback without any complex processing
     this.setState({

@@ -3,6 +3,7 @@ import { View, Text, FlatList, RefreshControl, TouchableOpacity } from 'react-na
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import BookingItem from './BookingItem';
 import { parseDate } from '../utils/dateUtils';
+import { formatAddress } from '../../../utils/addressUtils';
 
 const BookingsTab = ({
   bookings,

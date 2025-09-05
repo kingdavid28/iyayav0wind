@@ -7,15 +7,17 @@ import { styles } from '../../styles/ParentDashboard.styles';
 // Privacy components temporarily disabled due to backend API not implemented
 import { usePrivacy } from '../../../components/Privacy/PrivacyManager';
 import PrivacyNotificationModal from '../../../components/Privacy/PrivacyNotificationModal';
-import PrivacySettingsModal from '../../../components/Privacy/PrivacySettingsModal';
+import { SettingsModal } from '../../../components/SettingsModal';
+import { RequestInfoModal } from '../../../components/RequestInfoModal';
 import { useMessaging } from '../../../contexts/MessagingContext';
 
-const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfileEdit, profileName, profileImage, profileContact, profileLocation }) => {
+const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfileEdit, profileName, profileImage, profileContact, profileLocation, setActiveTab }) => {
   // Use real privacy system
   const { pendingRequests, notifications } = usePrivacy();
   const { unreadCount } = useMessaging();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   
   // Calculate real notification counts
   const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
@@ -90,11 +92,12 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
             </View>
           )}
           
-          {/* Header Actions */}
+          {/* Header Actions - 2 Row Layout: 4 icons top, 2 icons bottom */}
           <View style={styles.headerActions}>
+            {/* First Row - 4 icons */}
             <Pressable 
-              style={[headerStyles.headerButton, { position: 'relative' }]} 
-              onPress={() => navigation?.navigate('Messages')}
+              style={[styles.headerButton, { position: 'relative' }]} 
+              onPress={() => setActiveTab('messages')}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={22} color="#db2777" />
               {unreadCount > 0 && (
@@ -107,10 +110,10 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
             </Pressable>
             
             <Pressable 
-              style={[headerStyles.headerButton, { position: 'relative' }]} 
+              style={[styles.headerButton, { position: 'relative' }]} 
               onPress={() => setShowNotifications(true)}
             >
-              <Ionicons name="notifications-outline" size={22} color="#db2777" />
+              <Ionicons name="shield-outline" size={22} color="#db2777" />
               {(unreadNotifications > 0 || pendingRequestsCount > 0) && (
                 <View style={headerStyles.notificationBadge}>
                   <Text style={headerStyles.notificationBadgeText}>
@@ -124,21 +127,29 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
             </Pressable>
             
             <Pressable 
-              style={headerStyles.headerButton}
-              onPress={() => setShowPrivacySettings(true)}
+              style={[styles.headerButton, { position: 'relative' }]} 
+              onPress={() => setShowRequestModal(true)}
             >
-              <Ionicons name="shield-outline" size={22} color="#db2777" />
+              <Ionicons name="mail-outline" size={22} color="#db2777" />
             </Pressable>
             
             <Pressable 
-              style={headerStyles.headerButton}
+              style={styles.headerButton}
+              onPress={() => setShowSettings(true)}
+            >
+              <Ionicons name="settings-outline" size={22} color="#db2777" />
+            </Pressable>
+            
+            {/* Second Row - 2 icons */}
+            <Pressable 
+              style={styles.headerButton}
               onPress={onProfileEdit}
             >
               <Ionicons name="person-outline" size={22} color="#db2777" />
             </Pressable>
             
             <Pressable 
-              style={headerStyles.headerButton}
+              style={styles.headerButton}
               onPress={onSignOut}
             >
               <Ionicons name="log-out-outline" size={22} color="#db2777" />
@@ -153,9 +164,19 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
         requests={pendingRequests}
       />
       
-      <PrivacySettingsModal
-        visible={showPrivacySettings}
-        onClose={() => setShowPrivacySettings(false)}
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        user={{ role: 'parent' }}
+        userType="parent"
+        colors={{ primary: '#db2777' }}
+      />
+      
+      <RequestInfoModal
+        visible={showRequestModal}
+        onClose={() => setShowRequestModal(false)}
+        targetUser={{ id: 'sample', name: 'Caregiver' }}
+        colors={{ primary: '#db2777' }}
       />
     </View>
   );
@@ -171,9 +192,15 @@ const headerStyles = {
     paddingVertical: 4,
   },
   headerButton: {
-    padding: 8,
-    borderRadius: 8,
-    marginHorizontal: 4,
+    padding: 6,
+    marginLeft: 4,
+    marginBottom: 4,
+    minWidth: 36,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileSection: {
     flex: 1,

@@ -37,72 +37,9 @@ import PaymentConfirmationScreen from "./src/screens/PaymentConfirmationScreen";
 import ProfileScreen from "./src/screens/profile/ProfileScreen";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 
-// Force remote debugging to show errors in terminal
+// Development mode setup
 if (__DEV__) {
-  // Enable remote debugging
-  if (typeof global !== 'undefined') {
-    global.__REMOTEDEV__ = true;
-  }
-  
-  // Force console output to Metro bundler
-  const originalLog = console.log;
-  const originalError = console.error;
-  const originalWarn = console.warn;
-  
-  console.log = (...args) => {
-    originalLog('📱 [MOBILE]', ...args);
-  };
-  
-  console.error = (...args) => {
-    const errorStr = args.map(arg => 
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ');
-    
-    originalError('\n\n🔴 MOBILE ERROR:', errorStr);
-    originalLog('\n\n🔴 MOBILE ERROR:', errorStr);
-    
-    // Force Metro to see this
-    if (args[0] instanceof Error) {
-      originalError('Stack:', args[0].stack);
-      originalLog('Stack:', args[0].stack);
-    }
-  };
-  
-  console.warn = (...args) => {
-    const warnStr = args.map(arg => 
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ');
-    
-    originalWarn('🟡 MOBILE WARN:', warnStr);
-    originalLog('🟡 MOBILE WARN:', warnStr);
-  };
-  
-  // Catch all errors
-  const handleError = (error, isFatal = false) => {
-    const errorInfo = {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      isFatal
-    };
-    
-    console.error('CAUGHT ERROR:', JSON.stringify(errorInfo, null, 2));
-  };
-  
-  // Global error handlers
-  if (global.ErrorUtils) {
-    global.ErrorUtils.setGlobalHandler(handleError);
-  }
-  
-  global.addEventListener?.('error', (event) => {
-    handleError(event.error || new Error(event.message));
-  });
-  
-  global.addEventListener?.('unhandledrejection', (event) => {
-    handleError(new Error(`Unhandled Promise: ${event.reason}`));
-  });
-  
-  console.log('🚀 Remote debugging enabled - errors will show in terminal');
+  console.log('🚀 Development mode enabled');
 }
 
 // Only ignore specific warnings, not errors
@@ -308,7 +245,7 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        console.log('📱 Initializing app...');
+        console.log('Initializing app...');
         
         // App initialization complete
         
@@ -318,7 +255,7 @@ export default function App() {
       } finally {
         setIsReady(true);
         await SplashScreen.hideAsync();
-        console.log('✅ App initialization complete');
+        console.log('App initialization complete');
       }
     }
 

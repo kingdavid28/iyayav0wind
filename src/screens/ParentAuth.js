@@ -135,8 +135,7 @@ const ParentAuth = ({ navigation, route }) => {
       }
     }, {
       onError: (error) => {
-        console.error('Auth error:', error);
-        Alert.alert("Error", error.message || "Authentication failed");
+        Alert.alert("Error", error?.message || "Authentication failed");
       }
     });
   };
@@ -157,20 +156,21 @@ const ParentAuth = ({ navigation, route }) => {
   const keyboardOffset = Platform.select({ ios: 80, android: 0 });
 
   return (
-    <KeyboardAvoidingWrapper
+    <KeyboardAvoidingView 
       style={styles.container}
-      keyboardVerticalOffset={Platform.select({ ios: 64, android: 0, web: 0 })}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.select({ ios: 0, android: 0 })}
     >
       <LinearGradient 
         colors={["#fce8f4", "#f3e8ff"]}
-        style={{ flex: 1 }}
+        style={styles.container}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          bounces={false}
+          showsVerticalScrollIndicator={false}
         >
         <View style={styles.header}>
           <TouchableOpacity 
@@ -353,12 +353,16 @@ const ParentAuth = ({ navigation, route }) => {
         </View>
         </ScrollView>
       </LinearGradient>
-    </KeyboardAvoidingWrapper>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 50,
+  },
   header: {
     flexDirection: 'center',
     alignItems: 'center',
@@ -390,7 +394,7 @@ const styles = StyleSheet.create({
     color: '#db2777',
     marginTop: 8,
   },
-  authContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  authContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 40 },
   authCard: {
     backgroundColor: 'white',
     borderRadius: 16,

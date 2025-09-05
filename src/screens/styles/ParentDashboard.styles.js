@@ -174,10 +174,11 @@ export const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 4,
-    justifyContent: 'center',
-    paddingEnd: 10,
+    flexShrink: 0,
+    maxWidth: 160,
+    justifyContent: 'flex-end',
     marginTop: Platform.select({
       web: 5,
       default: 2,
@@ -186,16 +187,31 @@ export const styles = StyleSheet.create({
   headerButton: {
     padding: Platform.select({
       web: 8,
-      default: 2,
+      default: 6,
     }),
     marginLeft: Platform.select({
       web: 20,
-      default: 8,
+      default: 4,
     }),
+    marginBottom: 4,
     minWidth: Platform.select({
       web: 5,
       default: 36,
     }),
+    width: Platform.select({
+      web: 'auto',
+      default: 36,
+    }),
+    height: Platform.select({
+      web: 'auto',
+      default: 36,
+    }),
+    borderRadius: Platform.select({
+      web: 0,
+      default: 18,
+    }),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Fixed tab container styles
   tabContainer: {

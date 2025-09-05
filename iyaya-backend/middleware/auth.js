@@ -66,35 +66,34 @@ const authenticate = async (req, res, next) => {
         ignoreExpiration: false
       });
 
-      // Map JWT token roles to correct userType
-      let userType = decoded.role || 'user';
-      if (decoded.role === 'provider') {
+      // CRITICAL: Check if user still exists in database
+      const User = require('../models/User');
+      const user = await User.findById(decoded.id).select('role userType email');
+      
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          error: 'User no longer exists'
+        });
+      }
+
+      // Map JWT token roles to correct userType using actual DB data
+      let userType = user.userType || user.role || 'user';
+      if (user.role === 'provider' || user.userType === 'provider') {
         userType = 'caregiver';
-      } else if (decoded.role === 'caregiver') {
+      } else if (user.role === 'caregiver' || user.userType === 'caregiver') {
         userType = 'caregiver';
-      } else if (decoded.role === 'client') {
-        // For legacy tokens with 'client' role, check actual user profile
-        try {
-          const User = require('../models/User');
-          const user = await User.findById(decoded.id).select('role userType');
-          if (user && (user.role === 'caregiver' || user.userType === 'provider')) {
-            userType = 'caregiver';
-          } else {
-            userType = 'parent';
-          }
-        } catch (dbError) {
-          console.error('Error checking user profile for role mapping:', dbError);
-          userType = 'parent'; // fallback
-        }
-      } else if (decoded.role === 'parent') {
+      } else if (user.role === 'client' || user.userType === 'client') {
+        userType = 'parent';
+      } else if (user.role === 'parent' || user.userType === 'parent') {
         userType = 'parent';
       }
 
       req.user = {
         id: decoded.id,
-        role: decoded.role || 'user',
+        role: user.role || 'user',
         userType: userType,
-        ...(decoded.email && { email: decoded.email })
+        email: user.email
       };
       // For custom JWTs that carry Mongo id, expose it as mongoId
       if (decoded.id) {

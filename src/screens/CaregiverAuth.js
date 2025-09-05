@@ -137,8 +137,7 @@ const CaregiverAuth = ({ navigation }) => {
       }
     }, {
       onError: (error) => {
-        console.error('Auth error:', error);
-        Alert.alert("Error", error.message || "Authentication failed");
+        Alert.alert("Error", error?.message || "Authentication failed");
       }
     });
   };
@@ -158,19 +157,21 @@ const CaregiverAuth = ({ navigation }) => {
   const keyboardOffset = Platform.select({ ios: 80, android: 0 });
 
   return (
-    <KeyboardAvoidingWrapper
+    <KeyboardAvoidingView 
       style={styles.container}
-      keyboardVerticalOffset={Platform.select({ ios: 64, android: 0, web: 0 })}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.select({ ios: 0, android: 0 })}
     >
       <LinearGradient 
         colors={["#e0f2fe", "#f3e8ff"]}
+        style={styles.container}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
-          bounces={false}
+          showsVerticalScrollIndicator={false}
         >
         <View style={styles.header}>
           <TouchableOpacity 
@@ -331,13 +332,17 @@ const CaregiverAuth = ({ navigation }) => {
         </View>
         </ScrollView>
       </LinearGradient>
-    </KeyboardAvoidingWrapper>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 50,
   },
   header: {
     flexDirection: 'center',
@@ -377,6 +382,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   authCard: {
     backgroundColor: 'white',

@@ -3,7 +3,7 @@ const Application = require('../models/Application');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const { validationResult } = require('express-validator');
-const { errorHandler } = require('../utils/errorHandler');
+const errorHandler = require('../utils/errorHandler');
 const { logger } = require('../utils/logger');
 
 // Get all jobs (public listing for caregivers)
@@ -81,7 +81,7 @@ exports.getAllJobs = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || 'Failed to fetch jobs'
     });
   }
 };
@@ -120,6 +120,7 @@ exports.createJob = async (req, res) => {
       description,
       location,
       rate,
+      salary,
       startDate,
       endDate,
       workingHours,
@@ -127,13 +128,23 @@ exports.createJob = async (req, res) => {
       children = [],
       urgency = 'normal'
     } = req.body;
+    
+    // Basic validation
+    if (!title || !description || !location || (!rate && !salary)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: title, description, location, and salary are required'
+      });
+    }
+    
+    const jobRate = rate || salary;
 
     const job = await Job.create({
       parentId,
       title,
       description,
       location,
-      rate: Number(rate),
+      rate: Number(jobRate),
       startDate: new Date(startDate),
       endDate: endDate ? new Date(endDate) : undefined,
       workingHours,
@@ -158,7 +169,7 @@ exports.createJob = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || 'Failed to create job'
     });
   }
 };

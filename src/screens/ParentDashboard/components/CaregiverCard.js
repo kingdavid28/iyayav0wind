@@ -11,6 +11,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
 import { API_CONFIG } from "../../../config/constants";
+import { formatAddress } from "../../../utils/addressUtils";
 import {
   colors,
   spacing,
@@ -82,71 +83,10 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
   const reviewCount =
     typeof caregiver?.reviewCount === "number" ? caregiver.reviewCount : 0;
 
-  // Enhanced location handling
+  // Use centralized address formatting
   const getLocationString = (location) => {
-    try {
-      if (!location) return "—";
-
-      // If location is already a string, return it
-      if (typeof location === "string") {
-        // Check if it's a stringified object
-        if (location.startsWith("{") && location.endsWith("}")) {
-          try {
-            const parsed = JSON.parse(location);
-            return getLocationString(parsed);
-          } catch (e) {
-            return location; // Return as is if can't parse
-          }
-        }
-        return location;
-      }
-
-      // Handle case where location is an object with toString() method
-      if (
-        typeof location.toString === "function" &&
-        location.toString() !== "[object Object]"
-      ) {
-        return location.toString();
-      }
-
-      // Handle common location object structures
-      if (location.formattedAddress) return location.formattedAddress;
-      if (location.street && location.city)
-        return `${location.street}, ${location.city}`;
-      if (location.street) return location.street;
-      if (location.city) return location.city;
-
-      // Handle coordinates if available
-      if (Array.isArray(location.coordinates)) {
-        const [lng, lat] = location.coordinates; // Note: GeoJSON uses [lng, lat] order
-        if (typeof lat === "number" && typeof lng === "number") {
-          return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        }
-      }
-
-      // If we have any properties, try to build a string from them
-      const locationParts = [];
-      if (location.address) locationParts.push(location.address);
-      if (location.city) locationParts.push(location.city);
-      if (location.state) locationParts.push(location.state);
-      if (location.country) locationParts.push(location.country);
-
-      if (locationParts.length > 0) {
-        return locationParts.join(", ");
-      }
-
-      // Last resort - try to find any string value in the object
-      for (const key in location) {
-        if (typeof location[key] === "string" && location[key]) {
-          return location[key];
-        }
-      }
-
-      return "—";
-    } catch (e) {
-      console.error("Error processing location:", e);
-      return "—";
-    }
+    const formatted = formatAddress(location);
+    return formatted === 'Location not specified' ? '—' : formatted;
   };
 
   // Get the location from various possible locations in the object
@@ -195,27 +135,8 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
   const bookButtonLabel = `Book ${name} for a session`;
   const messageButtonLabel = `Message ${name}`;
 
-  // Add helper function to format location
-  const formatLocation = (location) => {
-    if (!location) return "Location not specified";
-
-    if (typeof location === "string") return location;
-
-    // Handle location object structure
-    const { address, city, province, country, coordinates } = location;
-
-    // Build location string from available fields
-    const parts = [];
-    if (address) parts.push(address);
-    if (city) parts.push(city);
-    if (province) parts.push(province);
-    if (country) parts.push(country);
-
-    return parts.length > 0 ? parts.join(", ") : "Location not specified";
-  };
-
   // Format the location before rendering
-  const locationText = formatLocation(caregiver.location);
+  const locationText = getLocationString(locationSource);
 
   return (
     <View

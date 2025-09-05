@@ -10,6 +10,9 @@ export const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
+  scrollContent: {
+    paddingBottom: 120,
+  },
   progressContainer: {
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
@@ -54,20 +57,20 @@ export const styles = StyleSheet.create({
     padding: 20,
   },
   stepTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 8,
   },
   stepDescription: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6b7280',
-    lineHeight: 24,
+    lineHeight: 20,
     marginBottom: 24,
   },
   photoSection: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 10,
   },
   uploadingContainer: {
     width: 120,
@@ -295,10 +298,9 @@ export const styles = StyleSheet.create({
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginTop: 0,
     gap: 16,
   },
   navButton: {

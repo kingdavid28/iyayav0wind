@@ -14,8 +14,10 @@ import { useAuth } from "../contexts/AuthContext"
 import { useMessaging } from "../contexts/MessagingContext"
 import { usePrivacy } from "../components/Privacy/PrivacyManager"
 import PrivacyNotificationModal from "../components/Privacy/PrivacyNotificationModal"
-import PrivacySettingsModal from "../components/Privacy/PrivacySettingsModal"
+import { SettingsModal } from "../components/SettingsModal"
+import { RequestInfoModal } from "../components/RequestInfoModal"
 import MessagesTab from "../components/MessagesTab"
+import { formatAddress } from "../utils/addressUtils"
 import { styles } from "./styles/CaregiverDashboard.styles"
 
 // Local quick tiles
@@ -56,8 +58,8 @@ export default function CaregiverDashboard({ onLogout }) {
   const sectionHorizontalPadding = 16
   const gridGap = 16
   // On Android, prefer a single-column layout for larger cards
-  const columns = isTablet ? 3 : (isAndroid ? 1 : 2)
-  const containerWidth = width - sectionHorizontalPadding * 2
+  const columns = isTablet ? 2 : (isAndroid ? 1 : 2)
+  const containerWidth = width - sectionHorizontalPadding * 1
   const gridCardWidth = Math.floor((containerWidth - gridGap * (columns - 1)) / columns)
   // On Android single-column, let cards auto-size by content for better look
   const gridCardHeight = isAndroid ? undefined : 280
@@ -83,7 +85,8 @@ export default function CaregiverDashboard({ onLogout }) {
   // Privacy state
   const { pendingRequests, notifications } = usePrivacy();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
 
   // Default profile as fallback - rich mock data for better UX
   const defaultProfile = {
@@ -171,6 +174,20 @@ export default function CaregiverDashboard({ onLogout }) {
       urgent: false,
       children: 1,
       ages: "8 months"
+    },
+    {
+      id: 3,
+      title: "After School Care Assistant",
+      family: "The Garcia Family",
+      location: "Cebu City",
+      distance: "2.1 km away",
+      hourlyRate: 20,
+      schedule: "Monday-Friday, 3PM-7PM",
+      requirements: ["Homework help", "Driver's license", "First aid certified"],
+      postedDate: "3 days ago",
+      urgent: false,
+      children: 3,
+      ages: "6, 8, 10"
     }
   ]
 
@@ -222,7 +239,12 @@ export default function CaregiverDashboard({ onLogout }) {
   // Load profile data function
   const loadProfile = async () => {
     try {
-      console.log('🔍 Loading caregiver profile in dashboard...');
+      // Check if user is authenticated before making API calls
+      if (!user?.id) {
+        console.log('[INFO] No user ID, skipping profile load');
+        return;
+      }
+      
       const isCaregiver = (user?.role === 'caregiver');
       
       // Only call caregiver endpoint if role is caregiver; otherwise use auth profile
@@ -299,6 +321,7 @@ export default function CaregiverDashboard({ onLogout }) {
           // Load other data
           await Promise.all([
             // Fetch jobs with graceful fallback
+            // Fetch jobs (no auth required for browsing)
             (async () => {
               try {
                 const res = await jobsAPI.getAvailableJobs();
@@ -320,7 +343,9 @@ export default function CaregiverDashboard({ onLogout }) {
                   })));
                 }
               } catch (e) {
-                console.error('Error fetching jobs:', e);
+                if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
+                  console.error('Error fetching jobs:', e);
+                }
                 // keep existing jobs on error
               }
             })(),
@@ -329,6 +354,12 @@ export default function CaregiverDashboard({ onLogout }) {
             (async () => {
               const isCaregiver = (user?.role === 'caregiver');
               if (!isCaregiver) return;
+              
+              // Check if user is authenticated
+              if (!user?.id) {
+                console.log('[INFO] No user authentication, skipping applications fetch in focus effect');
+                return;
+              }
               
               try {
                 const res = await applicationsAPI.getMyApplications();
@@ -345,7 +376,9 @@ export default function CaregiverDashboard({ onLogout }) {
                   })));
                 }
               } catch (e) {
-                console.error('Error fetching applications:', e);
+                if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
+                  console.error('Error fetching applications:', e);
+                }
                 // keep existing applications on error
               }
             })(),
@@ -355,7 +388,14 @@ export default function CaregiverDashboard({ onLogout }) {
               const isCaregiver = (user?.role === 'caregiver');
               if (!isCaregiver) return;
               
+              // Check if user is authenticated
+              if (!user?.id) {
+                console.log('[INFO] No user authentication, skipping bookings fetch in focus effect');
+                return;
+              }
+              
               try {
+                console.log('[INFO] Fetching bookings...');
                 const res = await bookingsAPI.getMy();
                 const list = Array.isArray(res?.bookings) ? res.bookings : Array.isArray(res) ? res : [];
                 if (list.length && isActive) {
@@ -370,7 +410,10 @@ export default function CaregiverDashboard({ onLogout }) {
                   })));
                 }
               } catch (error) {
-                console.warn('Booking fetch error:', error);
+                console.error('❌ Error loading profile data:', error);
+                if (error && (typeof error !== 'object' || Object.keys(error).length > 0)) {
+                  console.warn('Booking fetch error:', error);
+                }
               }
             })()
           ]);
@@ -403,24 +446,28 @@ export default function CaregiverDashboard({ onLogout }) {
         // Load profile data
         await loadProfile();
         
-        // Load jobs
-        const jobsRes = await jobsAPI.getAvailableJobs();
-        const apiJobs = Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [];
-        if (apiJobs.length) {
-          setJobs(apiJobs.map(j => ({
-            id: j._id || j.id,
-            title: j.title || j.name || "Care Job",
-            family: j.employerName || j.family || "Family",
-            location: j.location || "",
-            distance: j.distance ? `${j.distance} km away` : "",
-            hourlyRate: j.rate || j.salary || 0,
-            schedule: j.workingHours || j.schedule || "",
-            requirements: Array.isArray(j.requirements) ? j.requirements : [],
-            postedDate: j.postedDate || j.postedTime || new Date().toISOString(),
-            urgent: j.urgent || false,
-            children: Array.isArray(j.children) ? j.children.length : (j.children || 0),
-            ages: j.ages || "",
-          })));
+        // Load jobs (no auth required for browsing)
+        try {
+          const jobsRes = await jobsAPI.getAvailableJobs();
+          const apiJobs = Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [];
+          if (apiJobs.length) {
+            setJobs(apiJobs.map(j => ({
+              id: j._id || j.id,
+              title: j.title || j.name || "Care Job",
+              family: j.employerName || j.family || "Family",
+              location: j.location || "",
+              distance: j.distance ? `${j.distance} km away` : "",
+              hourlyRate: j.rate || j.salary || 0,
+              schedule: j.workingHours || j.schedule || "",
+              requirements: Array.isArray(j.requirements) ? j.requirements : [],
+              postedDate: j.postedDate || j.postedTime || new Date().toISOString(),
+              urgent: j.urgent || false,
+              children: Array.isArray(j.children) ? j.children.length : (j.children || 0),
+              ages: j.ages || "",
+            })));
+          }
+        } catch (jobError) {
+          console.log('Jobs fetch failed, using mock data:', jobError.message);
         }
       } catch (error) {
         console.error('Error in initial data fetch:', error);
@@ -436,6 +483,12 @@ export default function CaregiverDashboard({ onLogout }) {
     const fetchApplications = async () => {
       const isCaregiver = (user?.role === 'caregiver');
       if (!isCaregiver) return;
+      
+      // Check if user is authenticated
+      if (!user?.id) {
+        console.log('[INFO] No user authentication, skipping applications fetch');
+        return;
+      }
       
       try {
         const res = await applicationsAPI.getMyApplications();
@@ -453,7 +506,9 @@ export default function CaregiverDashboard({ onLogout }) {
           setApplications(normalized);
         }
       } catch (e) {
-        console.error('Error fetching applications:', e);
+        if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
+          console.error('Error fetching applications:', e);
+        }
         // keep initial mock applications
       }
     };
@@ -462,6 +517,12 @@ export default function CaregiverDashboard({ onLogout }) {
     const fetchBookings = async () => {
       const isCaregiver = (user?.role === 'caregiver');
       if (!isCaregiver) return;
+      
+      // Check if user is authenticated
+      if (!user?.id) {
+        console.log('[INFO] No user authentication, skipping bookings fetch');
+        return;
+      }
       
       try {
         const res = await bookingsAPI.getMy();
@@ -474,42 +535,14 @@ export default function CaregiverDashboard({ onLogout }) {
             time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ""),
             status: b.status || "pending",
             children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
-            location: (() => {
-              try {
-                // If location is a string, return it directly
-                if (typeof b.location === 'string') return b.location;
-                if (typeof b.address === 'string') return b.address;
-                
-                // Handle location/address as object
-                const locationObj = b.location || b.address || {};
-                
-                // Try to build a readable address from common location object properties
-                if (locationObj.formattedAddress) return locationObj.formattedAddress;
-                if (locationObj.street && locationObj.city) {
-                  return `${locationObj.street}, ${locationObj.city}`;
-                }
-                if (locationObj.street) return locationObj.street;
-                if (locationObj.city) return locationObj.city;
-                
-                // If we have coordinates, return them as a fallback
-                if (locationObj.coordinates) {
-                  const [lat, lng] = locationObj.coordinates;
-                  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                }
-                
-                // Last resort: log the object for debugging
-                console.log('Location object:', JSON.stringify(locationObj, null, 2));
-                return 'Location not specified';
-              } catch (e) {
-                console.error('Error processing location:', e);
-                return 'Location not available';
-              }
-            })(),
+            location: formatAddress(b.location || b.address),
           }));
           setBookings(normalized);
         }
       } catch (e) {
-        console.error('Error fetching bookings:', e);
+        if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
+          console.error('Error fetching bookings:', e);
+        }
         // keep mock bookings
       }
     };
@@ -596,8 +629,8 @@ export default function CaregiverDashboard({ onLogout }) {
     try {
       const isCaregiver = ['caregiver', 'provider'].includes(String(user?.role || '').toLowerCase())
       // Ask permission (iOS specific; Android auto if manifest ok)
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-      if (perm.status !== 'granted') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow access to your photo library to change profile picture.')
         return
       }
@@ -656,11 +689,13 @@ export default function CaregiverDashboard({ onLogout }) {
 
       // Try to refresh profile to get authoritative image URL from server
       try {
-        const fresh = await authAPI.getProfile()
-        const serverUrl = fresh?.imageUrl || fresh?.avatarUrl || fresh?.photoUrl || fresh?.profileImage || fresh?.data?.imageUrl || fresh?.data?.avatarUrl || fresh?.data?.photoUrl || fresh?.data?.profileImage
-        if (serverUrl) {
-          // Convert relative URLs to absolute URLs
-          finalUrl = serverUrl.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${serverUrl}` : serverUrl;
+        if (user?.id) {
+          const fresh = await authAPI.getProfile()
+          const serverUrl = fresh?.imageUrl || fresh?.avatarUrl || fresh?.photoUrl || fresh?.profileImage || fresh?.data?.imageUrl || fresh?.data?.avatarUrl || fresh?.data?.photoUrl || fresh?.data?.profileImage
+          if (serverUrl) {
+            // Convert relative URLs to absolute URLs
+            finalUrl = serverUrl.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${serverUrl}` : serverUrl;
+          }
         }
       } catch (error) {
         console.warn('Profile refresh error:', error);
@@ -687,6 +722,12 @@ export default function CaregiverDashboard({ onLogout }) {
         hourlyRate: Number.isFinite(numericRate) ? numericRate : undefined,
         rate: Number.isFinite(numericRate) ? numericRate : undefined,
         experience: profileExperience,
+        previousVersion: {
+          name: profile.name,
+          hourlyRate: profile.hourlyRate,
+          experience: profile.experience,
+          updatedAt: new Date().toISOString()
+        }
       }
       
       console.log(' Dashboard payload:', payload);
@@ -868,7 +909,14 @@ export default function CaregiverDashboard({ onLogout }) {
               
               <Pressable 
                 style={styles.headerButton} 
-                onPress={() => setShowPrivacySettings(true)}
+                onPress={() => setShowRequestModal(true)}
+              >
+                <Ionicons name="mail-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              
+              <Pressable 
+                style={styles.headerButton} 
+                onPress={() => setShowSettings(true)}
               >
                 <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
               </Pressable>
@@ -876,7 +924,25 @@ export default function CaregiverDashboard({ onLogout }) {
               <Pressable style={styles.headerButton} onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}>
                 <Ionicons name="person-outline" size={22} color="#FFFFFF" />
               </Pressable>
-              <Pressable style={styles.headerButton} onPress={onLogout || signOut}>
+              <Pressable 
+                style={styles.headerButton} 
+                onPress={async () => {
+                  try {
+                    console.log('🚪 Caregiver logout initiated...');
+                    if (onLogout) {
+                      console.log('Using onLogout prop');
+                      await onLogout();
+                    } else {
+                      console.log('Using signOut from AuthContext');
+                      await signOut();
+                    }
+                    console.log('✅ Logout completed');
+                  } catch (error) {
+                    console.error('❌ Logout error:', error);
+                    Alert.alert('Logout Error', 'Failed to logout. Please try again.');
+                  }
+                }}
+              >
                 <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
               </Pressable>
             </View>
@@ -1146,12 +1212,17 @@ export default function CaregiverDashboard({ onLogout }) {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recommended Jobs</Text>
-                <Pressable>
+                <Pressable onPress={() => setActiveTab('jobs')}>
                   <Text style={styles.seeAllText}>See All</Text>
                 </Pressable>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-                {(jobs || []).slice(0, 3).map((job) => (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.horizontalScroll}
+                contentContainerStyle={{ paddingRight: 16 }}
+              >
+                {(jobs || []).slice(0, 3).map((job, index) => (
                   <JobCard
                     key={job.id}
                     job={job}
@@ -1159,7 +1230,10 @@ export default function CaregiverDashboard({ onLogout }) {
                     onApply={handleJobApplication}
                     onLearnMore={handleViewJob}
                     hasApplied={(id) => applications.some((a) => a.jobId === id)}
-                    jobCardStyle={styles.jobCardHorizontal}
+                    jobCardStyle={[
+                      styles.jobCardHorizontal,
+                      { marginRight: index === 2 ? 0 : 16 }
+                    ]}
                   />
                 ))}
               </ScrollView>
@@ -1438,9 +1512,19 @@ export default function CaregiverDashboard({ onLogout }) {
         requests={pendingRequests}
       />
       
-      <PrivacySettingsModal
-        visible={showPrivacySettings}
-        onClose={() => setShowPrivacySettings(false)}
+      <SettingsModal
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        user={user}
+        userType={user?.role || 'caregiver'}
+        colors={{ primary: '#3B82F6' }}
+      />
+      
+      <RequestInfoModal
+        visible={showRequestModal}
+        onClose={() => setShowRequestModal(false)}
+        targetUser={{ id: 'sample', name: 'Parent' }}
+        colors={{ primary: '#3B82F6' }}
       />
     </View>
   )

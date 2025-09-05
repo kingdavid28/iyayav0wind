@@ -1,70 +1,48 @@
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+// Expo Go compatible notification service (stub implementation)
+const isExpoGo = __DEV__ && !process.env.EAS_BUILD;
 
-// Configure notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
-
-// Request notification permissions
+// Stub implementations for Expo Go compatibility
 const requestPermissions = async () => {
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+  if (isExpoGo) {
+    console.log('📱 [NOTIFICATIONS] Stub: Permissions granted (Expo Go mode)');
+    return true;
+  }
+  // Real implementation would go here for production builds
+  return false;
 };
 
-// Schedule a local notification
 const schedulePushNotification = async (title, body, data = {}) => {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      data,
-      sound: 'default',
-    },
-    trigger: null, // Send immediately
-  });
+  if (isExpoGo) {
+    console.log('📱 [NOTIFICATIONS] Stub notification:', { title, body, data });
+    return;
+  }
+  // Real implementation would go here for production builds
 };
 
-// Handle notification received when app is in foreground
 const handleNotificationReceived = (notification) => {
-  // You can add custom handling here
-  console.log('Notification received:', notification);
+  console.log('📱 [NOTIFICATIONS] Received:', notification);
 };
 
-// Handle notification response (user taps on notification)
 const handleNotificationResponse = (response) => {
-  const { data } = response.notification.request.content;
-  // Handle navigation based on notification data
-  console.log('Notification response:', data);
-  return data;
+  console.log('📱 [NOTIFICATIONS] Response:', response);
+  return response?.data || {};
 };
 
-// Send a push notification to a specific user (stub; backend should handle distribution)
 const sendPushNotification = async (_userId, title, body, data = {}) => {
   try {
-    // For local testing only
     await schedulePushNotification(title, body, data);
   } catch (error) {
-    console.error('Error sending notification:', error);
+    console.error('📱 [NOTIFICATIONS] Error:', error);
   }
 };
 
-// Initialize notifications
 const initNotifications = async () => {
-  await requestPermissions();
-  
-  // Get the token for this device
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
-  console.log('Push token:', token);
-  
-  // In a real app, you would save this token to your backend
-  // to send push notifications to this device
-  
-  return token;
+  if (isExpoGo) {
+    console.log('📱 [NOTIFICATIONS] Stub: Initialized (Expo Go mode)');
+    return 'expo-go-stub-token';
+  }
+  // Real implementation would go here for production builds
+  return null;
 };
 
 export {

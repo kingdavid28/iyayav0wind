@@ -148,16 +148,21 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
       
       // Prepare payload for backend
       const payload = {
-        title: jobData.title,
-        description: jobData.description,
-        location: jobData.location,
-        rate: Number(jobData.rate),
+        title: jobData.title.trim(),
+        description: jobData.description.trim(),
+        location: jobData.location.trim(),
+        salary: Number(jobData.rate), // Backend expects 'salary' not 'rate'
+        rate: Number(jobData.rate), // Keep both for compatibility
         startDate: jobData.startDate,
         endDate: jobData.endDate || undefined,
         workingHours: jobData.workingHours,
-        requirements: jobData.requirements,
-        children: jobData.children,
+        requirements: jobData.requirements || [],
+        children: jobData.children || [],
+        parentId: user?.uid,
+        status: 'open'
       };
+      
+      console.log('📱 [MOBILE] Job payload:', payload);
 
       await jobsAPI.create(payload);
 
