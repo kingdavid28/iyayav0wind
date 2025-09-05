@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { formatDistanceToNow } from 'date-fns';
+import { getCaregiverDisplayName } from '../utils/caregiverUtils';
 
 // Mock data and utilities
 const SAMPLE_BOOKINGS = [
@@ -45,9 +46,6 @@ const SAMPLE_BOOKINGS = [
   },
 ];
 
-const getCaregiverDisplayName = (caregiver) => {
-  return caregiver?.name || 'Caregiver Not Assigned';
-};
 
 const getStatusColor = (status) => {
   switch(status) {

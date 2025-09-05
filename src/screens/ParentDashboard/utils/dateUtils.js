@@ -122,16 +122,3 @@ export const buildSchedule = (dateStr, start, end) => {
   
   return parts.join(' • ');
 };
-
-// Additional utility function for getting display name
-export const getCaregiverDisplayName = (caregiver) => {
-  if (typeof caregiver === 'string') return caregiver;
-  if (caregiver?.name) return caregiver.name;
-  return 'Caregiver';
-};
-
-// Additional utility for normalizing booking status
-export const normalizeStatus = (s) => {
-  if (!s) return 'pending';
-  return s === 'pending_confirmation' ? 'pending' : s;
-};

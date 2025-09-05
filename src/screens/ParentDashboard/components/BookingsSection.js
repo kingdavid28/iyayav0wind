@@ -5,9 +5,10 @@ import { styles, colors } from '../../styles/ParentDashboard.styles';
 import { 
   parseDate, 
   formatDateFriendly, 
-  formatTimeRange, 
-  getCaregiverDisplayName 
+  formatTimeRange
 } from '../utils/dateUtils';
+import { getCaregiverDisplayName } from '../../../utils/caregiverUtils';
+import CaregiverCard from '../../../components/CaregiverCard';
 
 const BookingsSection = ({ bookings, onViewBookings }) => {
   // Filter and sort upcoming bookings

@@ -1,20 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Image, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput as RNTextInput,
+  TouchableOpacity,
   Alert,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
-  Keyboard
+  ActivityIndicator,
+  Image,
+  Dimensions,
+  StyleSheet,
+  Keyboard,
 } from 'react-native';
+import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
 import { TextInput, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useApp, ACTION_TYPES } from '../context/AppContext';
+import { useApp, ACTION_TYPES } from '../contexts/AppContext';
 import { authAPI } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 import { CommonActions } from '@react-navigation/native';
@@ -47,7 +51,9 @@ const CaregiverAuth = ({ navigation }) => {
             routes: [{ name: 'CaregiverDashboard' }],
           })
         );
-      } catch (_) {}
+      } catch (error) {
+        console.warn('Navigation error:', error);
+      }
     }
   }, [authUser, navigation]);
 
@@ -91,7 +97,11 @@ const CaregiverAuth = ({ navigation }) => {
   };
 
   const handleSubmit = async () => {
-    Keyboard.dismiss();
+    try {
+      Keyboard.dismiss();
+    } catch (e) {
+      // Keyboard might not be available on web
+    }
     
     if (!validateCurrentForm()) {
       return;
@@ -101,44 +111,34 @@ const CaregiverAuth = ({ navigation }) => {
     
     const result = await execute(async () => {
       if (mode === 'signup') {
-        await signup({ email, password, name, phone, role: 'caregiver' });
+        const result = await signup({ email, password, name, phone, role: 'caregiver' });
         
         // Set role to caregiver
         try { 
           await authAPI.setRole('caregiver'); 
-        } catch (_) {}
-        
-        try {
-          const profile = await authAPI.getProfile();
-          if (profile) {
-            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: profile });
-            const mergedUser = { ...profile, role: 'caregiver' };
-            dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser });
-          }
-        } catch (_) {}
+        } catch (error) {
+          console.warn('Role setting error:', error);
+        }
         
         // Inform user to verify email
-        Alert.alert('Verify Your Email', 'A verification email has been sent. Please check your inbox.');
+        Alert.alert('Account Created', 'Your caregiver account has been created successfully!');
+        return result;
       } else {
-        await login(email, password);
+        const result = await login(email, password);
         
         // Set role to caregiver
         try { 
           await authAPI.setRole('caregiver'); 
-        } catch (_) {}
+        } catch (error) {
+          console.warn('Role setting error:', error);
+        }
         
-        try {
-          const profile = await authAPI.getProfile();
-          if (profile) {
-            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: profile });
-            const mergedUser = { ...profile, role: 'caregiver' };
-            dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser });
-          }
-        } catch (_) {}
+        return result;
       }
     }, {
       onError: (error) => {
-        Alert.alert("Error", error.userMessage || "Authentication failed");
+        console.error('Auth error:', error);
+        Alert.alert("Error", error.message || "Authentication failed");
       }
     });
   };
@@ -158,14 +158,12 @@ const CaregiverAuth = ({ navigation }) => {
   const keyboardOffset = Platform.select({ ios: 80, android: 0 });
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={keyboardOffset}
-      style={{ flex: 1 }}
+    <KeyboardAvoidingWrapper
+      style={styles.container}
+      keyboardVerticalOffset={Platform.select({ ios: 64, android: 0, web: 0 })}
     >
       <LinearGradient 
         colors={["#e0f2fe", "#f3e8ff"]}
-        style={styles.container}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
@@ -333,7 +331,7 @@ const CaregiverAuth = ({ navigation }) => {
         </View>
         </ScrollView>
       </LinearGradient>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingWrapper>
   );
 };
 

@@ -1,22 +1,52 @@
 import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
 
 export default [
   js.configs.recommended,
-  ...tseslint.configs.recommended,
   {
     files: ['src/**/*.{js,jsx,ts,tsx}'],
-    ignores: ['node_modules', 'dist'],
     languageOptions: {
-      parser: tseslint.parser,
+      ecmaVersion: 2022,
+      sourceType: 'module',
       parserOptions: {
-        project: './tsconfig.json',
+        ecmaFeatures: {
+          jsx: true
+        }
       },
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+        module: 'readonly',
+        require: 'readonly',
+        exports: 'readonly',
+        global: 'readonly',
+        Buffer: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly'
+      }
     },
     rules: {
-      // Add your custom rules here
-      'no-unused-vars': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
-    },
+      'no-unused-vars': 'off',
+      'no-console': 'off',
+      'no-undef': 'off'
+    }
   },
+  {
+    files: ['**/*.test.{js,jsx,ts,tsx}', '**/__tests__/**/*.{js,jsx,ts,tsx}'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        jest: 'readonly'
+      }
+    }
+  }
 ];

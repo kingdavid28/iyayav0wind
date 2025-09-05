@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import CustomDateTimePicker from '../components/DateTimePicker';
 import TimePicker from '../components/TimePicker';
-import jobsService from '../services/jobsService';
+import jobService from '../services/jobService';
 import { useApi } from '../hooks/useApi';
 import { styles } from './styles/JobPostingScreen.styles';
 
@@ -86,7 +86,7 @@ const JobPostingScreen = () => {
         endDate: formData.endDate.toISOString(),
       };
 
-      const result = await createJob(() => jobsService.createJob(jobData));
+      const result = await createJob(() => jobService.createJobPost(jobData));
 
       if (result) {
         Alert.alert(

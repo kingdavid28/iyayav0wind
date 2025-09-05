@@ -13,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useAuth } from "../contexts/AuthContext";
-import { useApp } from "../context/AppContext";
+import { useApp } from "../contexts/AppContext";
 import { AlignCenter } from 'lucide-react-native';
 
 /**
@@ -33,7 +33,9 @@ export default function WelcomeScreen() {
   React.useEffect(() => {
     try {
       console.log('[Welcome] user:', !!user, user ? { email: user.email, role: user.role } : null, 'AppContext.isAuthenticated:', !!state?.isAuthenticated, 'role:', role);
-    } catch(_) {}
+    } catch(error) {
+      console.warn('Welcome screen log error:', error);
+    }
   }, [user, state?.isAuthenticated, role]);
 
   // If logged in, immediately reset to the correct dashboard based on role
@@ -48,8 +50,12 @@ export default function WelcomeScreen() {
         })
       );
     } catch (e) {
-      try { console.warn('[Welcome] reset navigation failed, falling back to navigate', e?.message || e); } catch(_) {}
-      try { navigation.dispatch(CommonActions.navigate({ name: target })); } catch(_) {}
+      try { console.warn('[Welcome] reset navigation failed, falling back to navigate', e?.message || e); } catch(error) {
+        console.warn('Console warn error:', error);
+      }
+      try { navigation.dispatch(CommonActions.navigate({ name: target })); } catch(error) {
+        console.warn('Navigation fallback error:', error);
+      }
     }
   }, [isLoggedIn, role, navigation]);
 
@@ -113,7 +119,9 @@ export default function WelcomeScreen() {
                 pressed && styles.cardPressed
               ]}
               onPress={() => {
-                try { console.log('[Welcome] Parent card pressed. user?', !!user, 'isLoggedIn', isLoggedIn); } catch(_) {}
+                try { console.log('[Welcome] Parent card pressed. user?', !!user, 'isLoggedIn', isLoggedIn); } catch(error) {
+                  console.warn('Console log error:', error);
+                }
                 try {
                   if (isLoggedIn) {
                     navigation.dispatch(CommonActions.navigate({ name: 'ParentDashboard' }));
@@ -121,7 +129,9 @@ export default function WelcomeScreen() {
                     navigation.dispatch(CommonActions.navigate({ name: 'ParentAuth' }));
                   }
                 } catch (e) {
-                  try { console.error('[Welcome] Parent navigation error:', e?.message || e); } catch(_) {}
+                  try { console.error('[Welcome] Parent navigation error:', e?.message || e); } catch(error) {
+                    console.warn('Console error log error:', error);
+                  }
                 }
               }}
               android_ripple={{ color: "#fce7f3" }}
@@ -158,7 +168,9 @@ export default function WelcomeScreen() {
                 pressed && styles.cardPressed
               ]}
               onPress={() => {
-                try { console.log('[Welcome] Caregiver card pressed. user?', !!user, 'isLoggedIn', isLoggedIn); } catch(_) {}
+                try { console.log('[Welcome] Caregiver card pressed. user?', !!user, 'isLoggedIn', isLoggedIn); } catch(error) {
+                  console.warn('Console log error:', error);
+                }
                 try {
                   if (isLoggedIn) {
                     navigation.dispatch(CommonActions.navigate({ name: 'CaregiverDashboard' }));
@@ -166,7 +178,9 @@ export default function WelcomeScreen() {
                     navigation.dispatch(CommonActions.navigate({ name: 'CaregiverAuth' }));
                   }
                 } catch (e) {
-                  try { console.error('[Welcome] Caregiver navigation error:', e?.message || e); } catch(_) {}
+                  try { console.error('[Welcome] Caregiver navigation error:', e?.message || e); } catch(error) {
+                    console.warn('Console error log error:', error);
+                  }
                 }
               }}
               android_ripple={{ color: "#e0f2fe" }}

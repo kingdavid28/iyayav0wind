@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import jobsService from '../services/jobsService';
+import jobService from '../services/jobService';
 import { useApi } from '../hooks/useApi';
 import { formatDistanceToNow } from 'date-fns';
 import { styles } from './styles/JobSearchScreen.styles';
@@ -57,7 +57,7 @@ const JobSearchScreen = () => {
         limit: 10,
       };
 
-      const result = await loadJobs(() => jobsService.getJobs(searchFilters));
+      const result = await loadJobs(() => jobService.getAllJobs(searchFilters));
 
       if (result) {
         const { jobs: newJobs, pagination } = result;

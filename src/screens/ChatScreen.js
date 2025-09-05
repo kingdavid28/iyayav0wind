@@ -76,7 +76,9 @@ export default function ChatScreen() {
       .filter((m) => m.user?._id !== user.uid && !m.read)
       .map((m) => m._id);
     if (unreadIds.length) {
-      try { markMessagesAsRead(unreadIds); } catch {}
+      try { markMessagesAsRead(unreadIds); } catch (error) {
+        console.warn('Mark read error:', error);
+      }
     }
   }, [user?.uid, markMessagesAsRead]);
 

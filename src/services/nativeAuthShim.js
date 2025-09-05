@@ -40,15 +40,22 @@ const requiredKey = () => {
 const storage = {
   async setToken(token) {
     if (!AsyncStorage) return
-    try { await AsyncStorage.setItem('@shim_id_token', token) } catch {}
+    try { await AsyncStorage.setItem('@shim_id_token', token) } catch (error) {
+      console.warn('Token storage error:', error);
+    }
   },
   async getToken() {
     if (!AsyncStorage) return null
-    try { return await AsyncStorage.getItem('@shim_id_token') } catch { return null }
+    try { return await AsyncStorage.getItem('@shim_id_token') } catch (error) {
+      console.warn('Token retrieval error:', error);
+      return null;
+    }
   },
   async clear() {
     if (!AsyncStorage) return
-    try { await AsyncStorage.removeItem('@shim_id_token') } catch {}
+    try { await AsyncStorage.removeItem('@shim_id_token') } catch (error) {
+      console.warn('Token removal error:', error);
+    }
   }
 }
 

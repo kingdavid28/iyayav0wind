@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, LogBox, Text, View } from "react-native";
+import { ActivityIndicator, LogBox, Platform, Text, View, Alert } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 // Providers
@@ -12,6 +12,8 @@ import { AuthProvider, useAuth } from "./src/contexts/AuthContext"; // Add this 
 import { MessagingProvider } from "./src/contexts/MessagingContext";
 import { useThemeContext } from "./src/contexts/ThemeContext";
 import AppProvider from "./src/providers/AppProvider";
+import PrivacyProvider from "./src/components/Privacy/PrivacyManager";
+import ProfileDataProvider from "./src/components/Privacy/ProfileDataManager";
 
 // Screens (keep your screen imports as they are)
 import AvailabilityManagementScreen from "./src/screens/AvailabilityManagementScreen";
@@ -35,12 +37,30 @@ import PaymentConfirmationScreen from "./src/screens/PaymentConfirmationScreen";
 import ProfileScreen from "./src/screens/profile/ProfileScreen";
 import WelcomeScreen from "./src/screens/WelcomeScreen";
 
+// Enhanced error logging for mobile debugging
+if (__DEV__) {
+  console.log('🚀 App started in development mode');
+  
+  // Catch all unhandled errors and make them visible
+  const originalConsoleError = console.error;
+  console.error = (...args) => {
+    originalConsoleError('🔴 [MOBILE ERROR]', ...args);
+  };
+  
+  const originalConsoleWarn = console.warn;
+  console.warn = (...args) => {
+    originalConsoleWarn('🟡 [MOBILE WARN]', ...args);
+  };
+}
+
 // Suppress specific warnings
 LogBox.ignoreLogs([
   "AsyncStorage has been extracted",
   "Setting a timer",
   "Non-serializable values",
   "Require cycle:", // Ignore require cycle warnings
+  "Image load error", // Suppress image loading errors
+  "defaultSource", // Suppress iOS defaultSource warnings
 ]);
 
 // Keep splash screen visible while loading
@@ -241,16 +261,26 @@ const MainApp = () => {
   useEffect(() => {
     async function prepare() {
       try {
+        console.log('🚀 App initialization starting...');
+        
+        // Check if we're on iOS and handle potential issues
+        if (Platform.OS === 'ios') {
+          console.log('📱 iOS detected, applying compatibility fixes...');
+        }
+        
         // Pre-load fonts, make any API calls you need to do here
-        // await Font.loadAsync(...);
-
-        // Artificially delay for two seconds to simulate a slow loading
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500)); // Minimal delay
+        
+        console.log('✅ App initialization completed');
       } catch (e) {
-        console.warn("Error during app preparation:", e);
+        console.error('❌ App initialization failed:', e);
+        if (Platform.OS === 'ios') {
+          Alert.alert('iOS Startup Error', `Failed to initialize app: ${e.message}`);
+        }
       } finally {
+        // Tell the application to render
         setAppIsReady(true);
-        await SplashScreen.hideAsync();
+        SplashScreen.hideAsync();
       }
     }
 
@@ -258,21 +288,26 @@ const MainApp = () => {
   }, []);
 
   if (!appIsReady) {
-    return null; // ⏳ Splash screen stays visible
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#C2185B" />
+      </View>
+    );
   }
 
   return (
     <ErrorBoundary>
       <AuthProvider>
-        {" "}
-        {/* Wrap with AuthProvider */}
         <AppProvider>
           <SafeAreaProvider>
             <StatusBar style="auto" />
-            <MessagingProvider>
-              {/* AppNavigator owns the single NavigationContainer */}
-              <AppNavigator />
-            </MessagingProvider>
+            <ProfileDataProvider>
+              <PrivacyProvider>
+                <MessagingProvider>
+                  <AppNavigator />
+                </MessagingProvider>
+              </PrivacyProvider>
+            </ProfileDataProvider>
           </SafeAreaProvider>
         </AppProvider>
       </AuthProvider>
@@ -280,18 +315,24 @@ const MainApp = () => {
   );
 };
 
-// App Wrapper with Providers
+// App Wrapper with Error Handling
 const App = () => {
   try {
     return <MainApp />;
   } catch (error) {
-    console.error("Error in App component:", error);
+    console.error("Critical App Error:", error);
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Error loading the app. Please restart.</Text>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+        <Text style={{ fontSize: 18, textAlign: 'center', marginBottom: 20 }}>
+          App failed to start
+        </Text>
+        <Text style={{ fontSize: 14, textAlign: 'center', color: '#666' }}>
+          {error?.message || 'Unknown error occurred'}
+        </Text>
       </View>
     );
   }
 };
 
 export default App;
+

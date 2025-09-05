@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../utils/auth');
 const jobs = require('../controllers/jobController');
 
 // All routes here are authenticated

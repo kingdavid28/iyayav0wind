@@ -1,16 +1,8 @@
-// metro.config.js
-const { getDefaultConfig } = require("@expo/metro-config");
+const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-module.exports = {
-  ...config,
-  resolver: {
-    ...config.resolver,
-    sourceExts: [...config.resolver.sourceExts, "env"],
-    extraNodeModules: {
-      "react-native-keyboard-controller":
-        __dirname + "/src/shims/react-native-keyboard-controller.js",
-    },
-  },
-};
+// Enable console logs in production
+config.resolver.platforms = ['ios', 'android', 'native', 'web'];
+
+module.exports = config;

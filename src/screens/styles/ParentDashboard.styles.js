@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 // Design tokens - export as named exports
 export const colors = {
@@ -53,23 +53,45 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  contentContainer: {
-    flex: 1,
-    padding: spacing.md,
-  },
   header: {
     paddingTop: Platform.select({
       web: 20,
-      ios: 40,
-      android: 50,
+      ios: 50,
+      android: 30,
     }),
     paddingBottom: Platform.select({
-      web: 10,
-      default: 1,
+      web: 20,
+      default: 12,
     }),
     paddingHorizontal: Platform.select({
       web: 10,
-      default: 5,
+      default: 2,
+    }),
+    flexShrink: 0,
+    backgroundColor: colors.background,
+    position: 'relative',
+    zIndex: 1000,
+    elevation: 10,
+    minHeight: Platform.select({
+      web: 120,
+      ios: 80,
+      android: 90,
+    }),
+    shadowColor: Platform.select({
+      web: 'transparent',
+      default: '#000',
+    }),
+    shadowOffset: Platform.select({
+      web: { width: 0, height: 0 },
+      default: { width: 0, height: 2 },
+    }),
+    shadowOpacity: Platform.select({
+      web: 0,
+      default: 0.1,
+    }),
+    shadowRadius: Platform.select({
+      web: 0,
+      default: 4,
     }),
   },
   headerContent: {
@@ -78,7 +100,14 @@ export const styles = StyleSheet.create({
       web: 'row',
       default: 'column',
     }),
-    justifyContent: 'space-between',
+    justifyContent: Platform.select({
+      web: 'space-between',
+      default: 'center',
+    }),
+    alignItems: Platform.select({
+      web: 'flex-start',
+      default: 'center',
+    }),
   },
   headerTop: {
     flexDirection: 'row',
@@ -146,6 +175,9 @@ export const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    justifyContent: 'center',
+    paddingEnd: 10,
     marginTop: Platform.select({
       web: 5,
       default: 2,
@@ -167,28 +199,85 @@ export const styles = StyleSheet.create({
   },
   // Fixed tab container styles
   tabContainer: {
-    flexDirection: 'row',
     backgroundColor: 'white',
-    borderBottomWidth: 1,
+    borderBottomWidth: Platform.select({
+      web: 1,
+      default: 0,
+    }),
     borderBottomColor: '#e5e7eb',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    height: Platform.select({
+      web: 56,
+      default: 64,
+    }),
+    justifyContent: 'center',
+    zIndex: 500,
+    elevation: Platform.select({
+      web: 0,
+      default: 2,
+    }),
+    shadowColor: Platform.select({
+      web: 'transparent',
+      default: '#000',
+    }),
+  },
+  tabsScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Platform.select({
+      web: 8,
+      default: 16,
+    }),
+    shadowOffset: Platform.select({
+      web: { width: 0, height: 0 },
+      default: { width: 0, height: 1 },
+    }),
+    shadowOpacity: Platform.select({
+      web: 0,
+      default: 0.05,
+    }),
+    shadowRadius: Platform.select({
+      web: 0,
+      default: 2,
+    }),
   },
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginHorizontal: 4,
-    borderRadius: 20,
+    paddingHorizontal: Platform.select({
+      web: 16,
+      default: 20,
+    }),
+    paddingVertical: Platform.select({
+      web: 10,
+      default: 14,
+    }),
+    marginHorizontal: Platform.select({
+      web: 4,
+      default: 6,
+    }),
+    borderRadius: Platform.select({
+      web: 20,
+      default: 25,
+    }),
     backgroundColor: '#ffffff',
+    minHeight: Platform.select({
+      web: 'auto',
+      default: 44,
+    }),
+    justifyContent: 'center',
   },
   activeNavItem: {
     backgroundColor: '#fce7f3',
   },
   navText: {
-    marginLeft: 6,
-    fontSize: 14,
+    marginLeft: Platform.select({
+      web: 6,
+      default: 8,
+    }),
+    fontSize: Platform.select({
+      web: 14,
+      default: 16,
+    }),
     fontWeight: '500',
     color: '#6b7280',
   },
@@ -197,30 +286,80 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   dashboardContent: {
-    padding: 16,
-    gap: 16,
+    flex: 1,
+    padding: Platform.select({
+      web: 16,
+      default: 20,
+    }),
+    paddingTop: Platform.select({
+      web: 16,
+      default: 8,
+    }),
   },
   welcomeCard: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: Platform.select({
+      web: 16,
+      default: 20,
+    }),
+    padding: Platform.select({
+      web: 20,
+      default: 24,
+    }),
+    marginBottom: Platform.select({
+      web: 16,
+      default: 20,
+    }),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: Platform.select({
+        web: 2,
+        default: 4,
+      }),
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: Platform.select({
+      web: 0.1,
+      default: 0.15,
+    }),
+    shadowRadius: Platform.select({
+      web: 6,
+      default: 8,
+    }),
+    elevation: Platform.select({
+      web: 3,
+      default: 6,
+    }),
   },
   welcomeTitle: {
-    fontSize: 24,
+    fontSize: Platform.select({
+      web: 24,
+      default: 28,
+    }),
     fontWeight: 'bold',
     color: '#1f2937',
-    marginBottom: 8,
+    marginBottom: Platform.select({
+      web: 8,
+      default: 12,
+    }),
+    textAlign: Platform.select({
+      web: 'left',
+      default: 'center',
+    }),
   },
   welcomeSubtitle: {
-    fontSize: 16,
+    fontSize: Platform.select({
+      web: 16,
+      default: 18,
+    }),
     color: '#4b5563',
+    textAlign: Platform.select({
+      web: 'left',
+      default: 'center',
+    }),
+    lineHeight: Platform.select({
+      web: 22,
+      default: 26,
+    }),
   },
   quickActionsContainer: {
     flexDirection: 'row',
@@ -252,8 +391,9 @@ export const styles = StyleSheet.create({
   sectionCard: {
     borderRadius: 16,
     borderWidth: 1,
-    marginRight: 10,
-    marginLeft: 10,
+    marginRight: 1,
+    marginLeft: 1,
+    marginBottom: 20,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
     shadowOffset: {
@@ -298,7 +438,7 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
   },
   childrenList: {
-    gap: 12,
+    gap: 10,
   },
   childCard: {
     flexDirection: 'row',
@@ -455,7 +595,7 @@ export const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   caregiversList: {
-    gap: 16,
+    gap: 5,
   },
   caregiverCard: {
     borderRadius: 16,
@@ -571,12 +711,19 @@ export const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+    marginVertical: 2,
+    alignSelf: 'flex-end',
   },
   messageButton: {
     backgroundColor: '#f3f4f6',
@@ -686,19 +833,39 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 99999,
+    elevation: 99999,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 5,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   modalContent: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 0,
-    width: '50%',
-    maxWidth: 500,
-    minHeight: '60%',
-    maxHeight: '85%',
+    width: Platform.select({
+      web: '50%',
+      default: '90%',
+    }),
+    maxWidth: Platform.select({
+      web: 500,
+      default: 400,
+    }),
+    minHeight: Platform.select({
+      web: '60%',
+      default: '70%',
+    }),
+    maxHeight: Platform.select({
+      web: '80%',
+      default: '85%',
+    }),
+    zIndex: 100000,
+    elevation: 100000,
     height: 'auto',
-    elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1087,7 +1254,130 @@ statLabel: {
   color: colors.textSecondary,
 },
 
+// Jobs Tab Styles
+tabContent: {
+  flex: 1,
+  backgroundColor: colors.background,
+},
+jobsHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: spacing.md,
+  backgroundColor: colors.surface,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.border,
+},
+createJobButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: colors.secondary,
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.sm,
+  borderRadius: 8,
+  gap: spacing.xs,
+},
+createJobText: {
+  ...typography.button,
+  color: colors.textInverse,
+},
+filterTabs: {
+  flexDirection: 'row',
+  backgroundColor: colors.backgroundLight,
+  margin: spacing.md,
+  borderRadius: 8,
+  padding: 4,
+},
+jobsList: {
+  flex: 1,
+  paddingHorizontal: spacing.md,
+},
+jobCard: {
+  backgroundColor: colors.surface,
+  borderRadius: 12,
+  padding: spacing.md,
+  marginBottom: spacing.md,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+jobHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: spacing.md,
+},
+jobTitle: {
+  ...typography.subtitle1,
+  color: colors.text,
+  flex: 1,
+  marginRight: spacing.sm,
+},
+statusBadge: {
+  paddingHorizontal: spacing.sm,
+  paddingVertical: 4,
+  borderRadius: 12,
+},
+statusText: {
+  ...typography.caption,
+  color: colors.textInverse,
+  fontWeight: '600',
+  textTransform: 'capitalize',
+},
+jobDetails: {
+  gap: spacing.sm,
+  marginBottom: spacing.md,
+},
+jobDetailRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: spacing.sm,
+},
+jobDetailText: {
+  ...typography.body2,
+  color: colors.textSecondary,
+},
+jobActions: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  gap: spacing.sm,
+},
+jobActionButton: {
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.sm,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: colors.border,
+  backgroundColor: colors.surface,
+},
+deleteButton: {
+  borderColor: colors.error,
+  backgroundColor: colors.error + '10',
+},
+jobActionText: {
+  ...typography.body2,
+  color: colors.text,
+  fontWeight: '500',
+},
+deleteText: {
+  color: colors.error,
+},
+emptyStateButton: {
+  backgroundColor: colors.secondary,
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.md,
+  borderRadius: 8,
+  marginTop: spacing.md,
+},
+emptyStateButtonText: {
+  ...typography.button,
+  color: colors.textInverse,
+},
+
 });
+export default styles;
 
 // Export styles as both named and default for backward compatibility
 // export { styles };

@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  //Image, 
-  StyleSheet,
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
   Modal,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  Platform,
   ActivityIndicator,
+  StyleSheet,
   KeyboardAvoidingView,
-  Platform
+  Image,
 } from 'react-native';
+import KeyboardAvoidingWrapper from '../../../components/KeyboardAvoidingWrapper';
 import { 
   X, 
   Calendar, 
@@ -223,7 +225,7 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
             <Text style={styles.costValue}>₱{calculateTotalCost()}</Text>
           </View>
           <Text style={styles.costDetail}>
-            ₱{caregiver.hourlyRate}/hour × {Math.max(0, (new Date(`2024-01-01T${bookingData.endTime}`).getTime() - new Date(`2024-01-01T${bookingData.startTime}`).getTime()) / (1000 * 60 * 60))} hours
+            {`₱${resolveHourlyRate()}/hour × ${Math.max(0, Math.round((calculateTotalCost() / resolveHourlyRate()) * 100) / 100)} hours`}
           </Text>
         </View>
       )}
@@ -264,9 +266,9 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
             </TouchableOpacity>
             <View style={styles.childInfo}>
               <Text style={styles.childName}>{child.name}</Text>
-              <Text style={styles.childDetails}>Age {child.age} • {child.preferences}</Text>
+              <Text style={styles.childDetailsText}>{`Age ${child.age} • ${child.preferences}`}</Text>
               {child.allergies && child.allergies !== 'None' && (
-                <Text style={styles.allergyWarning}>⚠️ Allergies: {child.allergies}</Text>
+                <Text style={styles.allergyWarning}>{`⚠️ Allergies: ${child.allergies}`}</Text>
               )}
             </View>
           </View>
@@ -361,7 +363,7 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
           />
           <View style={styles.caregiverInfo}>
             <Text style={styles.caregiverName}>{caregiver.name}</Text>
-            <Text style={styles.rateText}>₱{caregiver.rate || caregiver.hourlyRate || '400'}/hr</Text>
+            <Text style={styles.rateText}>₱{resolveHourlyRate()}/hr</Text>
           </View>
         </View>
       </View>
@@ -374,100 +376,136 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
   );
 
   return (
-  <Modal
-    visible={visible}
-    transparent
-    animationType="fade"
-    onRequestClose={onClose}
-  >
-    <KeyboardAvoidingView 
-      style={styles.modalOverlay}
-      behavior={Platform.OS === 'ios' ? 'position' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? -50 : 20}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
-        {/* Header - Fixed whitespace and dynamic text */}
-        <View style={styles.modalHeader}>
-          <View>
-            <Text style={styles.modalTitle}>Book {caregiver?.name || ""}</Text>
-            <Text style={styles.stepIndicator}>Step {currentStep} of 4</Text>
-          </View>
-          <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
-        </View>
-
-        {/* Progress Bar - Fixed whitespace */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            {[1, 2, 3, 4].map((step) => (
-              <View key={step} style={styles.progressStep}>
-                <View style={[
-                  styles.progressCircle,
-                  step <= currentStep && styles.progressCircleActive
-                ]}>
-                  <Text style={[
-                    styles.progressText,
-                    step <= currentStep && styles.progressTextActive
-                  ]}>
-                    {step}
-                  </Text>
-                </View>
-                {step < 4 && (
-                  <View style={[
-                    styles.progressLine,
-                    step < currentStep && styles.progressLineActive
-                  ]}/>
+      <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <View style={styles.headerLeft}>
+              <View style={styles.caregiverAvatar}>
+                {caregiver?.avatar ? (
+                  <Image source={{ uri: caregiver.avatar }} style={styles.avatarImage} />
+                ) : (
+                  <User size={20} color="#6b7280" />
                 )}
               </View>
-            ))}
-          </View>
-          <View style={styles.progressLabels}>
-            <Text style={styles.progressLabel}>Schedule</Text>
-            <Text style={styles.progressLabel}>Children</Text>
-            <Text style={styles.progressLabel}>Contact</Text>
-            <Text style={styles.progressLabel}>Review</Text>
-          </View>
-        </View>
-
-        {/* Content */}
-        <ScrollView style={styles.contentContainer} contentContainerStyle={styles.scrollContent}>
-          {currentStep === 1 && renderStep1()}
-          {currentStep === 2 && renderStep2()}
-          {currentStep === 3 && renderStep3()}
-          {currentStep === 4 && renderStep4()}
-        </ScrollView>
-
-        {submitError ? (
-          <Text style={styles.errorText}>{submitError}</Text>
-        ) : null}
-
-        {/* Footer - Fixed whitespace */}
-        <View style={styles.modalFooter}>
-          <TouchableOpacity
-            onPress={handlePrevStep}
-            disabled={currentStep === 1 || submitting}
-            style={[styles.footerButton, styles.secondaryButton, (currentStep === 1 || submitting) && styles.disabledButton]}
-          ><Text style={styles.secondaryButtonText}>Previous</Text></TouchableOpacity>
-          
-          {currentStep < 4 ? (
-            <TouchableOpacity
-              onPress={handleNextStep}
-              disabled={!isStepValid() || submitting}
-              style={[styles.footerButton, styles.primaryButton, (!isStepValid() || submitting) && styles.disabledButton]}
-            ><Text style={styles.primaryButtonText}>Next</Text></TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              onPress={handleSubmit}
-              disabled={submitting}
-              style={[styles.footerButton, styles.successButton, submitting && styles.disabledButton]}
-            >
-              <Text style={styles.primaryButtonText}>{submitting ? 'Submitting…' : 'Confirm Booking'}</Text>
+              <View>
+                <Text style={styles.modalTitle}>Book {caregiver?.name || "Caregiver"}</Text>
+                <Text style={styles.stepIndicator}>Step {currentStep} of 4</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <X size={24} color="#6b7280" />
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+
+          {/* Progress Bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              {[1, 2, 3, 4].map((step) => (
+                <View key={step} style={styles.progressStep}>
+                  <View style={[
+                    styles.progressCircle,
+                    step <= currentStep && styles.progressCircleActive
+                  ]}>
+                    <Text style={[
+                      styles.progressText,
+                      step <= currentStep && styles.progressTextActive
+                    ]}>
+                      {step}
+                    </Text>
+                  </View>
+                  {step < 4 && (
+                    <View style={[
+                      styles.progressLine,
+                      step < currentStep && styles.progressLineActive
+                    ]}/>
+                  )}
+                </View>
+              ))}
+            </View>
+            <View style={styles.progressLabels}>
+              <Text style={styles.progressLabel}>Schedule</Text>
+              <Text style={styles.progressLabel}>Children</Text>
+              <Text style={styles.progressLabel}>Contact</Text>
+              <Text style={styles.progressLabel}>Review</Text>
+            </View>
+          </View>
+
+          {/* Content */}
+          <ScrollView 
+            style={styles.contentContainer}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {currentStep === 1 && renderStep1()}
+            {currentStep === 2 && renderStep2()}
+            {currentStep === 3 && renderStep3()}
+            {currentStep === 4 && renderStep4()}
+          </ScrollView>
+
+          {submitError ? (
+            <View style={styles.errorContainer}>
+              <AlertCircle size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{submitError}</Text>
+            </View>
+          ) : null}
+
+          {/* Footer */}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              onPress={handlePrevStep}
+              disabled={currentStep === 1 || submitting}
+              style={[
+                styles.footerButton, 
+                styles.secondaryButton, 
+                (currentStep === 1 || submitting) && styles.disabledButton
+              ]}
+            >
+              <Text style={styles.secondaryButtonText}>Previous</Text>
+            </TouchableOpacity>
+            
+            {currentStep < 4 ? (
+              <TouchableOpacity
+                onPress={handleNextStep}
+                disabled={!isStepValid() || submitting}
+                style={[
+                  styles.footerButton, 
+                  styles.primaryButton, 
+                  (!isStepValid() || submitting) && styles.disabledButton
+                ]}
+              >
+                <Text style={styles.primaryButtonText}>Next</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={handleSubmit}
+                disabled={submitting}
+                style={[
+                  styles.footerButton, 
+                  styles.successButton, 
+                  submitting && styles.disabledButton
+                ]}
+              >
+                {submitting && <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />}
+                <Text style={styles.primaryButtonText}>
+                  {submitting ? 'Submitting…' : 'Confirm Booking'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </KeyboardAvoidingView>
       </View>
-    </KeyboardAvoidingView>
-  </Modal>
-);
+    </Modal>
+  );
 }
 
 const BookingDetailsModal = ({ 
@@ -596,14 +634,14 @@ const BookingDetailsModal = ({
                   <DollarSign size={20} color="#6b7280" />
                   <View>
                     <Text style={styles.overviewLabel}>Rate</Text>
-                    <Text style={[styles.overviewValue, styles.rateValue]}>${enhancedBooking.hourlyRate}/hr</Text>
+                    <Text style={[styles.overviewValue, styles.rateValue]}>₱{enhancedBooking.hourlyRate}/hr</Text>
                   </View>
                 </View>
                 <View style={styles.overviewItem}>
                   <Star size={20} color="#6b7280" />
                   <View>
                     <Text style={styles.overviewLabel}>Total</Text>
-                    <Text style={[styles.overviewValue, styles.totalValue]}>${enhancedBooking.totalAmount}</Text>
+                    <Text style={[styles.overviewValue, styles.totalValue]}>₱{enhancedBooking.totalAmount}</Text>
                   </View>
                 </View>
               </View>
@@ -766,48 +804,60 @@ const styles = StyleSheet.create({
   // Common styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    padding: 16,
-    paddingBottom: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   modalContainer: {
+    flex: 1,
     backgroundColor: 'white',
-    borderRadius: 16,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    width: '100%',
-    maxHeight: '85%',
-    minHeight: '70%',
-    overflow: 'hidden',
-    flex: 0,
-    display: 'flex',
-    flexDirection: 'column',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: 50,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: 'white',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  caregiverAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#111827',
   },
   stepIndicator: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
+    marginTop: 2,
+  },
+  closeButton: {
+    padding: 4,
   },
   
   // BookingModal specific styles
   progressContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: '#f9fafb',
   },
   progressBar: {
@@ -865,7 +915,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 100,
   },
   stepContainer: {
     gap: 16,
@@ -894,7 +944,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   multilineInput: {
-    minHeight: 80,
+    minHeight: 50,
     textAlignVertical: 'top',
   },
   timeContainer: {
@@ -963,7 +1013,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
-  childDetails: {
+  childDetailsText: {
     fontSize: 14,
     color: '#6b7280',
   },
@@ -1003,13 +1053,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    color: '#6b7280',
+  rateText: {
+    color: '#3b82f6',
+    fontWeight: '600',
   },
   
   summaryDetails: {
@@ -1037,7 +1083,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
   },
-  totalValue: {
+  totalAmount: {
     fontWeight: 'bold',
     fontSize: 16,
     color: '#10b981',
@@ -1045,24 +1091,36 @@ const styles = StyleSheet.create({
   
   modalFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
-    minHeight: 80,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: 'white',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fef2f2',
+    borderTopWidth: 1,
+    borderTopColor: '#fecaca',
   },
   errorText: {
-    color: '#ef4444',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    color: '#dc2626',
+    fontSize: 14,
+    flex: 1,
   },
   footerButton: {
+    flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: 44,
   },
   secondaryButton: {
     borderWidth: 1,
@@ -1072,9 +1130,10 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#374151',
     fontWeight: '500',
+    fontSize: 14,
   },
   primaryButton: {
-    backgroundColor: '#ec4899',
+    backgroundColor: '#3b82f6',
   },
   disabledButton: {
     opacity: 0.5,
@@ -1082,6 +1141,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: 'white',
     fontWeight: '500',
+    fontSize: 14,
   },
   successButton: {
     backgroundColor: '#10b981',
@@ -1090,9 +1150,15 @@ const styles = StyleSheet.create({
   // BookingDetailsModal specific styles
   detailsModalContainer: {
     maxWidth: 500,
+    marginHorizontal: 20,
+    marginVertical: 40,
+    borderRadius: 20,
+    maxHeight: '90%',
   },
   detailsHeader: {
     backgroundColor: '#eff6ff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   detailsHeaderContent: {
     flexDirection: 'row',
@@ -1204,10 +1270,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  childName: {
-    fontWeight: '600',
-    color: '#111827',
-  },
   childAge: {
     fontSize: 14,
     color: '#6b7280',
@@ -1286,40 +1348,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    padding: 16,
+    padding: 12,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     backgroundColor: '#f9fafb',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    minHeight: 36,
+    flex: 1,
+    justifyContent: 'center',
   },
   actionButtonText: {
     fontWeight: '500',
+    fontSize: 13,
   },
   messageButton: {
     backgroundColor: '#dbeafe',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
   },
   directionsButton: {
     backgroundColor: '#d1fae5',
+    borderWidth: 1,
+    borderColor: '#86efac',
   },
   completeButton: {
     backgroundColor: '#3b82f6',
   },
   completeButtonText: {
     color: 'white',
+    fontSize: 13,
   },
   cancelButton: {
     backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
   },
   cancelButtonText: {
     color: '#ef4444',
     fontWeight: '500',
+    fontSize: 13,
   },
 });
 

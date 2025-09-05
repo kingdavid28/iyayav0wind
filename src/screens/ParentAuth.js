@@ -1,19 +1,23 @@
-import React, { useEffect, useState } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Image, 
-  TouchableOpacity, 
-  Alert, 
-  KeyboardAvoidingView, 
-  Platform, 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput as RNTextInput,
+  TouchableOpacity,
+  Alert,
   ScrollView,
-  Keyboard
-} from "react-native";
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Image,
+  Dimensions,
+  StyleSheet,
+  Keyboard,
+} from 'react-native';
+import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
 import { TextInput, Button, useTheme } from "react-native-paper";
 import { useAuth } from "../contexts/AuthContext";
-import { useApp, ACTION_TYPES } from "../context/AppContext";
+import { useApp, ACTION_TYPES } from "../contexts/AppContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { validateForm, validationRules } from "../utils/validation";
@@ -36,7 +40,9 @@ const ParentAuth = ({ navigation, route }) => {
             routes: [{ name: 'ParentDashboard' }],
           })
         );
-      } catch (_) {}
+      } catch (error) {
+        console.warn('Navigation error:', error);
+      }
     }
   }, [authUser, navigation]);
   
@@ -96,7 +102,11 @@ const ParentAuth = ({ navigation, route }) => {
   
   // Handle form submission
   const handleSubmit = async () => {
-    Keyboard.dismiss();
+    try {
+      Keyboard.dismiss();
+    } catch (e) {
+      // Keyboard might not be available on web
+    }
     
     if (!validateCurrentForm()) {
       return;
@@ -106,36 +116,27 @@ const ParentAuth = ({ navigation, route }) => {
     
     const result = await execute(async () => {
       if (mode === 'login') {
-        await login(email, password);
+        const result = await login(email, password);
         // Set role to parent
-        try { await authAPI.setRole('parent'); } catch (_) {}
-        try {
-          const profile = await authAPI.getProfile();
-          if (profile) {
-            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: profile });
-            const mergedUser = { ...profile, role: 'parent' };
-            dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser });
-          }
-        } catch (_) {}
+        try { await authAPI.setRole('parent'); } catch (error) {
+          console.warn('Role setting error:', error);
+        }
+        return result;
       } else if (mode === 'signup') {
-        await signup({ email, password, name, phone, role: 'parent' });
-        try { await authAPI.setRole('parent'); } catch (_) {}
-        try {
-          const profile = await authAPI.getProfile();
-          if (profile) {
-            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: profile });
-            const mergedUser = { ...profile, role: 'parent' };
-            dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser });
-          }
-        } catch (_) {}
+        const result = await signup({ email, password, name, phone, role: 'parent' });
+        try { await authAPI.setRole('parent'); } catch (error) {
+          console.warn('Role setting error:', error);
+        }
+        return result;
       } else if (mode === 'reset') {
-        await authAPI.resetPassword(email);
-        Alert.alert("Success", "Password reset link sent to your email");
-        setMode('login');
+        // Note: resetPassword method doesn't exist in authAPI, you may need to add it
+        Alert.alert("Info", "Password reset feature not implemented yet");
+        return;
       }
     }, {
       onError: (error) => {
-        Alert.alert("Error", error.userMessage || "Authentication failed");
+        console.error('Auth error:', error);
+        Alert.alert("Error", error.message || "Authentication failed");
       }
     });
   };
@@ -156,14 +157,13 @@ const ParentAuth = ({ navigation, route }) => {
   const keyboardOffset = Platform.select({ ios: 80, android: 0 });
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={keyboardOffset}
-      style={{ flex: 1 }}
+    <KeyboardAvoidingWrapper
+      style={styles.container}
+      keyboardVerticalOffset={Platform.select({ ios: 64, android: 0, web: 0 })}
     >
       <LinearGradient 
         colors={["#fce8f4", "#f3e8ff"]}
-        style={styles.container}
+        style={{ flex: 1 }}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
@@ -353,7 +353,7 @@ const ParentAuth = ({ navigation, route }) => {
         </View>
         </ScrollView>
       </LinearGradient>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingWrapper>
   );
 };
 

@@ -1,41 +1,38 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { 
-  View, 
-  ScrollView,
-  SafeAreaView,
-  StatusBar,
-  Modal,
-  Alert
-} from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import * as FileSystem from 'expo-file-system';
+import { useAuth } from '../../contexts/AuthContext';
+import { caregiversAPI, jobsAPI, authAPI, bookingsAPI } from '../../config/api';
+import { styles } from '../styles/ParentDashboard.styles';
+// Privacy components temporarily disabled due to backend API not implemented
+// import PrivacyProvider from '../../components/Privacy/PrivacyManager';
+// import ProfileDataProvider from '../../components/Privacy/ProfileDataManager';
 
-// Import components
 import Header from './components/Header';
 import NavigationTabs from './components/NavigationTabs';
 import HomeTab from './components/HomeTab';
 import SearchTab from './components/SearchTab';
 import BookingsTab from './components/BookingsTab';
-
-// Import modals
-import ChildModal from './modals/ChildModal';
+import MessagesTab from './components/MessagesTab';
+import JobsTab from './components/JobsTab';
+// import ProfileTab from './components/ProfileTab';
+import MobileProfileSection from './components/MobileProfileSection';
 import ProfileModal from './modals/ProfileModal';
 import FilterModal from './modals/FilterModal';
 import JobPostingModal from './modals/JobPostingModal';
 import BookingModal from './modals/BookingModal';
 import PaymentModal from './modals/PaymentModal';
-
-// Import styles
-import { colors, styles } from '../styles/ParentDashboard.styles';
+import ChildModal from './modals/ChildModal';
 
 // Import services
-import { bookingsAPI, jobsAPI, caregiversAPI, authAPI } from '../../config/api';
-import { userService } from '../../services/userService';
-import { useApp } from '../../context/AppContext';
-import useAuth from '../../contexts/useAuth';
+// import { userService } from '../../services/userService';
+import { useApp } from '../../contexts/AppContext';
 
 // Import utilities
-import { fetchMyBookings, getCaregiverDisplayName } from './utils/bookingUtils';
-import { applyFilters, countActiveFilters } from './utils/caregiverUtils';
+import { fetchMyBookings } from './utils/bookingUtils';
+// import { getCaregiverDisplayName } from '../../utils/caregiverUtils';
+import { applyFilters, countActiveFilters } from '../../utils/caregiverUtils';
 
 // Sample data
 const SAMPLE_CHILDREN = [
@@ -124,6 +121,7 @@ const ParentDashboard = () => {
   const [profileName, setProfileName] = useState('');
   const [profileContact, setProfileContact] = useState('');
   const [profileLocation, setProfileLocation] = useState('');
+  const [profileImage, setProfileImage] = useState('');
   
   // Booking modal state
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
@@ -186,13 +184,19 @@ const ParentDashboard = () => {
       id: 'messages',
       icon: 'message-circle',
       title: 'Messages',
-      onPress: () => navigation.navigate('Messages')
+      onPress: () => setActiveTab('messages')
     },
     {
       id: 'add-child',
       icon: 'plus',
       title: 'Add Child',
       onPress: () => openAddChild()
+    },
+    {
+      id: 'post-job',
+      icon: 'briefcase',
+      title: 'Post Job',
+      onPress: () => setActiveTab('jobs')
     },
   ], [caregivers, navigation]);
 
@@ -233,7 +237,11 @@ const ParentDashboard = () => {
       return transformedCaregivers;
     } catch (error) {
       console.error('Error fetching caregivers:', error);
-      return [];
+      // Ensure we don't throw objects as errors
+      if (error && typeof error === 'object' && !error.message) {
+        throw new Error(`API Error: ${JSON.stringify(error)}`);
+      }
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -241,46 +249,58 @@ const ParentDashboard = () => {
 
   const fetchMyChildren = useCallback(async () => {
     try {
-      let profile = state?.userProfile;
-      if (!profile && user?.uid) {
-        profile = await userService.getProfile(user.uid);
-      }
-
-      const list = profile?.children || profile?.data?.children || [];
-      const pName = profile?.name || profile?.data?.name || '';
-      const pContact = profile?.contact || profile?.data?.contact || '';
-      const pLocation = profile?.location || profile?.data?.location || '';
-      
-      setProfileName(String(pName || ''));
-      setProfileContact(String(pContact || ''));
-      setProfileLocation(String(pLocation || ''));
-
-      if (Array.isArray(list) && list.length) {
-        const normalized = list.map((c) => ({
-          id: c._id || c.id || String(Math.random()),
-          name: c.name || c.firstName || 'Child',
-          age: (c.age ?? c.years) || 0,
-          preferences: c.preferences || '',
-        }));
-        setChildren(normalized);
-      } else {
-        setChildren(SAMPLE_CHILDREN);
-      }
+      // Children data is now loaded through the main loadData() function
+      // This function now just sets sample data as fallback
+      setChildren(SAMPLE_CHILDREN);
     } catch (err) {
       setChildren(SAMPLE_CHILDREN);
     }
-  }, [state?.userProfile, user?.uid]);
+  }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Loading profile data...');
       const profile = await authAPI.getProfile();
+      console.log('📋 Profile API response:', profile);
       setUserData(profile.data);
+
+      // Initialize profile form data from API response
+      if (profile.data) {
+        setProfileName(profile.data.name || '');
+        setProfileContact(profile.data.email || profile.data.contact || '');
+        setProfileLocation(profile.data.location || '');
+        // Handle nested user object structure from API response
+        const imageUrl = profile.data.profileImage || 
+                        profile.data.avatar || 
+                        profile.data.user?.profileImage || 
+                        profile.data.user?.avatar || 
+                        '';
+        setProfileImage(imageUrl);
+        
+        // Debug log to check values
+        console.log('Profile data loaded:', {
+          name: profile.data.name,
+          email: profile.data.email,
+          contact: profile.data.contact,
+          location: profile.data.location,
+          profileImage: profile.data.profileImage,
+          avatar: profile.data.avatar
+        });
+        
+        console.log('Setting profileImage state to:', imageUrl);
+        console.log('Full profile.data object:', JSON.stringify(profile.data, null, 2));
+      }
 
       const jobsResponse = await jobsAPI.getMyJobs();
       setJobs(jobsResponse?.data?.jobs || []);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading profile data:', error);
+      // Set default values if profile loading fails
+      setProfileName('User');
+      setProfileContact('No email available');
+      setProfileLocation('Location not set');
+      setProfileImage('');
     } finally {
       setLoading(false);
     }
@@ -376,7 +396,7 @@ const ParentDashboard = () => {
   };
 
   const handleMessageCaregiver = (caregiver) => {
-    navigation.navigate('Chat', { 
+    navigation.navigate('Messaging', { 
       recipientId: caregiver.id,
       recipientName: caregiver.name,
       recipientAvatar: caregiver.avatar
@@ -398,31 +418,87 @@ const ParentDashboard = () => {
 
   // Booking functions
   const handleBookingConfirm = async (bookingData) => {
+    console.log('🔍 Raw booking data received:', bookingData);
+    
+    // Validate required fields
+    if (!bookingData.caregiverId || !bookingData.date || !bookingData.startTime || !bookingData.endTime) {
+      throw new Error('Missing required booking information');
+    }
+    
+    // Transform selected children names to child objects
+    const selectedChildrenObjects = (bookingData.selectedChildren || []).map(childName => {
+      const childData = children.find(child => child.name === childName);
+      return childData ? {
+        name: childData.name,
+        age: childData.age,
+        preferences: childData.preferences || '',
+        allergies: childData.allergies || 'None'
+      } : {
+        name: childName,
+        age: 0,
+        preferences: '',
+        allergies: 'None'
+      };
+    });
+
+    // Validate all required fields are present
+    const requiredFields = ['caregiverId', 'date', 'startTime', 'endTime', 'address', 'hourlyRate', 'totalCost'];
+    for (const field of requiredFields) {
+      if (!bookingData[field]) {
+        console.error(`Missing required field: ${field}`);
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+
     const payload = {
       caregiverId: bookingData.caregiverId,
       date: bookingData.date,
       startTime: bookingData.startTime,
       endTime: bookingData.endTime,
-      children: bookingData.selectedChildren || [],
       address: bookingData.address,
-      contact: { phone: bookingData.contactPhone },
-      emergencyContact: bookingData.emergencyContact || {},
-      specialInstructions: bookingData.specialInstructions || '',
-      hourlyRate: bookingData.hourlyRate,
-      totalCost: bookingData.totalCost,
-      status: bookingData.status || 'pending',
+      hourlyRate: Number(bookingData.hourlyRate),
+      totalCost: Number(bookingData.totalCost),
+      children: selectedChildrenObjects || []
     };
 
-    try {
-      const res = await bookingsAPI.create(payload);
-      setActiveTab('bookings');
-      await handleFetchBookings();
-      setIsBookingModalVisible(false);
-      return res;
-    } catch (err) {
-      console.error('Booking error:', err);
-      throw err;
-    }
+    console.log('📤 Sending booking payload:', JSON.stringify(payload, null, 2));
+
+    const attemptBooking = async (retryCount = 0) => {
+      try {
+        const res = await bookingsAPI.create(payload);
+        console.log('✅ Booking created successfully:', res);
+        setActiveTab('bookings');
+        await handleFetchBookings();
+        setIsBookingModalVisible(false);
+        Alert.alert('Success', 'Booking created successfully!');
+        return res;
+      } catch (err) {
+        console.error('❌ Booking error:', err);
+        
+        if (err.response?.status === 429) {
+          if (retryCount < 2) {
+            const waitTime = (retryCount + 1) * 30;
+            Alert.alert(
+              'Rate Limit Exceeded',
+              `Too many requests. Retrying in ${waitTime} seconds...`
+            );
+            
+            await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
+            return attemptBooking(retryCount + 1);
+          } else {
+            Alert.alert(
+              'Rate Limit Exceeded',
+              'Server is busy. Please try again in a few minutes.'
+            );
+          }
+        } else {
+          Alert.alert('Error', err.message || 'Failed to create booking');
+        }
+        throw err;
+      }
+    };
+
+    return attemptBooking();
   };
 
   const handleCancelBooking = async (bookingId) => {
@@ -467,12 +543,32 @@ const ParentDashboard = () => {
     setFilteredCaregivers(filtered);
     
     if (searchQuery) {
-      setSearchResults(searchFilteredCaregivers);
+      setSearchResults(filtered);
+    }
+  };
+
+  // Job management functions
+  const handleCreateJob = () => {
+    setShowJobPostingModal(true);
+  };
+
+  const handleEditJob = (job) => {
+    // Set job data for editing
+    setShowJobPostingModal(true);
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    try {
+      await jobsAPI.delete(jobId);
+      await loadData(); // Refresh jobs list
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      Alert.alert('Error', 'Failed to delete job');
     }
   };
 
   // Profile functions
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = async (imageUri = null) => {
     try {
       const updateData = {
         name: profileName.trim(),
@@ -480,13 +576,51 @@ const ParentDashboard = () => {
         location: profileLocation.trim()
       };
 
+      console.log('Updating profile with data:', updateData);
+      
+      // Handle image upload if provided
+      if (imageUri) {
+        try {
+          // Convert image to base64 using FileSystem (React Native compatible)
+          const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          
+          // Upload image first
+          const imageResult = await authAPI.uploadProfileImageBase64(base64Image, 'image/jpeg');
+          console.log('Image upload result:', imageResult);
+          
+          if (imageResult && imageResult.data && imageResult.data.profileImageUrl) {
+            updateData.profileImage = imageResult.data.profileImageUrl;
+            setProfileImage(imageResult.data.profileImageUrl);
+          }
+        } catch (imageError) {
+          console.error('Error uploading image:', imageError);
+          Alert.alert('Warning', 'Profile updated but image upload failed');
+        }
+      }
+      
       const result = await authAPI.updateProfile(updateData);
       
-      if (result.success) {
+      console.log('Profile update result:', result);
+      
+      // The API returns the updated data directly, not wrapped in success property
+      if (result && result.data) {
+        // Update local state with new data
+        setProfileName(result.data.name || profileName);
+        setProfileContact(result.data.contact || result.data.email || profileContact);
+        setProfileLocation(result.data.location || profileLocation);
+        if (result.data.profileImage) {
+          setProfileImage(result.data.profileImage);
+        }
+        
         setShowProfileModal(false);
         Alert.alert('Success', 'Profile updated successfully');
+        
+        // Reload profile data to ensure sync
+        await loadData();
       } else {
-        Alert.alert('Error', result.error || 'Failed to update profile');
+        Alert.alert('Error', 'Failed to update profile');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -500,10 +634,6 @@ const ParentDashboard = () => {
       case 'home':
         return (
           <HomeTab
-            greetingName={greetingName}
-            profileName={profileName}
-            profileContact={profileContact}
-            profileLocation={profileLocation}
             bookings={bookings}
             children={children}
             quickActions={quickActions}
@@ -543,30 +673,60 @@ const ParentDashboard = () => {
             onWriteReview={(bookingId, caregiverId) => navigation.navigate('Review', { bookingId, caregiverId })}
           />
         );
+      case 'messages':
+        return (
+          <MessagesTab
+            navigation={navigation}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        );
+      case 'jobs':
+        return (
+          <JobsTab
+            jobs={jobs}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            onCreateJob={handleCreateJob}
+            onEditJob={handleEditJob}
+            onDeleteJob={handleDeleteJob}
+          />
+        );
       default:
         return null;
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
+    <View style={styles.container}>
       <Header 
         navigation={navigation} 
         onProfilePress={() => setShowProfileModal(true)} 
-        onSignOut={signOut} 
+        onSignOut={signOut}
+        greetingName={greetingName}
+        onProfileEdit={() => setShowProfileModal(true)}
+        profileName={profileName}
+        profileImage={profileImage}
+        profileContact={profileContact}
+        profileLocation={profileLocation}
       />
-
+      
       <NavigationTabs 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        onProfilePress={() => setShowProfileModal(true)} 
+        onProfilePress={() => setShowProfileModal(true)}
+        navigation={navigation}
       />
       
-      <View style={{ flex: 1 }}>
-        {renderActiveTab()}
-      </View>
+      <MobileProfileSection 
+        greetingName={greetingName}
+        profileImage={profileImage}
+        profileContact={profileContact}
+        profileLocation={profileLocation}
+        activeTab={activeTab}
+      />
+      
+      {renderActiveTab()}
 
       {/* Modals */}
       <ChildModal
@@ -585,13 +745,15 @@ const ParentDashboard = () => {
       <ProfileModal
         visible={showProfileModal}
         onClose={() => setShowProfileModal(false)}
-        name={profileName}
-        setName={setProfileName}
-        contact={profileContact}
-        setContact={setProfileContact}
-        location={profileLocation}
-        setLocation={setProfileLocation}
-        onSave={handleSaveProfile}
+        profileName={profileName}
+        setProfileName={setProfileName}
+        profileContact={profileContact}
+        setProfileContact={setProfileContact}
+        profileLocation={profileLocation}
+        setProfileLocation={setProfileLocation}
+        profileImage={profileImage}
+        setProfileImage={setProfileImage}
+        handleSaveProfile={handleSaveProfile}
       />
 
       <FilterModal
@@ -604,8 +766,8 @@ const ParentDashboard = () => {
       <JobPostingModal
         visible={showJobPostingModal}
         onClose={() => setShowJobPostingModal(false)}
-        onSubmit={(jobData) => {
-          console.log('Job posted:', jobData);
+        onJobPosted={() => {
+          loadData(); // Refresh jobs list
           setShowJobPostingModal(false);
         }}
       />
@@ -625,7 +787,7 @@ const ParentDashboard = () => {
         childrenList={children.length ? children : SAMPLE_CHILDREN}
         onConfirm={handleBookingConfirm}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -1,15 +1,17 @@
 import { VALIDATION } from './constants';
 
 /**
- * Validation utility functions
+ * Comprehensive validation utility functions
+ * Consolidated from validation.js and validator.js
  */
 
 export const validators = {
   // Email validation
   email: (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return 'Email is required';
-    if (!emailRegex.test(email)) return 'Please enter a valid email address';
+    if (!VALIDATION.EMAIL_REGEX?.test(email) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return 'Please enter a valid email address';
+    }
     return null;
   },
 
@@ -19,29 +21,35 @@ export const validators = {
     if (password.length < VALIDATION.PASSWORD_MIN_LENGTH) {
       return `Password must be at least ${VALIDATION.PASSWORD_MIN_LENGTH} characters`;
     }
-    if (!/(?=.*[a-z])/.test(password)) return 'Password must contain at least one lowercase letter';
-    if (!/(?=.*[A-Z])/.test(password)) return 'Password must contain at least one uppercase letter';
-    if (!/(?=.*\d)/.test(password)) return 'Password must contain at least one number';
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      return 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
+    }
     return null;
   },
 
   // Name validation
   name: (name) => {
     if (!name) return 'Name is required';
-    if (name.length < VALIDATION.NAME_MIN_LENGTH) {
+    if (name.trim().length < VALIDATION.NAME_MIN_LENGTH) {
       return `Name must be at least ${VALIDATION.NAME_MIN_LENGTH} characters`;
     }
     if (name.length > VALIDATION.NAME_MAX_LENGTH) {
       return `Name cannot exceed ${VALIDATION.NAME_MAX_LENGTH} characters`;
+    }
+    // Check for valid characters (letters, spaces, hyphens, apostrophes)
+    if (!/^[a-zA-Z\s\-']+$/.test(name)) {
+      return 'Name can only contain letters, spaces, hyphens, and apostrophes';
     }
     return null;
   },
 
   // Phone validation
   phone: (phone) => {
-    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
     if (!phone) return 'Phone number is required';
-    if (!phoneRegex.test(phone)) return 'Please enter a valid phone number';
+    const digitsOnly = phone.replace(/\D/g, '');
+    if (!VALIDATION.PHONE_REGEX?.test(phone) && (!/^\+?[\d\s\-()]{10,}$/.test(phone) || digitsOnly.length < 10)) {
+      return 'Please enter a valid phone number (minimum 10 digits)';
+    }
     return null;
   },
 
@@ -84,6 +92,75 @@ export const validators = {
     if (numAge > 100) return 'Please enter a valid age';
     return null;
   },
+
+  // Date validation
+  date: (date, fieldName = 'Date') => {
+    if (!date) return `${fieldName} is required`;
+    const dateObj = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (isNaN(dateObj.getTime())) return `Invalid ${fieldName.toLowerCase()}`;
+    if (dateObj < today) return `${fieldName} cannot be in the past`;
+    return null;
+  },
+
+  // Time validation
+  time: (time, fieldName = 'Time') => {
+    if (!time) return `${fieldName} is required`;
+    if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+      return `Invalid ${fieldName.toLowerCase()} format. Use HH:MM format`;
+    }
+    return null;
+  },
+
+  // Rating validation
+  rating: (rating) => {
+    if (rating === undefined || rating === null) return 'Rating is required';
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+      return 'Rating must be between 1 and 5 stars';
+    }
+    return null;
+  },
+
+  // Comment validation
+  comment: (comment, minLength = 10, maxLength = 500) => {
+    if (!comment || comment.trim().length < minLength) {
+      return `Comment must be at least ${minLength} characters long`;
+    }
+    if (comment.length > maxLength) {
+      return `Comment must be less than ${maxLength} characters`;
+    }
+    return null;
+  },
+
+  // File validation for images
+  imageFile: (file) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    
+    if (!allowedTypes.includes(file.type)) {
+      return 'Only JPEG, PNG, and WebP images are allowed';
+    }
+    if (file.size > maxSize) {
+      return 'Image size must be less than 5MB';
+    }
+    return null;
+  },
+
+  // File validation for documents
+  documentFile: (file) => {
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (!allowedTypes.includes(file.type)) {
+      return 'Only PDF, JPEG, and PNG files are allowed';
+    }
+    if (file.size > maxSize) {
+      return 'File size must be less than 10MB';
+    }
+    return null;
+  },
 };
 
 /**
@@ -121,6 +198,26 @@ export const isFormValid = (errors) => {
 };
 
 /**
+ * Utility functions for data sanitization
+ */
+export const sanitize = {
+  string: (str) => {
+    if (!str) return '';
+    return str.trim().replace(/[<>]/g, '');
+  },
+  
+  email: (email) => {
+    if (!email) return '';
+    return email.toLowerCase().trim();
+  },
+  
+  phone: (phone) => {
+    if (!phone) return '';
+    return phone.replace(/[^\d+\-()\s]/g, '');
+  },
+};
+
+/**
  * Common validation rule sets
  */
 export const validationRules = {
@@ -154,4 +251,59 @@ export const validationRules = {
     email: validators.email,
     phone: validators.phone,
   },
+
+  // Booking validation
+  booking: {
+    startTime: validators.time,
+    endTime: validators.time,
+    date: validators.date,
+    children: validators.required,
+  },
+
+  // Review validation
+  review: {
+    rating: validators.rating,
+    comment: validators.comment,
+  },
 };
+
+// Legacy class-based validator for backward compatibility
+export class Validator {
+  validateEmail(email) {
+    const error = validators.email(email);
+    if (error) throw new Error(error);
+    return true;
+  }
+
+  validatePassword(password) {
+    const error = validators.password(password);
+    if (error) throw new Error(error);
+    return true;
+  }
+
+  validateName(name) {
+    const error = validators.name(name);
+    if (error) throw new Error(error);
+    return true;
+  }
+
+  validatePhone(phone) {
+    const error = validators.phone(phone);
+    if (error) throw new Error(error);
+    return true;
+  }
+
+  sanitizeString(str) {
+    return sanitize.string(str);
+  }
+
+  sanitizeEmail(email) {
+    return sanitize.email(email);
+  }
+
+  sanitizePhone(phone) {
+    return sanitize.phone(phone);
+  }
+}
+
+export const validator = new Validator();

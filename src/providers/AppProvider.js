@@ -3,7 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useThemeContext } from '../contexts/ThemeContext';
 import { PaperProvider } from 'react-native-paper';
-import { AppProvider as CoreAppProvider } from '../context/AppContext';
+import { AppProvider as CoreAppProvider } from '../contexts/AppContext';
 
 // Wrapper component to access theme context
 const ThemeWrapper = ({ children }) => {

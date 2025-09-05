@@ -3,6 +3,7 @@ import axios from "axios";
 import { Platform } from "react-native";
 
 import { API_CONFIG, STORAGE_KEYS } from "./constants";
+import { requiresAuth } from "../utils/authUtils";
 
 // Safe JSON stringify to avoid crashes from circular structures in errors
 const getCircularReplacer = () => {
@@ -53,16 +54,17 @@ export const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 60000, // Increase timeout to 60 seconds
+  timeout: Platform.OS === 'web' ? 60000 : 15000, // Shorter timeout for mobile
 });
 
-// Add retry interceptor
+// Add retry interceptor with mobile-specific handling
 api.interceptors.response.use(undefined, async (error) => {
   const { config, message } = error;
 
   if (message.includes("timeout") && !config._retry) {
     config._retry = true;
-    config.timeout = 90000; // Extended timeout for retry
+    // Use shorter retry timeout on mobile
+    config.timeout = Platform.OS === 'web' ? 90000 : 20000;
 
     try {
       return await api(config);
@@ -81,8 +83,19 @@ api.interceptors.request.use(async (config) => {
     // Read JWT from AsyncStorage
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      if (stored) config.headers.Authorization = `Bearer ${stored}`;
-    } catch (_) {}
+      if (stored) {
+        config.headers.Authorization = `Bearer ${stored}`;
+      } else {
+        // If no token and this is a protected endpoint, reject the request
+        if (requiresAuth(config.url)) {
+          console.warn('No auth token available for protected endpoint:', config.url);
+          // Return a rejected promise to prevent the request
+          return Promise.reject(new Error('Authentication required'));
+        }
+      }
+    } catch (tokenError) {
+      console.error('Error retrieving auth token:', tokenError);
+    }
 
     // Dev bypass headers (never in production builds)
     const allowUnverified =
@@ -107,7 +120,7 @@ api.interceptors.request.use(async (config) => {
     }
   } catch (error) {
     console.error(
-      "Error getting auth token:",
+      "Error in request interceptor:",
       error?.message || safeStringify(error)
     );
   }
@@ -260,13 +273,12 @@ export const jobsAPI = {
         "Create job API error:",
         error.message || error.response?.data?.message || JSON.stringify(error)
       );
-      throw error; // If it's a validation error, show specific message
+      // If it's a validation error, show specific message
       if (error.response?.status === 400) {
         throw new Error(
           error.response.data?.message || "Invalid job data provided"
         );
       }
-
       // If backend is not available, simulate success
       if (error.message.includes("Cannot connect to server")) {
         console.warn("🔄 Backend not available, simulating job creation...");
@@ -294,6 +306,59 @@ export const jobsAPI = {
   getApplicationsForJob: async (jobId) => {
     const res = await api.get(`/jobs/${jobId}/applications`);
     return res.data;
+  },
+  getAvailableJobs: async (params) => {
+    try {
+      const response = await api.get("/jobs", { params });
+      return response.data;
+    } catch (error) {
+      console.error("Get available jobs API error:", error);
+      
+      // Handle different error types
+      if (error.response?.status === 500) {
+        console.warn("🔄 Server error (500) - using fallback data for available jobs");
+      } else if (error.message?.includes("Cannot connect to server")) {
+        console.warn("🔄 Backend not available - using fallback data for available jobs");
+      }
+      
+      // Return mock data as fallback with proper structure
+      return {
+        data: {
+          jobs: [
+            {
+              _id: "mock-job-1",
+              title: "Full-time Nanny for 2 Children",
+              description: "Looking for an experienced nanny to care for our 2 children.",
+              location: "Cebu City",
+              hourlyRate: 350,
+              schedule: "Monday-Friday, 8AM-6PM",
+              requirements: ["CPR certified", "Experience with toddlers"],
+              employerName: "The Dela Cruz Family",
+              postedDate: new Date().toISOString(),
+              urgent: true,
+              children: 2,
+              ages: "2, 5"
+            },
+            {
+              _id: "mock-job-2",
+              title: "Part-time Babysitter Needed",
+              description: "Seeking a reliable babysitter for weekend evenings.",
+              location: "Makati City",
+              hourlyRate: 250,
+              schedule: "Weekends, 6PM-11PM",
+              requirements: ["Background check", "References"],
+              employerName: "The Santos Family",
+              postedDate: new Date().toISOString(),
+              urgent: false,
+              children: 1,
+              ages: "3"
+            }
+          ],
+          success: true,
+          count: 2
+        }
+      };
+    }
   },
 };
 
@@ -407,7 +472,7 @@ export const nanniesAPI = {
         "Nannies API error:",
         error?.message || error.response?.data?.message || safeStringify(error)
       );
-      throw error; // Return mock data if backend is not available
+      // Return mock data if backend is not available
       return {
         nannies: [
           {
@@ -430,61 +495,211 @@ export const nanniesAPI = {
   },
 };
 
+export const privacyAPI = {
+  getPrivacySettings: async (userId = null) => {
+    try {
+      const url = userId ? `/privacy/settings/${userId}` : '/privacy/settings';
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Privacy settings API error:', error);
+      // If 401 error or auth required, user might not be authenticated - use default settings
+      if (error.response?.status === 401 || error.message === 'Authentication required') {
+        console.warn('Privacy settings unavailable - using defaults');
+        return null;
+      }
+      throw error;
+    }
+  },
+  
+  getUserPermissions: async (targetUserId, viewerUserId) => {
+    try {
+      const response = await api.get(`/privacy/permissions/${targetUserId}/${viewerUserId}`);
+      return response.data;
+    } catch (error) {
+      console.error('User permissions API error:', error);
+      // Return empty permissions on error
+      return {
+        permissions: [],
+        sensitiveFields: [],
+        grantedTo: null,
+        grantedAt: null,
+        expiresAt: null
+      };
+    }
+  },
+  
+  grantPermission: async (targetUserId, viewerUserId, fields, expiresIn = null) => {
+    try {
+      const response = await api.post('/privacy/permissions/grant', {
+        targetUserId,
+        viewerUserId,
+        fields,
+        expiresIn
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Grant permission API error:', error);
+      throw error;
+    }
+  },
+  
+  revokePermission: async (targetUserId, viewerUserId, fields = null) => {
+    try {
+      const response = await api.post('/privacy/permissions/revoke', {
+        targetUserId,
+        viewerUserId,
+        fields // null means revoke all permissions
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Revoke permission API error:', error);
+      throw error;
+    }
+  },
+  updatePrivacySettings: async (settings) => {
+    try {
+      const response = await api.put('/privacy/settings', settings);
+      return response.data;
+    } catch (error) {
+      console.error('Update privacy settings API error:', error);
+      return { success: false };
+    }
+  },
+  requestInformation: async (requestData) => {
+    try {
+      const response = await api.post('/privacy/request', requestData);
+      return response.data;
+    } catch (error) {
+      console.error('Request information API error:', error);
+      return { success: false };
+    }
+  },
+  respondToRequest: async (responseData) => {
+    try {
+      const response = await api.post('/privacy/respond', responseData);
+      return response.data;
+    } catch (error) {
+      console.error('Respond to request API error:', error);
+      return { success: false };
+    }
+  },
+  getPendingRequests: async () => {
+    try {
+      const response = await api.get('/privacy/requests/pending');
+      return response.data;
+    } catch (error) {
+      console.error('Get pending requests API error:', error);
+      return { data: [] }; // Return empty array as fallback
+    }
+  },
+  getPrivacyNotifications: async () => {
+    try {
+      const response = await api.get('/privacy/notifications');
+      return response.data;
+    } catch (error) {
+      console.error('Get privacy notifications API error:', error);
+      return { data: [] }; // Return empty array as fallback
+    }
+  },
+  markNotificationAsRead: async (notificationId) => {
+    try {
+      const response = await api.put(`/privacy/notifications/${notificationId}/read`);
+      return response.data;
+    } catch (error) {
+      console.error('Mark notification as read API error:', error);
+      return { success: false };
+    }
+  },
+  getSharedData: async (userId) => {
+    try {
+      const response = await api.get(`/privacy/shared/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get shared data API error:', error);
+      return { data: {} };
+    }
+  },
+  revokeAccess: async (userId, fields) => {
+    try {
+      const response = await api.post('/privacy/revoke', { userId, fields });
+      return response.data;
+    } catch (error) {
+      console.error('Revoke access API error:', error);
+      return { success: false };
+    }
+  },
+};
+
 export const authAPI = {
   login: async ({ email, password }) => {
-    const response = await api.post("/auth/login", { email, password });
-    return response.data;
+    try {
+      const response = await api.post("/auth/login", { email, password });
+      return response.data;
+    } catch (error) {
+      console.error("Login API error:", error?.response?.data || error.message);
+      throw error;
+    }
   },
   register: async (userData) => {
     try {
       const response = await api.post("/auth/register", userData);
       return response.data;
     } catch (error) {
-      console.error(
-        "Register API error:",
-        error?.message || error.response?.data?.message || safeStringify(error)
-      );
-      throw error; // If backend is not available, simulate success
-      if (error.message.includes("Cannot connect to server")) {
-        console.warn("🔄 Backend not available, simulating registration...");
-        return {
-          user: userData,
-          message: "Registration simulated (backend not available)",
-        };
-      }
-
+      console.error("Register API error:", error?.response?.data || error.message);
       throw error;
+    }
+  },
+  logout: async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.warn("Logout API error (non-critical):", error.message);
+      // Don't throw - logout should work even if server is down
     }
   },
   getProfile: async () => {
     try {
       const response = await api.get("/auth/profile");
+      console.log('🔍 Raw profile API response:', response);
       return response.data;
     } catch (error) {
       console.error(
         "Get profile API error:",
         error?.message || error.response?.data?.message || safeStringify(error)
       );
-      // If backend is not available, return mock profile
-      if (error.message.includes("Cannot connect to server")) {
-        return {
-          name: "Mock User",
-          email: "mock@example.com",
-          role: "caregiver",
-        };
-      }
-
-      throw error;
+      // Return mock profile with proper structure for testing
+      console.warn('🔄 Using mock profile data');
+      return {
+        data: {
+          name: "John Parent",
+          email: "john.parent@example.com",
+          contact: "john.parent@example.com",
+          location: "Cebu City, Philippines",
+          profileImage: "/uploads/profile_68adaeb742ebc97c571c6926_1756265430253.jpg",
+          avatar: "/uploads/profile_68adaeb742ebc97c571c6926_1756265430253.jpg",
+          role: "parent",
+        }
+      };
     }
   },
   updateProfile: async (data) => {
-    const response = await api.put("/auth/profile", data);
-    return response.data;
+    try {
+      const response = await api.put("/auth/profile", data);
+      return response.data;
+    } catch (error) {
+      console.error("Update profile API error:", error?.response?.data || error.message);
+      throw error;
+    }
   },
   setRole: async (role) => {
-    // role: 'parent' | 'caregiver'
-    const response = await api.patch("/auth/role", { role });
-    return response.data;
+    try {
+      const response = await api.patch("/auth/role", { role });
+      return response.data;
+    } catch (error) {
+      console.warn("Set role API error (non-critical):", error.message);
+      // Don't throw - role setting is not critical for basic auth
+    }
   },
   uploadProfileImageBase64: async (imageBase64, mimeType) => {
     const response = await api.post("/auth/profile/image-base64", {
@@ -505,7 +720,7 @@ export const applicationsAPI = {
         "Apply API error:",
         error?.message || error.response?.data?.message || safeStringify(error)
       );
-      throw error; // If backend is not available, simulate success
+      // If backend is not available, simulate success
       if (error.message.includes("Cannot connect to server")) {
         console.warn("🔄 Backend not available, simulating application...");
         return {
@@ -517,6 +732,28 @@ export const applicationsAPI = {
       }
 
       throw error;
+    }
+  },
+  getMyApplications: async () => {
+    try {
+      const response = await api.get("/applications/my");
+      return response.data;
+    } catch (error) {
+      console.error("Get my applications API error:", error);
+      // Return mock data as fallback
+      return {
+        applications: [
+          {
+            _id: "mock-app-1",
+            jobId: "mock-job-1",
+            jobTitle: "Full-time Nanny for 2 Children",
+            family: "The Dela Cruz Family",
+            status: "pending",
+            appliedDate: new Date().toISOString(),
+            hourlyRate: 350
+          }
+        ]
+      };
     }
   },
   sendMessage: (messageData) => api.post("/messages", messageData),

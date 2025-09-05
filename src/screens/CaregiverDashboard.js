@@ -11,6 +11,11 @@ import Toast from "../components/Toast"
 import { applicationsAPI, authAPI, bookingsAPI, caregiversAPI, jobsAPI, uploadsAPI } from "../config/api"
 import { API_CONFIG } from '../config/constants'
 import { useAuth } from "../contexts/AuthContext"
+import { useMessaging } from "../contexts/MessagingContext"
+import { usePrivacy } from "../components/Privacy/PrivacyManager"
+import PrivacyNotificationModal from "../components/Privacy/PrivacyNotificationModal"
+import PrivacySettingsModal from "../components/Privacy/PrivacySettingsModal"
+import MessagesTab from "../components/MessagesTab"
 import { styles } from "./styles/CaregiverDashboard.styles"
 
 // Local quick tiles
@@ -74,6 +79,11 @@ export default function CaregiverDashboard({ onLogout }) {
   // Toast state
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
   const showToast = (message, type = 'success') => setToast({ visible: true, message, type })
+  
+  // Privacy state
+  const { pendingRequests, notifications } = usePrivacy();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
 
   // Default profile as fallback - rich mock data for better UX
   const defaultProfile = {
@@ -124,7 +134,9 @@ export default function CaregiverDashboard({ onLogout }) {
       setProfileName(profile?.name || '')
       setProfileHourlyRate(String(profile?.hourlyRate ?? ''))
       setProfileExperience(profile?.experience || '')
-    } catch (_) {}
+    } catch (error) {
+      console.warn('Profile modal error:', error);
+    }
     setEditProfileModalVisible(true)
   }
 
@@ -357,9 +369,8 @@ export default function CaregiverDashboard({ onLogout }) {
                     location: b.address || b.location || "",
                   })));
                 }
-              } catch (e) {
-                console.error('Error fetching bookings:', e);
-                // keep existing bookings on error
+              } catch (error) {
+                console.warn('Booking fetch error:', error);
               }
             })()
           ]);
@@ -530,7 +541,9 @@ export default function CaregiverDashboard({ onLogout }) {
   const handleMessageFamily = (application) => {
     setShowApplicationDetails(false)
     // Navigate to Messages screen
-    try { navigation.navigate('Messages') } catch (_) {}
+    try { navigation.navigate('Messages') } catch (error) {
+      console.warn('Navigation error:', error);
+    }
   }
 
   // Submit application: add to applications state and close modal
@@ -649,7 +662,9 @@ export default function CaregiverDashboard({ onLogout }) {
           // Convert relative URLs to absolute URLs
           finalUrl = serverUrl.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${serverUrl}` : serverUrl;
         }
-      } catch (_) {}
+      } catch (error) {
+        console.warn('Profile refresh error:', error);
+      }
 
       // Update UI with final URL
       setProfile((prev) => ({ ...prev, imageUrl: finalUrl }))
@@ -766,37 +781,110 @@ export default function CaregiverDashboard({ onLogout }) {
   )
 
   // Parent-style header with logout and actions
-  const renderHeader = () => (
-    <View style={styles.parentLikeHeaderContainer}>
-      <LinearGradient
-        colors={["#5bbafa", "#b672ff"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.parentLikeHeaderGradient}
-      >
-        <View style={styles.headerTop}>
-          <View style={[styles.logoContainer, { flexDirection: 'column', alignItems: 'center' }]}>
-            <Image source={require('../../assets/icon.png')} style={[styles.logoImage, { marginBottom: 6 }]} />
-            
-            <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>I am a Caregiver</Text>
+  const renderHeader = () => {
+    const { unreadCount } = useMessaging();
+    
+    // Calculate privacy notification counts
+    const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
+    const pendingRequestsCount = pendingRequests?.length || 0;
+    const totalPrivacyNotifications = unreadNotifications + pendingRequestsCount;
+    
+    return (
+      <View style={styles.parentLikeHeaderContainer}>
+        <LinearGradient
+          colors={["#5bbafa", "#b672ff"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.parentLikeHeaderGradient}
+        >
+          <View style={styles.headerTop}>
+            <View style={[styles.logoContainer, { flexDirection: 'column', alignItems: 'center' }]}>
+              <Image source={require('../../assets/icon.png')} style={[styles.logoImage, { marginBottom: 6 }]} />
+              
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>I am a Caregiver</Text>
+              </View>
+            </View>
+            <View style={styles.headerActions}>
+              <Pressable 
+                style={[styles.headerButton, { position: 'relative' }]} 
+                onPress={() => setActiveTab('messages')}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={22} color="#FFFFFF" />
+                {unreadCount > 0 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -4,
+                    backgroundColor: '#ef4444',
+                    borderRadius: 10,
+                    minWidth: 20,
+                    height: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                  }}>
+                    <Text style={{
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: '600',
+                    }}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.headerButton, { position: 'relative' }]} 
+                onPress={() => setShowNotifications(true)}
+              >
+                <Ionicons name="shield-outline" size={22} color="#FFFFFF" />
+                {totalPrivacyNotifications > 0 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -4,
+                    backgroundColor: '#ef4444',
+                    borderRadius: 10,
+                    minWidth: 20,
+                    height: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                  }}>
+                    <Text style={{
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: '600',
+                    }}>
+                      {totalPrivacyNotifications > 99 ? '99+' : totalPrivacyNotifications}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+              
+              <Pressable 
+                style={styles.headerButton} 
+                onPress={() => setShowPrivacySettings(true)}
+              >
+                <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              
+              <Pressable style={styles.headerButton} onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}>
+                <Ionicons name="person-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              <Pressable style={styles.headerButton} onPress={onLogout || signOut}>
+                <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+              </Pressable>
             </View>
           </View>
-          <View style={styles.headerActions}>
-            <Pressable style={styles.headerButton} onPress={() => navigation.navigate('Messages')}>
-              <Ionicons name="chatbubble-ellipses-outline" size={22} color="#FFFFFF" />
-            </Pressable>
-            <Pressable style={styles.headerButton} onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}>
-              <Ionicons name="person-outline" size={22} color="#FFFFFF" />
-            </Pressable>
-            <Pressable style={styles.headerButton} onPress={onLogout || signOut}>
-              <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </View>
-      </LinearGradient>
-    </View>
-  )
+        </LinearGradient>
+      </View>
+    )
+  }
 
   // Parent-style horizontal top navigation for caregiver tabs
   const renderTopNav = () => (
@@ -810,13 +898,7 @@ export default function CaregiverDashboard({ onLogout }) {
           { id: 'messages', label: 'Messages', icon: 'chatbubble-ellipses' },
         ].map((tab) => {
           const active = activeTab === tab.id
-          const onPress = () => {
-            if (tab.id === 'messages') {
-              try { navigation.navigate('Messages') } catch (_) {}
-            } else {
-              setActiveTab(tab.id)
-            }
-          }
+          const onPress = () => setActiveTab(tab.id)
           const iconColor = active ? '#3b83f5' : '#6B7280'
           return (
             <Pressable
@@ -1006,19 +1088,21 @@ export default function CaregiverDashboard({ onLogout }) {
 
       {/* Top nav replaces old tabs */}
 
-      <ScrollView style={styles.content}>
-        <Searchbar
-          placeholder="Search jobs, families..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={styles.searchBar}
-          iconColor="#9CA3AF"
-          placeholderTextColor="#9CA3AF"
-          inputStyle={styles.searchInput}
-        />
+      <View style={{ flex: 1 }}>
+        {activeTab !== "messages" && (
+          <Searchbar
+            placeholder="Search jobs, families..."
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            style={styles.searchBar}
+            iconColor="#9CA3AF"
+            placeholderTextColor="#9CA3AF"
+            inputStyle={styles.searchInput}
+          />
+        )}
 
         {activeTab === "dashboard" && (
-          <View>
+          <ScrollView style={styles.content}>
             {/* Quick stats 2x2 grid */}
             <View style={styles.quickGrid}>
               <QuickStat icon="star" value={profile.rating} label="Rating" color="#F59E0B" bgColor="#FFFBEB" />
@@ -1048,7 +1132,7 @@ export default function CaregiverDashboard({ onLogout }) {
                 label="Messages"
                 color="#ffffff"
                 gradientColors={["#A78BFA", "#8B5CF6"]}
-                onPress={() => { try { navigation.navigate('Messages') } catch(_) {} }}
+                onPress={() => setActiveTab('messages')}
               />
               <QuickAction
                 icon="document-text"
@@ -1145,126 +1229,136 @@ export default function CaregiverDashboard({ onLogout }) {
                 />
               ))}
             </View>
-          </View>
+          </ScrollView>
         )}
 
         {activeTab === "jobs" && (
-          <View style={styles.section}>
-            <View style={styles.filters}>
-              <Chip style={styles.filterChip} textStyle={styles.filterChipText}>
-                All Jobs
-              </Chip>
-              <Chip
-                style={[styles.filterChip, styles.filterChipActive]}
-                textStyle={[styles.filterChipText, styles.filterChipTextActive]}
-              >
-                Nearby
-              </Chip>
-              <Chip style={styles.filterChip} textStyle={styles.filterChipText}>
-                High Pay
-              </Chip>
-              <Chip style={styles.filterChip} textStyle={styles.filterChipText}>
-                Urgent
-              </Chip>
-            </View>
+          <ScrollView style={styles.content}>
+            <View style={styles.section}>
+              <View style={styles.filters}>
+                <Chip style={styles.filterChip} textStyle={styles.filterChipText}>
+                  All Jobs
+                </Chip>
+                <Chip
+                  style={[styles.filterChip, styles.filterChipActive]}
+                  textStyle={[styles.filterChipText, styles.filterChipTextActive]}
+                >
+                  Nearby
+                </Chip>
+                <Chip style={styles.filterChip} textStyle={styles.filterChipText}>
+                  High Pay
+                </Chip>
+                <Chip style={styles.filterChip} textStyle={styles.filterChipText}>
+                  Urgent
+                </Chip>
+              </View>
 
-            {jobs && jobs.length > 0 ? (
-              <View style={[styles.jobsGrid, columns === 1 && { flexDirection: 'column' }]}>
-                {jobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    showActions={true}
-                    onApply={handleJobApplication}
-                    onLearnMore={handleViewJob}
-                    hasApplied={(id) => applications.some((a) => a.jobId === id)}
-                    jobCardStyle={columns === 1 ? { width: '100%', ...(gridCardHeight ? { height: gridCardHeight } : {}) } : { width: gridCardWidth, height: gridCardHeight }}
-                    gridMode
-                  />
-                ))}
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="briefcase" size={48} color="#9CA3AF" />
-                <Text style={styles.emptyStateText}>No jobs available</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Please check back later or adjust your filters
-                </Text>
-              </View>
-            )}
-          </View>
+              {jobs && jobs.length > 0 ? (
+                <View style={[styles.jobsGrid, columns === 1 && { flexDirection: 'column' }]}>
+                  {jobs.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      showActions={true}
+                      onApply={handleJobApplication}
+                      onLearnMore={handleViewJob}
+                      hasApplied={(id) => applications.some((a) => a.jobId === id)}
+                      jobCardStyle={columns === 1 ? { width: '100%', ...(gridCardHeight ? { height: gridCardHeight } : {}) } : { width: gridCardWidth, height: gridCardHeight }}
+                      gridMode
+                    />
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="briefcase" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyStateText}>No jobs available</Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Please check back later or adjust your filters
+                  </Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
         )}
 
         {activeTab === "applications" && (
-          <View style={styles.section}>
-            {applications.length > 0 ? (
-              applications.map((application) => (
-                <ApplicationCard 
-                  key={application.id} 
-                  application={application}
-                  onViewDetails={handleViewApplication}
-                  onMessage={handleMessageFamily}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="document-text" size={48} color="#9CA3AF" />
-                <Text style={styles.emptyStateText}>No applications yet</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Apply to jobs to see them here
-                </Text>
-              </View>
-            )}
-          </View>
+          <ScrollView style={styles.content}>
+            <View style={styles.section}>
+              {applications.length > 0 ? (
+                applications.map((application) => (
+                  <ApplicationCard 
+                    key={application.id} 
+                    application={application}
+                    onViewDetails={handleViewApplication}
+                    onMessage={handleMessageFamily}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="document-text" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyStateText}>No applications yet</Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Apply to jobs to see them here
+                  </Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        )}
+
+        {activeTab === "messages" && (
+          <MessagesTab navigation={navigation} />
         )}
 
         {activeTab === "bookings" && (
-          <View style={styles.section}>
-            <View style={styles.bookingFilters}>
-              <Chip
-                style={[styles.bookingFilterChip, styles.bookingFilterChipActive]}
-                textStyle={styles.bookingFilterChipText}
-              >
-                Upcoming
-              </Chip>
-              <Chip
-                style={styles.bookingFilterChip}
-                textStyle={styles.bookingFilterChipText}
-              >
-                Past
-              </Chip>
-              <Chip
-                style={styles.bookingFilterChip}
-                textStyle={styles.bookingFilterChipText}
-              >
-                Cancelled
-              </Chip>
-            </View>
-
-            {bookings.length > 0 ? (
-              bookings.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  onMessage={() => setActiveTab("dashboard")}
-                  onViewDetails={() => {
-                    setSelectedBooking(booking)
-                    setShowBookingDetails(true)
-                  }}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="calendar" size={48} color="#9CA3AF" />
-                <Text style={styles.emptyStateText}>No bookings yet</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Your upcoming bookings will appear here
-                </Text>
+          <ScrollView style={styles.content}>
+            <View style={styles.section}>
+              <View style={styles.bookingFilters}>
+                <Chip
+                  style={[styles.bookingFilterChip, styles.bookingFilterChipActive]}
+                  textStyle={styles.bookingFilterChipText}
+                >
+                  Upcoming
+                </Chip>
+                <Chip
+                  style={styles.bookingFilterChip}
+                  textStyle={styles.bookingFilterChipText}
+                >
+                  Past
+                </Chip>
+                <Chip
+                  style={styles.bookingFilterChip}
+                  textStyle={styles.bookingFilterChipText}
+                >
+                  Cancelled
+                </Chip>
               </View>
-            )}
-          </View>
+
+              {bookings.length > 0 ? (
+                bookings.map((booking) => (
+                  <BookingCard
+                    key={booking.id}
+                    booking={booking}
+                    onMessage={() => setActiveTab("dashboard")}
+                    onViewDetails={() => {
+                      setSelectedBooking(booking)
+                      setShowBookingDetails(true)
+                    }}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="calendar" size={48} color="#9CA3AF" />
+                  <Text style={styles.emptyStateText}>No bookings yet</Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Your upcoming bookings will appear here
+                  </Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
         )}
-      </ScrollView>
+      </View>
 
       {/* Logout button moved to header actions */}
 
@@ -1336,6 +1430,18 @@ export default function CaregiverDashboard({ onLogout }) {
       )}
 
       {renderToast()}
+      
+      {/* Privacy Modals */}
+      <PrivacyNotificationModal
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        requests={pendingRequests}
+      />
+      
+      <PrivacySettingsModal
+        visible={showPrivacySettings}
+        onClose={() => setShowPrivacySettings(false)}
+      />
     </View>
   )
 }

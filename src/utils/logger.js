@@ -1,119 +1,16 @@
-// Development mode check
-const __DEV__ = process.env.NODE_ENV === 'development';
-
-// Safely stringify values, handling circular references and non-serializable values
-function safeStringify(value) {
-  const seen = new WeakSet();
-  try {
-    return JSON.stringify(value, (key, val) => {
-      if (typeof val === 'object' && val !== null) {
-        if (seen.has(val)) return '[Circular]';
-        seen.add(val);
-      }
-      if (typeof val === 'function') return `[Function: ${val.name || 'anonymous'}]`;
-      if (val instanceof Error) return val.message || String(val);
-      return val;
-    });
-  } catch (_) {
-    try {
-      return String(value);
-    } catch (_) {
-      return '[Unserializable]';
-    }
-  }
-}
-
-class Logger {
-  constructor() {
-    this.logs = []
-    this.maxLogs = 1000
-  }
-
-  log(level, message, ...args) {
-    const timestamp = new Date().toISOString()
-    const logEntry = {
-      timestamp,
-      level,
-      message,
-      args,
-    }
-
-    // Store log entry
-    this.logs.push(logEntry)
-
-    // Maintain max logs limit
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift()
-    }
-
-    // Console output in development
+// Enhanced logger for mobile debugging
+export const logger = {
+  info: (message, ...args) => {
+    console.log(`[INFO] ${message}`, ...args);
+  },
+  error: (message, ...args) => {
+    console.error(`[ERROR] ${message}`, ...args);
+    // Also show alert in development
     if (__DEV__) {
-      const consoleMethod = console[level] || console.log;
-      // Convert error-like args to readable strings for console output
-      const safeArgs = args.map(arg => {
-        if (arg instanceof Error) return arg.message;
-        if (typeof arg === 'object') return safeStringify(arg);
-        return arg;
-      });
-      consoleMethod(`[${timestamp}] [${level.toUpperCase()}]`, message, ...safeArgs);
+      console.warn('ERROR OCCURRED:', message);
     }
+  },
+  warn: (message, ...args) => {
+    console.warn(`[WARN] ${message}`, ...args);
   }
-
-  debug(message, ...args) {
-    this.log("debug", message, ...args)
-  }
-
-  info(message, ...args) {
-    this.log("info", message, ...args)
-  }
-
-  warn(message, ...args) {
-    this.log("warn", message, ...args)
-  }
-
-  error(message, ...args) {
-    // Convert error-like args to readable strings
-    const safeArgs = args.map(arg => {
-      if (arg instanceof Error) return arg.message;
-      if (typeof arg === 'object') return safeStringify(arg);
-      return arg;
-    });
-    this.log("error", message, ...safeArgs);
-  }
-
-  // Performance logging
-  time(label) {
-    if (__DEV__) {
-      console.time(label)
-    }
-  }
-
-  timeEnd(label) {
-    if (__DEV__) {
-      console.timeEnd(label)
-    }
-  }
-
-  // Get logs for debugging
-  getLogs(level = null, limit = 100) {
-    let filteredLogs = this.logs
-
-    if (level) {
-      filteredLogs = this.logs.filter((log) => log.level === level)
-    }
-
-    return filteredLogs.slice(-limit)
-  }
-
-  // Clear logs
-  clearLogs() {
-    this.logs = []
-  }
-
-  // Export logs
-  exportLogs() {
-    return safeStringify(this.logs)
-  }
-}
-
-export const logger = new Logger()
+};

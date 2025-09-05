@@ -238,7 +238,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         }
         break;
         
-      case 'experience.years':
+      case 'experience.years': {
         const years = parseInt(value);
         if (isNaN(years) || years < 0 || years > VALIDATION.EXPERIENCE_MAX_YEARS) {
           newErrors.experienceYears = `Experience must be between 0 and ${VALIDATION.EXPERIENCE_MAX_YEARS} years`;
@@ -246,6 +246,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
           delete newErrors.experienceYears;
         }
         break;
+      }
         
       case 'experience.description':
         if (!value || value.length < 50) {

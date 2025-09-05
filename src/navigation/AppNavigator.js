@@ -26,7 +26,7 @@ import ProfileScreen from "../screens/profile/ProfileScreen";
 import WelcomeScreen from "../screens/WelcomeScreen";
 
 // Hooks
-import { useApp } from "../context/AppContext";
+import { useApp } from "../contexts/AppContext";
 import { useThemeContext } from "../contexts/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 

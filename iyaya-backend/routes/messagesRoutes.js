@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const messagesController = require('../controllers/messagesController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../utils/auth');
 
 // Apply authentication to all routes
 router.use(authenticate);

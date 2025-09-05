@@ -464,22 +464,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
-  // Review image styles
-  reviewImageContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#6366f1',
-    alignSelf: 'center',
-  },
-  reviewImage: {
-    width: '100%',
-    height: '100%',
-  },
+
   reviewImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -540,11 +525,7 @@ export const styles = StyleSheet.create({
     marginVertical: 10,
     borderRadius: 5,
   },
-  debugText: {
-    fontSize: 12,
-    color: '#666',
-    fontFamily: 'monospace',
-  },
+
   datePickerRow: {
     flexDirection: 'row',
     marginVertical: 10,

@@ -32,10 +32,12 @@ const getBaseHost = () => {
         return { mode: "android-emulator", url: "http://10.0.2.2:5001" };
       }
       if (platform === "ios") {
-        // iOS simulator can access localhost
+        // iOS simulator can access localhost - try both localhost and network IP
         return { mode: "ios-simulator", url: "http://localhost:5001" };
       }
-    } catch (_) {}
+    } catch (_) {
+      // Platform not available
+    }
 
     // 3) Web (expo web / react-native-web) – use localhost for trustworthy origin
     if (typeof window !== "undefined" && window.location?.hostname) {
@@ -43,7 +45,7 @@ const getBaseHost = () => {
       return { mode: "web", url: "http://localhost:5001" };
     }
 
-    // 4) Fallback
+    // 4) Fallback - try localhost first, then network IP
     return { mode: "fallback", url: "http://localhost:5001" };
   } catch (error) {
     console.error("Error determining base host:", error);

@@ -1,6 +1,17 @@
-import React from "react";
-import { Modal, StyleSheet, TextInput, View } from "react-native";
-import { Button, Text } from "react-native-paper";
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  Modal,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  Platform,
+  StyleSheet,
+} from 'react-native';
+import KeyboardAvoidingWrapper from '../../../components/KeyboardAvoidingWrapper';
+import { Button } from "react-native-paper";
 
 const ChildModal = ({
   visible = false,

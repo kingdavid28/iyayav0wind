@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, Linking, Alert, Image, Platform, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, Alert, Platform, StyleSheet } from 'react-native';
 import { Calendar, Clock, DollarSign, MapPin, Phone, Mail, MessageCircle, Navigation, Star, Baby, AlertCircle, CheckCircle, X } from 'lucide-react-native';
 import PropTypes from 'prop-types';
 

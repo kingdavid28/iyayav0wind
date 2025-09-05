@@ -95,7 +95,7 @@ const SearchTab = ({
                 : `Available Caregivers (${displayData.length})`}
             </Text>
           }
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

@@ -9,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const { rateLimit } = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
-const { authenticate, authorize } = require('./middleware/auth');
+const { authenticate, authorize } = require('./utils/auth');
 const config = require('./config/env');
 
 const app = express();
@@ -161,6 +161,7 @@ const mountRoutes = () => {
   apiRouter.use('/uploads', authenticate, require('./routes/uploadsRoutes'));
   // Apply authenticate BEFORE messagesLimiter so keyGenerator can use req.user
   apiRouter.use('/messages', authenticate, messagesLimiter, require('./routes/messagesRoutes'));
+  apiRouter.use('/privacy', require('./routes/privacy'));
 
   // Admin Routes removed
   

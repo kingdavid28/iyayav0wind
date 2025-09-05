@@ -31,7 +31,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import mime from 'mime';
-import { Platform } from 'react-native';
+
 
 // Platform-specific FileSystem import
 const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');

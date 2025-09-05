@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
   parentLikeHeaderContainer: {
     paddingTop: 40,
     paddingBottom: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 2,
   },
   parentLikeHeaderGradient: {
     borderRadius: 16,

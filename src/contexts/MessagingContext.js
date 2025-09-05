@@ -32,7 +32,9 @@ export const MessagingProvider = ({ children }) => {
         if (enableRealtime) {
           await initRealtime(() => user?.getIdToken?.());
         }
-      } catch {}
+      } catch {
+        // Ignore realtime init errors
+      }
 
       const load = async () => {
         try {
@@ -131,11 +133,17 @@ export const MessagingProvider = ({ children }) => {
   // Expose typing helpers
   const startTyping = () => {
     if (!activeConversation?.id) return;
-    try { emitSocket('typing:start', { conversationId: activeConversation.id }); } catch {}
+    try { emitSocket('typing:start', { conversationId: activeConversation.id }); } catch (error) {
+      // Ignore socket errors
+      console.warn('Typing start failed:', error);
+    }
   };
   const stopTyping = () => {
     if (!activeConversation?.id) return;
-    try { emitSocket('typing:stop', { conversationId: activeConversation.id }); } catch {}
+    try { emitSocket('typing:stop', { conversationId: activeConversation.id }); } catch (error) {
+      // Ignore socket errors
+      console.warn('Typing stop failed:', error);
+    }
   };
 
   // Start or get existing conversation
@@ -208,7 +216,10 @@ export const MessagingProvider = ({ children }) => {
               jobId: activeConversation?.jobId || null,
             }
           );
-        } catch {}
+        } catch (error) {
+          // Ignore push notification errors
+          console.warn('Push notification failed:', error);
+        }
       }
 
       return msg;
@@ -230,7 +241,10 @@ export const MessagingProvider = ({ children }) => {
         setMessages((prev) => prev.map((m) => ({ ...m, read: true, readAt: new Date().toISOString() })));
       }
       if (activeConversation?.id) {
-        try { await messagesAPI.markRead(activeConversation.id); } catch (_) {}
+        try { await messagesAPI.markRead(activeConversation.id); } catch (error) {
+          // Ignore mark read errors
+          console.warn('Mark read failed:', error);
+        }
       }
     } catch (error) {
       console.error('Error marking messages as read (local):', error);

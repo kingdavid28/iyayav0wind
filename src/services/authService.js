@@ -21,7 +21,9 @@ class AuthService {
       let profile = null;
       try {
         profile = await authAPI.getProfile();
-      } catch (_) {}
+      } catch (error) {
+        console.warn('Profile fetch error:', error);
+      }
       return { user: profile, token };
     } catch (error) {
       logger.error("Login failed:", error);
@@ -39,7 +41,9 @@ class AuthService {
       let profile = null;
       try {
         profile = await authAPI.getProfile();
-      } catch (_) {}
+      } catch (error) {
+        console.warn('Profile fetch error:', error);
+      }
       logger.info("Registration successful");
       return { user: profile, token };
     } catch (error) {
@@ -84,12 +88,15 @@ class AuthService {
           let profile = null;
           try {
             profile = await authAPI.getProfile();
-          } catch (_) {}
+          } catch (error) {
+            console.warn('Profile fetch error:', error);
+          }
           callback(profile);
         } else {
           callback(null);
         }
-      } catch (_) {
+      } catch (error) {
+        console.warn('Auth state error:', error);
         callback(null);
       }
     })();
@@ -125,7 +132,9 @@ class AuthService {
       // Also clear shim token if present
       try {
         await AsyncStorage.removeItem("@shim_id_token");
-      } catch (_) {}
+      } catch (error) {
+        console.warn('Shim token clear error:', error);
+      }
     } catch (error) {
       logger.error("Error clearing auth data:", error);
     }

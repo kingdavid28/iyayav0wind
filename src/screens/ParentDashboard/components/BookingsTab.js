@@ -28,7 +28,7 @@ const BookingsTab = ({
   const filteredBookings = getFilteredBookings();
 
   return (
-    <View style={styles.bookingsContent}>
+    <View style={[styles.bookingsContent, { flex: 1 }]}>
       <View style={styles.bookingsHeader}>
         <Text style={styles.bookingsTitle}>My Bookings</Text>
         <View style={styles.bookingsFilterTabs}>
@@ -78,6 +78,7 @@ const BookingsTab = ({
       </View>
 
       <FlatList
+        style={{ flex: 1 }}
         data={filteredBookings}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (

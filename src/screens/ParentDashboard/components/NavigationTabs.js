@@ -1,11 +1,19 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Home, Search, Calendar, User } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { Home, Search, Calendar, User, MessageCircle, Plus } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
+import { useMessaging } from '../../../contexts/MessagingContext';
 
-const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress }) => {
+const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation }) => {
+  const { unreadCount } = useMessaging();
+  
   return (
     <View style={styles.tabContainer}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsScrollContent}
+      >
       <TouchableOpacity
         style={[styles.navItem, activeTab === 'home' && styles.activeNavItem]}
         onPress={() => setActiveTab('home')}
@@ -37,6 +45,16 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress }) => {
       </TouchableOpacity>
 
       <TouchableOpacity
+        style={[styles.navItem, activeTab === 'jobs' && styles.activeNavItem]}
+        onPress={() => setActiveTab('jobs')}
+      >
+        <Plus size={20} color={activeTab === 'jobs' ? colors.secondary : colors.textTertiary} />
+        <Text style={[styles.navText, activeTab === 'jobs' && styles.activeNavText]}>
+          Post Job
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={[styles.navItem, activeTab === 'profile' && styles.activeNavItem]}
         onPress={onProfilePress}
       >
@@ -45,6 +63,7 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress }) => {
           Profile
         </Text>
       </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 };

@@ -63,7 +63,9 @@ const Messages = () => {
         try {
           const d = updatedAt ? new Date(updatedAt) : new Date();
           time = formatDistanceToNow(d, { addSuffix: true });
-        } catch {}
+        } catch (error) {
+          console.warn('Time format error:', error);
+        }
         const senderId = lm.senderId || lm.sender_id;
         const currentId = currentUser?._id || currentUser?.id || currentUser?.uid;
         const unread = lm && !lm.read && senderId && currentId && senderId !== currentId;
@@ -92,7 +94,9 @@ const Messages = () => {
   const markAsRead = async (conversationId) => {
     if (!currentUser) return;
     // REST: best-effort server call and optimistic UI update
-    try { await messagesAPI.markRead(conversationId); } catch {}
+    try { await messagesAPI.markRead(conversationId); } catch (error) {
+      console.warn('Mark read error:', error);
+    }
     setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, unread: false, unreadCount: 0 } : c));
   };
 

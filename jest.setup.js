@@ -6,24 +6,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
-// Mock Firebase
-jest.mock('firebase/app', () => {
-  const mockAuth = () => ({
-    currentUser: { uid: 'test-user-id', email: 'test@example.com' },
-    signInWithEmailAndPassword: jest.fn(),
-    createUserWithEmailAndPassword: jest.fn(),
-    signOut: jest.fn(),
-    onAuthStateChanged: jest.fn(),
-    sendPasswordResetEmail: jest.fn(),
-  });
-
-  return {
-    initializeApp: jest.fn(),
-    getApp: jest.fn(),
-    getApps: jest.fn(() => []),
-    auth: mockAuth,
-  };
-});
+// Skip Firebase mocking for now
 
 // Mock React Native
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');

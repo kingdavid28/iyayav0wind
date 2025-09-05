@@ -389,28 +389,7 @@ class Validator {
     return true
   }
 
-  // Review Validation
-  validateReview(review) {
-    const errors = []
 
-    if (!review.rating || review.rating < 1 || review.rating > 5) {
-      errors.push("Rating must be between 1 and 5 stars")
-    }
-
-    if (review.comment && review.comment.length > 500) {
-      errors.push("Review comment must be less than 500 characters")
-    }
-
-    if (!review.comment || review.comment.trim().length < 10) {
-      errors.push("Review comment must be at least 10 characters long")
-    }
-
-    if (errors.length > 0) {
-      throw new Error(errors.join(", "))
-    }
-
-    return true
-  }
 
   // Job Alert Validation
   validateJobAlert(alert) {

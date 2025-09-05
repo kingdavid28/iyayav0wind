@@ -1,4 +1,5 @@
 import { buildSchedule, formatDateFriendly, formatTimeRange } from './dateUtils';
+import { normalizeStatus } from '../../../utils/caregiverUtils';
 
 export const fetchMyBookings = async (bookingsAPI) => {
   try {
@@ -24,17 +25,6 @@ export const fetchMyBookings = async (bookingsAPI) => {
     console.error('Error fetching bookings:', error);
     return [];
   }
-};
-
-export const normalizeStatus = (s) => {
-  if (!s) return 'pending';
-  return s === 'pending_confirmation' ? 'pending' : s;
-};
-
-export const getCaregiverDisplayName = (caregiver) => {
-  if (typeof caregiver === 'string') return caregiver;
-  if (caregiver?.name) return caregiver.name;
-  return 'Caregiver';
 };
 
 // These functions are already imported from dateUtils, so you don't need to re-export them

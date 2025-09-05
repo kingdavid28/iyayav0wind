@@ -7,11 +7,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "description": "Connect with trusted caregivers and find quality childcare services in your area.",
     "keywords": ["childcare", "nanny", "babysitter", "caregiver", "family", "kids"],
     "privacy": "public",
-    "platforms": ["ios", "android"],
+    "platforms": ["ios", "android", "web"],
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",

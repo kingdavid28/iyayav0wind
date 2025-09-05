@@ -163,7 +163,7 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
 
       setLoading(false);
       if (onJobPosted) onJobPosted();
-      if (onClose) onClose();
+      onClose();
       
       // Show success message
       Alert.alert('Success', 'Job posted successfully!');
