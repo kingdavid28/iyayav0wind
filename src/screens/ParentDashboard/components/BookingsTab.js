@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
+import { View, Text, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import BookingItem from './BookingItem';
-import { TouchableOpacity } from 'react-native';
+import { parseDate } from '../utils/dateUtils';
 
 const BookingsTab = ({
   bookings,

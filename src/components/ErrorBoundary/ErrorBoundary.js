@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { errorHandler } from '../../utils/errorHandler';
-import { logger } from '../../utils/logger';
+// Removed imports to avoid dependency issues
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -18,45 +17,18 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Safely handle error logging
-    try {
-      logger.error('ErrorBoundary caught an error:', error);
-      logger.error('Error info:', errorInfo);
-    } catch (logError) {
-      console.error('Logger failed:', logError);
-      console.error('Original error:', error);
-    }
+    // Simple error logging without any processing
+    console.error('🔴 ACTUAL ERROR:', error);
+    console.error('🔴 ERROR MESSAGE:', error?.message);
+    console.error('🔴 ERROR STACK:', error?.stack);
+    console.error('🔴 COMPONENT STACK:', errorInfo?.componentStack);
     
-    // Safely process error
-    let processedError;
-    try {
-      processedError = errorHandler.process(error);
-    } catch (handlerError) {
-      console.error('Error handler failed:', handlerError);
-      // Fallback error processing
-      processedError = {
-        userMessage: typeof error === 'string' ? error : 
-                    error?.message || 
-                    error?.toString() || 
-                    'An unexpected error occurred',
-        retryable: true,
-        code: 'UNKNOWN_ERROR'
-      };
-    }
-    
-    // Safely report error
-    try {
-      errorHandler.reportError(error, {
-        component: this.props.componentName || 'Unknown',
-        errorInfo,
-        props: this.props,
-      });
-    } catch (reportError) {
-      console.error('Error reporting failed:', reportError);
-    }
-
+    // Simple fallback without any complex processing
     this.setState({
-      error: processedError,
+      error: {
+        userMessage: error?.message || 'Something went wrong',
+        retryable: true
+      },
       errorInfo,
     });
   }

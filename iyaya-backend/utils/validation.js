@@ -1,4 +1,12 @@
-const Joi = require('joi');
+// Graceful handling of missing dependencies
+let Joi;
+try {
+  Joi = require('joi');
+} catch (err) {
+  console.warn('Joi not installed, using express-validator only');
+  Joi = null;
+}
+
 const { body, param, query, validationResult } = require('express-validator');
 const { regEx } = require('../config/constants');
 
@@ -47,8 +55,8 @@ const customValidators = {
   }
 };
 
-// Joi Schema Definitions
-const joiSchemas = {
+// Joi Schema Definitions (only if Joi is available)
+const joiSchemas = Joi ? {
   // Auth schemas
   register: {
     body: Joi.object().keys({
@@ -166,7 +174,7 @@ const joiSchemas = {
       }),
     }),
   },
-};
+} : {};
 
 // Express-validator Schema Definitions
 const expressValidatorSchemas = {
@@ -228,6 +236,11 @@ const expressValidatorSchemas = {
 
 // Joi validation middleware factory
 const validateJoi = (schemaName) => {
+  if (!Joi) {
+    console.warn(`Joi validation requested for '${schemaName}' but Joi is not available`);
+    return (req, res, next) => next();
+  }
+  
   const schema = joiSchemas[schemaName];
   if (!schema) {
     return (req, res, next) => next();

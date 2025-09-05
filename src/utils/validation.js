@@ -3,6 +3,7 @@ import { VALIDATION } from './constants';
 /**
  * Comprehensive validation utility functions
  * Consolidated from validation.js and validator.js
+ * Single source of truth for all validation logic
  */
 
 export const validators = {

@@ -30,7 +30,7 @@ import ChildModal from './modals/ChildModal';
 import { useApp } from '../../contexts/AppContext';
 
 // Import utilities
-import { fetchMyBookings } from './utils/bookingUtils';
+import { fetchAndProcessBookings } from '../../utils/bookingUtils';
 // import { getCaregiverDisplayName } from '../../utils/caregiverUtils';
 import { applyFilters, countActiveFilters } from '../../utils/caregiverUtils';
 
@@ -192,22 +192,22 @@ const ParentDashboard = () => {
       title: 'Add Child',
       onPress: () => openAddChild()
     },
-    {
-      id: 'post-job',
-      icon: 'briefcase',
-      title: 'Post Job',
-      onPress: () => setActiveTab('jobs')
-    },
+    // {
+    //   id: 'post-job',
+    //   icon: 'briefcase',
+    //   title: 'Post Job',
+    //   onPress: () => setActiveTab('jobs')
+    // },
   ], [caregivers, navigation]);
 
   // Data loading functions
   const handleFetchBookings = useCallback(async () => {
     try {
       setRefreshing(true);
-      const normalizedBookings = await fetchMyBookings(bookingsAPI);
+      const normalizedBookings = await fetchAndProcessBookings(bookingsAPI);
       setBookings(normalizedBookings);
     } catch (err) {
-      console.warn('[fetchMyBookings] failed:', err?.message || err);
+      console.warn('[fetchAndProcessBookings] failed:', err?.message || err);
     } finally {
       setRefreshing(false);
     }

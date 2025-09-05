@@ -12,8 +12,20 @@ export const ERROR_CODES = {
 
 class ErrorHandler {
   process(error) {
-    // Log the error
-    logger.error("Processing error:", error)
+    // Enhanced error logging
+    logger.error("Processing error:", {
+      error,
+      type: typeof error,
+      keys: Object.keys(error || {}),
+      string: String(error),
+      message: error?.message,
+      stack: error?.stack
+    });
+    
+    // Handle empty or invalid error objects
+    if (!error || (typeof error === 'object' && Object.keys(error).length === 0)) {
+      return this.createUnknownError(new Error('Empty error object received'));
+    }
 
     // Determine error type and create standardized error object
     if (this.isNetworkError(error)) {
@@ -179,18 +191,22 @@ class ErrorHandler {
     return null
   }
 
-  // Error reporting
+  // Error reporting (React Native compatible)
   reportError(error, context = {}) {
-    const errorReport = {
-      timestamp: new Date().toISOString(),
-      error: this.process(error),
-      context,
-      userAgent: navigator?.userAgent,
-      url: window?.location?.href,
-    }
+    try {
+      const errorReport = {
+        timestamp: new Date().toISOString(),
+        error: this.process(error),
+        context,
+        platform: 'react-native',
+        // Remove browser-specific properties
+      }
 
-    // Send to error reporting service (e.g., Sentry, Bugsnag)
-    this.sendToErrorService(errorReport)
+      // Send to error reporting service
+      this.sendToErrorService(errorReport)
+    } catch (reportingError) {
+      console.error('Failed to create error report:', reportingError);
+    }
   }
 
   sendToErrorService(errorReport) {

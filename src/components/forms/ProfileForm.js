@@ -15,7 +15,7 @@ import {
   IconButton, 
   ActivityIndicator 
 } from 'react-native-paper';
-import { validator } from '../../utils/validator';
+import { validator } from '../../utils/validation';
 import ValidatedInput from './ValidatedInput';
 import DocumentUpload from './DocumentUpload';
 import { Rating } from 'react-native-ratings';

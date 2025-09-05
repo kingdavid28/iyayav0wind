@@ -83,7 +83,17 @@ const authController = loadController('auth') || {
   updateChildren: (req, res) => res.status(503).json({ error: 'Update children service unavailable' })
 };
 
-const validation = loadController('validation');
+// Load validation from utils directory instead of controllers
+let validation;
+try {
+  validation = require('../utils/validation');
+  console.log('✅ validation loaded successfully');
+} catch (err) {
+  console.warn('⚠️ Using basic validation fallback');
+  validation = {
+    validate: () => (req, res, next) => next()
+  };
+}
 
 // Method verification with better error reporting
 const verifyMethods = (controller, methods, controllerName) => {

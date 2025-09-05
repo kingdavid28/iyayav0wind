@@ -1,5 +1,10 @@
 // Enhanced logger for mobile debugging
 export const logger = {
+  debug: (message, ...args) => {
+    if (__DEV__) {
+      console.log(`[DEBUG] ${message}`, ...args);
+    }
+  },
   info: (message, ...args) => {
     console.log(`[INFO] ${message}`, ...args);
   },

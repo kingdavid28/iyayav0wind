@@ -1,7 +1,7 @@
 import { apiService } from "./apiService"
 import { api, authAPI, nanniesAPI } from "../config/api"
 import { logger } from "../utils/logger"
-import { validator } from "../utils/validator"
+import { validator } from "../utils/validation"
 import { API_CONFIG, VALIDATION } from "../config/constants"
 
 class UserService {

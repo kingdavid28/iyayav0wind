@@ -10,11 +10,11 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { GiftedChat, Bubble, InputToolbar, Send } from 'react-native-gifted-chat';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { ArrowLeft, Send as SendIcon, Check, CheckCheck, MoreVertical, Image as ImageIcon } from 'lucide-react-native';
+import { ArrowLeft, MoreVertical } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessaging } from '../contexts/MessagingContext';
+import SimpleChat from '../components/SimpleChat';
 
 export default function ChatScreen() {
   const { user } = useAuth();
@@ -45,8 +45,8 @@ export default function ChatScreen() {
     init();
   }, [conversationId, recipientId, user?.uid, getOrCreateConversation, setActiveConversation]);
 
-  // Map context messages to GiftedChat format
-  const giftedMessages = useMemo(() => {
+  // Map context messages to SimpleChat format
+  const chatMessages = useMemo(() => {
     return (ctxMessages || [])
       .slice()
       .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
@@ -57,17 +57,13 @@ export default function ChatScreen() {
         user: {
           _id: m.senderId || m.sender_id,
           name: m.senderName || m.sender_name || '',
-          avatar: m.senderAvatar || m.sender_avatar || undefined,
         },
-        read: !!m.read,
-        sent: true,
-        received: !!m.delivered || !!m.received,
       }));
   }, [ctxMessages]);
 
   useEffect(() => {
-    setMessages(giftedMessages);
-  }, [giftedMessages]);
+    setMessages(chatMessages);
+  }, [chatMessages]);
 
   // Mark messages as read (via context, optimistic)
   const handleMarkRead = useCallback((msgs) => {
@@ -98,106 +94,7 @@ export default function ChatScreen() {
     }
   }, [user, sendMessage]);
 
-  // Handle typing indicator
-  const onInputTextChanged = useCallback((text) => {
-    // Implement typing indicator logic here
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    // Set a timeout to indicate user stopped typing
-    typingTimeoutRef.current = setTimeout(() => {
-      // Update typing status in Firestore
-      // TODO: Implement typing indicator via backend if needed
-    }, 1000);
-  }, []);
-
-  // Custom render methods
-  const renderBubble = (props) => (
-    <Bubble
-      {...props}
-      wrapperStyle={{
-        right: {
-          backgroundColor: '#3b82f6',
-          marginVertical: 4,
-          padding: 8,
-          borderTopRightRadius: 12,
-          borderBottomRightRadius: 0,
-          borderTopLeftRadius: 12,
-          borderBottomLeftRadius: 12,
-        },
-        left: {
-          backgroundColor: '#f3f4f6',
-          marginVertical: 4,
-          padding: 8,
-          borderTopRightRadius: 12,
-          borderBottomRightRadius: 12,
-          borderTopLeftRadius: 12,
-          borderBottomLeftRadius: 0,
-        },
-      }}
-      textStyle={{
-        right: {
-          color: 'white',
-          fontSize: 15,
-        },
-        left: {
-          color: '#111827',
-          fontSize: 15,
-        },
-      }}
-      renderTime={(timeProps) => (
-        <View style={styles.timeContainer}>
-          <Text style={[
-            styles.timeText,
-            timeProps.position === 'right' ? styles.timeTextRight : {}
-          ]}>
-            {timeProps.currentMessage.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            {timeProps.position === 'right' && (
-              <View style={styles.statusIcon}>
-                {timeProps.currentMessage.read ? (
-                  <CheckCheck size={14} color="#60a5fa" />
-                ) : timeProps.currentMessage.sent ? (
-                  <Check size={14} color="#9ca3af" />
-                ) : (
-                  <View style={styles.sendingIndicator} />
-                )}
-              </View>
-            )}
-          </Text>
-        </View>
-      )}
-    />
-  );
-
-  const renderInputToolbar = (props) => (
-    <InputToolbar
-      {...props}
-      containerStyle={styles.inputToolbar}
-      primaryStyle={styles.inputPrimary}
-      renderSend={renderSend}
-      renderActions={renderActions}
-    />
-  );
-
-  const renderSend = (props) => (
-    <Send
-      {...props}
-      containerStyle={styles.sendContainer}
-    >
-      <View style={styles.sendButton}>
-        <SendIcon size={20} color="#ffffff" />
-      </View>
-    </Send>
-  );
-
-  const renderActions = (props) => (
-    <View style={styles.actionsContainer}>
-      <TouchableOpacity style={styles.actionButton}>
-        <ImageIcon size={24} color="#6b7280" />
-      </TouchableOpacity>
-    </View>
-  );
+  // Removed custom render methods - using SimpleChat instead
 
   if (isLoading) {
     return (
@@ -231,31 +128,13 @@ export default function ChatScreen() {
       </View>
 
       {/* Chat Interface */}
-      <GiftedChat
+      <SimpleChat
         messages={messages}
         onSend={onSend}
         user={user ? {
           _id: user.uid,
           name: user.displayName || user.email,
-          avatar: user.photoURL
         } : { _id: 'guest', name: 'Guest' }}
-        renderBubble={renderBubble}
-        renderInputToolbar={renderInputToolbar}
-        renderAvatarOnTop
-        showUserAvatar
-        alwaysShowSend
-        scrollToBottom
-        scrollToBottomComponent={() => null}
-        onInputTextChanged={onInputTextChanged}
-        placeholder="Type a message..."
-        textInputStyle={styles.textInput}
-        timeTextStyle={styles.timeText}
-        isLoadingEarlier={isLoading}
-        renderLoading={() => (
-          <View style={styles.loadingMore}>
-            <ActivityIndicator color="#3b82f6" />
-          </View>
-        )}
       />
     </View>
   );

@@ -85,7 +85,7 @@ const corsOptions = {
     'platform'
   ],
   exposedHeaders: ['Authorization', 'X-Refresh-Token', 'X-Request-ID'],
-  credentials: true,
+  credentials: false, // Changed to false for image requests
   optionsSuccessStatus: 204,
   maxAge: 86400
 };
@@ -138,8 +138,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve uploaded files with proper headers
+app.use('/uploads', (req, res, next) => {
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
 
 // ============================================
 // Routes
