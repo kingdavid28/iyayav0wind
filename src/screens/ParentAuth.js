@@ -129,9 +129,10 @@ const ParentAuth = ({ navigation, route }) => {
         }
         return result;
       } else if (mode === 'reset') {
-        // Note: resetPassword method doesn't exist in authAPI, you may need to add it
-        Alert.alert("Info", "Password reset feature not implemented yet");
-        return;
+        const result = await authAPI.resetPassword(email);
+        Alert.alert("Success", "Temporary password sent. Check console for password.");
+        setMode('login');
+        return result;
       }
     }, {
       onError: (error) => {

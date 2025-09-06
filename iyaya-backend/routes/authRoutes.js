@@ -225,6 +225,11 @@ router.post('/refresh-token',
   authController.refreshToken
 );
 
+router.post('/reset-password',
+  strictLimiter,
+  authController.resetPassword
+);
+
 router.get('/me',
   profileLimiter,
   authenticate,

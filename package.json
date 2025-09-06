@@ -2,6 +2,10 @@
   "name": "iyayav0",
   "version": "1.0.0",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kingdavid28/iyayav0wind.git"
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",

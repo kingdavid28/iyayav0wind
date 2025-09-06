@@ -86,9 +86,6 @@ exports.uploadProfileImageBase64 = async (req, res, next) => {
 
     // Update user profileImage
     let query = { _id: req.user.id };
-    if (req.user.firebase) {
-      query = { firebaseUid: req.user.id };
-    }
     const user = await User.findOneAndUpdate(query, { profileImage: publicUrl }, { new: true }).select('-password');
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -146,11 +143,8 @@ exports.updateProfile = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'No valid fields to update' });
     }
 
-    // Determine lookup for Firebase vs JWT
+    // JWT lookup
     let query = { _id: req.user.id };
-    if (req.user.firebase) {
-      query = { firebaseUid: req.user.id };
-    }
 
     const user = await User.findOneAndUpdate(query, update, { new: true, runValidators: true }).select('-password');
 
@@ -195,11 +189,8 @@ exports.updateRole = async (req, res, next) => {
 
     const { role: internalRole, userType } = normalizeIncomingRole(role);
 
-    // Determine lookup for Firebase vs JWT
+    // JWT lookup
     let query = { _id: req.user.id };
-    if (req.user.firebase) {
-      query = { firebaseUid: req.user.id };
-    }
 
     const user = await User.findOneAndUpdate(
       query,
@@ -296,88 +287,7 @@ async function hasActiveContractWithParent(requesterId, parentId) {
 // Get current authenticated user (works with both Firebase and custom JWT)
 exports.getCurrentUser = async (req, res, next) => {
   try {
-    // Check if this is a Firebase-authenticated user
-    if (req.user.firebase) {
-      try {
-        // For Firebase users, we need to find by firebaseUid
-        let user = await User.findOne({ firebaseUid: req.user.id }).select('-password');
-
-        // If user not found, try to link an existing account by email first
-        if (!user) {
-          const email = req.user.email;
-          if (email) {
-            const existingByEmail = await User.findOne({ email }).select('-password');
-            if (existingByEmail) {
-              // Link Firebase UID to existing account
-              if (!existingByEmail.firebaseUid) {
-                existingByEmail.firebaseUid = req.user.id;
-                await existingByEmail.save();
-              }
-              return res.status(200).json({ success: true, data: existingByEmail });
-            }
-          }
-
-          // No existing account by firebaseUid or email — create a new one
-          console.log('Creating new user record for Firebase UID:', req.user.id);
-
-          // Generate a simple random password for Firebase users (not used for authentication)
-          const randomPassword = 'FIREBASE_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-          try {
-            user = new User({
-              firebaseUid: req.user.id,
-              email: req.user.email,
-              name: req.user.name || (req.user.email ? req.user.email.split('@')[0] : 'New User'),
-              password: randomPassword, // Set a random password to satisfy validation
-              role: 'client', // Default role
-              userType: 'client', // Default userType
-              isEmailVerified: true, // Firebase email is already verified
-            });
-
-            // Skip password hashing for Firebase users
-            user.password = randomPassword;
-            user.passwordConfirm = randomPassword;
-
-            await user.save({ validateBeforeSave: false });
-            console.log('Created new Firebase user:', user._id);
-
-            // Fetch the user again to get the full user object
-            user = await User.findById(user._id).select('-password');
-          } catch (createErr) {
-            // Handle duplicate key (email) gracefully by linking
-            if (createErr && (createErr.code === 11000 || /duplicate key/i.test(createErr.message))) {
-              if (email) {
-                const existingAfterDup = await User.findOne({ email }).select('-password');
-                if (existingAfterDup) {
-                  if (!existingAfterDup.firebaseUid) {
-                    existingAfterDup.firebaseUid = req.user.id;
-                    await existingAfterDup.save();
-                  }
-                  return res.status(200).json({ success: true, data: existingAfterDup });
-                }
-              }
-            }
-            throw createErr;
-          }
-        }
-
-        // Return user data as a flat object and ensure a mapped role is present for the app
-        const obj = user.toObject ? user.toObject() : user;
-        const mappedRole = (obj.role === 'admin' || obj.userType === 'admin')
-          ? 'parent'
-          : (obj.role === 'client' || obj.userType === 'client')
-            ? 'parent'
-            : (obj.role === 'provider' || obj.userType === 'provider')
-              ? 'caregiver'
-              : (obj.role || 'parent');
-        return res.status(200).json({ ...obj, role: mappedRole });
-      } catch (error) {
-        console.error('Error in Firebase user lookup/creation:', error);
-        return next(new ErrorResponse('Error processing user data', 500));
-      }
-    }
-
-    // For custom JWT users
+    // For JWT users
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return next(new ErrorResponse('User not found', 404));
@@ -633,6 +543,41 @@ exports.refreshToken = async (req, res, next) => {
   }
 };
 
+// Reset password
+exports.resetPassword = async (req, res, next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return next(new ErrorResponse('Please provide an email', 400));
+  }
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return next(new ErrorResponse('User not found', 404));
+    }
+
+    // Generate temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    
+    // Hash and save temporary password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(tempPassword, salt);
+    await user.save();
+
+    console.log(`🔑 Temporary password for ${email}: ${tempPassword}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Temporary password generated. Check console for password.',
+      tempPassword // Remove in production
+    });
+  } catch (err) {
+    next(new ErrorResponse('Reset password failed', 500));
+  }
+};
+
 // Make sure all required methods are exported
 module.exports = {
   getCurrentUser: exports.getCurrentUser,
@@ -643,5 +588,6 @@ module.exports = {
   updateChildren: exports.updateChildren,
   updateProfile: exports.updateProfile,
   updateRole: exports.updateRole,
-  uploadProfileImageBase64: exports.uploadProfileImageBase64
+  uploadProfileImageBase64: exports.uploadProfileImageBase64,
+  resetPassword: exports.resetPassword
 };

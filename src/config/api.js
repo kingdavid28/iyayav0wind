@@ -44,21 +44,7 @@ export const authAPI = {
       
       return response.json();
     } catch (error) {
-      console.log('Backend unavailable, using mock auth:', error.message);
-      // Mock authentication when backend is not available
-      if (credentials.email && credentials.password) {
-        const mockToken = 'mock_token_' + Date.now();
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, mockToken);
-        return {
-          token: mockToken,
-          user: {
-            id: 'mock_user_' + Date.now(),
-            email: credentials.email,
-            name: credentials.email.split('@')[0],
-            role: credentials.email.includes('giver') ? 'caregiver' : 'parent'
-          }
-        };
-      }
+      console.error('Login failed:', error.message);
       throw error;
     }
   },
@@ -85,19 +71,8 @@ export const authAPI = {
       
       return response.json();
     } catch (error) {
-      console.log('Backend unavailable, using mock registration:', error.message);
-      // Mock registration
-      const mockToken = 'mock_token_' + Date.now();
-      await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, mockToken);
-      return {
-        token: mockToken,
-        user: {
-          id: 'mock_user_' + Date.now(),
-          email: userData.email,
-          name: userData.name,
-          role: userData.role || 'parent'
-        }
-      };
+      console.error('Registration failed:', error.message);
+      throw error;
     }
   },
   
@@ -133,15 +108,7 @@ export const authAPI = {
       
       return response.json();
     } catch (error) {
-      // Mock profile for development
-      if (token.startsWith('mock_token_')) {
-        return {
-          id: 'mock_user_123',
-          email: 'user@example.com',
-          name: 'Mock User',
-          role: 'parent'
-        };
-      }
+      console.error('Profile fetch failed:', error.message);
       throw error;
     }
   },
@@ -190,6 +157,33 @@ export const authAPI = {
     }
   },
   
+  resetPassword: async (email) => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Reset failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Reset password failed:', error.message);
+      throw error;
+    }
+  },
+
   uploadProfileImageBase64: async (imageBase64, mimeType) => {
     const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     if (!token) {

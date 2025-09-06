@@ -89,6 +89,8 @@ const CaregiverAuth = ({ navigation }) => {
           return null;
         }
       };
+    } else if (mode === 'reset') {
+      rules = { email: validationRules.userRegistration.email };
     }
     
     const errors = validateForm(formData, rules);
@@ -122,6 +124,11 @@ const CaregiverAuth = ({ navigation }) => {
         
         // Inform user to verify email
         Alert.alert('Account Created', 'Your caregiver account has been created successfully!');
+        return result;
+      } else if (mode === 'reset') {
+        const result = await authAPI.resetPassword(email);
+        Alert.alert("Success", "Temporary password sent. Check console for password.");
+        setMode('login');
         return result;
       } else {
         const result = await login(email, password);
@@ -208,7 +215,7 @@ const CaregiverAuth = ({ navigation }) => {
                 <Ionicons name="person-outline" size={32} color="#2563eb" />
               </LinearGradient>
               <Text style={styles.authTitle}>
-                {mode === 'signup' ? 'Create Caregiver Account' : 'Welcome Back Caregiver'}
+                {mode === 'signup' ? 'Create Caregiver Account' : mode === 'reset' ? 'Reset Password' : 'Welcome Back Caregiver'}
               </Text>
             </View>
 
@@ -260,6 +267,9 @@ const CaregiverAuth = ({ navigation }) => {
               />
               {formErrors.email ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.email}</Text> : null}
 
+              {/* Passwords (skip for reset mode) */}
+              {mode !== 'reset' && (
+                <>
               <TextInput
                 label="Password"
                 value={formData.password}
@@ -301,6 +311,8 @@ const CaregiverAuth = ({ navigation }) => {
                 />
               )}
               {formErrors.confirmPassword ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.confirmPassword}</Text> : null}
+                </>
+              )}
 
               <Button 
                 mode="contained" 
@@ -309,12 +321,18 @@ const CaregiverAuth = ({ navigation }) => {
                 disabled={isSubmitting}
                 style={[styles.authButton, styles.caregiverAuthButton]}
                 labelStyle={styles.authButtonLabel}
-                accessibilityLabel={mode === 'signup' ? 'Create account button' : 'Sign in button'}
+                accessibilityLabel={mode === 'signup' ? 'Create account button' : mode === 'reset' ? 'Send reset link button' : 'Sign in button'}
               >
-                {mode === 'signup' ? 'Create Account' : 'Sign In'}
+                {mode === 'signup' ? 'Create Account' : mode === 'reset' ? 'Send Reset Link' : 'Sign In'}
               </Button>
 
-              <View style={styles.authFooter}>
+              {/* Footer links */}
+              {mode !== 'reset' ? (
+                <>
+                  <TouchableOpacity onPress={() => setMode('reset')} accessibilityLabel="Switch to reset password">
+                    <Text style={styles.smallLink}>Forgot password?</Text>
+                  </TouchableOpacity>
+                  <View style={styles.authFooter}>
                 <Text style={styles.authFooterText}>
                   {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
                 </Text>
@@ -326,7 +344,13 @@ const CaregiverAuth = ({ navigation }) => {
                     {mode === 'signup' ? 'Sign In' : 'Sign Up'}
                   </Text>
                 </TouchableOpacity>
-              </View>
+                  </View>
+                </>
+              ) : (
+                <TouchableOpacity onPress={() => setMode('login')} accessibilityLabel="Back to sign in">
+                  <Text style={styles.smallLink}>Back to Sign In</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -446,6 +470,11 @@ const styles = StyleSheet.create({
   authFooterLink: {
     fontWeight: 'bold',
     marginLeft: 4,
+  },
+  smallLink: {
+    color: '#2563eb',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 

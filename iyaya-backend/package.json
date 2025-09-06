@@ -2,9 +2,13 @@
   "name": "iyaya-backend",
   "version": "1.0.0",
   "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kingdavid28/iyayav0wind.git"
+  },
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "engines": {
     "node": ">=16.0.0"

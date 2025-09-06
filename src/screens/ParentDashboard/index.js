@@ -276,8 +276,11 @@ const ParentDashboard = () => {
                         profile.data.avatar || 
                         profile.data.user?.profileImage || 
                         profile.data.user?.avatar || 
+                        profile.profileImage ||
+                        profile.avatar ||
                         '';
         setProfileImage(imageUrl);
+        console.log('🖼️ Initial profile image loaded:', imageUrl);
         
         // Debug log to check values
         console.log('Profile data loaded:', {
@@ -591,9 +594,14 @@ const ParentDashboard = () => {
           const imageResult = await authAPI.uploadProfileImageBase64(base64Image, 'image/jpeg');
           console.log('Image upload result:', imageResult);
           
-          if (imageResult && imageResult.data && imageResult.data.profileImageUrl) {
-            updateData.profileImage = imageResult.data.profileImageUrl;
-            setProfileImage(imageResult.data.profileImageUrl);
+          // Handle different response structures
+          const imageUrl = imageResult?.data?.url || imageResult?.url || imageResult?.data?.profileImageUrl;
+          if (imageUrl) {
+            updateData.profileImage = imageUrl;
+            setProfileImage(imageUrl);
+            console.log('✅ Profile image updated to:', imageUrl);
+          } else {
+            console.log('⚠️ No image URL found in response:', imageResult);
           }
         } catch (imageError) {
           console.error('Error uploading image:', imageError);
