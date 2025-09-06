@@ -1,42 +1,192 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from './constants';
 
+// Dynamic IP detection for Expo Go compatibility
+const getDevServerIP = () => {
+  // Try to get IP from Expo's development server
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    try {
+      // Get the current bundle URL which contains the dev server IP
+      const bundleUrl = typeof global !== 'undefined' && global.__DEV__ && global.__BUNDLE_START_TIME__
+        ? global.location?.hostname
+        : null;
+      
+      if (bundleUrl) {
+        return bundleUrl;
+      }
+    } catch (e) {
+      console.log('Could not detect dev server IP automatically');
+    }
+  }
+  
+  // Fallback IPs in order of preference
+  return [
+    '192.168.1.10',   // Current network IP
+    '192.168.0.10',   // Common home network
+    '10.0.0.10',      // Another common network
+    '172.16.0.10',    // Corporate network
+    'localhost',      // Local development
+    '127.0.0.1'       // Localhost fallback
+  ];
+};
+
 const API_CONFIG = {
   development: {
-    baseURL: 'http://192.168.1.10:5001/api',  // Use your network IP
+    // Support multiple IP configurations for Expo Go
+    baseURLs: [
+      'http://192.168.1.10:5001/api',
+      'http://192.168.0.10:5001/api', 
+      'http://10.0.0.10:5001/api',
+      'http://172.16.0.10:5001/api',
+      'http://localhost:5001/api',
+      'http://127.0.0.1:5001/api'
+    ],
+    socketURLs: [
+      'http://192.168.1.10:5001',
+      'http://192.168.0.10:5001',
+      'http://10.0.0.10:5001', 
+      'http://172.16.0.10:5001',
+      'http://localhost:5001',
+      'http://127.0.0.1:5001'
+    ],
+    // Primary URLs (backward compatibility)
+    baseURL: 'http://192.168.1.10:5001/api',
     socketURL: 'http://192.168.1.10:5001'
   },
   production: {
-    baseURL: 'https://your-backend-url.com/api', // Replace with your deployed backend URL
+    baseURL: 'https://your-backend-url.com/api',
     socketURL: 'https://your-backend-url.com'
   }
 };
 
 const ENV = __DEV__ ? 'development' : 'production';
-export const API_BASE_URL = API_CONFIG[ENV].baseURL;
-export const SOCKET_URL = API_CONFIG[ENV].socketURL;
 
-// Simple auth API implementation with timeout and mock fallback
+// Auto-detect working API URL in development
+let detectedBaseURL = null;
+let detectedSocketURL = null;
+
+const detectWorkingAPI = async () => {
+  if (ENV === 'production' || detectedBaseURL) {
+    return;
+  }
+  
+  const urls = API_CONFIG.development.baseURLs;
+  
+  for (const baseURL of urls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      
+      const response = await fetch(`${baseURL.replace('/api', '')}/api/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        detectedBaseURL = baseURL;
+        detectedSocketURL = baseURL.replace('/api', '');
+        console.log('✅ Detected working API:', detectedBaseURL);
+        return;
+      }
+    } catch (error) {
+      // Continue to next URL
+      continue;
+    }
+  }
+  
+  console.warn('⚠️ No working API detected, using default');
+};
+
+// Initialize detection
+if (ENV === 'development') {
+  detectWorkingAPI();
+}
+
+export const API_BASE_URL = ENV === 'development' 
+  ? (detectedBaseURL || API_CONFIG[ENV].baseURL)
+  : API_CONFIG[ENV].baseURL;
+  
+export const SOCKET_URL = ENV === 'development'
+  ? (detectedSocketURL || API_CONFIG[ENV].socketURL) 
+  : API_CONFIG[ENV].socketURL;
+
+// Helper function to get current API URL (for runtime access)
+export const getCurrentAPIURL = () => {
+  return ENV === 'development' 
+    ? (detectedBaseURL || API_CONFIG[ENV].baseURL)
+    : API_CONFIG[ENV].baseURL;
+};
+
+export const getCurrentSocketURL = () => {
+  return ENV === 'development'
+    ? (detectedSocketURL || API_CONFIG[ENV].socketURL)
+    : API_CONFIG[ENV].socketURL;
+};
+
+// Enhanced API implementation with automatic failover and IP detection
 // Export configuration
 export { API_CONFIG };
+
+// API call wrapper with automatic failover for development
+const apiCall = async (endpoint, options = {}) => {
+  const { retryUrls = true, ...fetchOptions } = options;
+  
+  // In production, use single URL
+  if (ENV === 'production') {
+    const url = `${API_CONFIG.production.baseURL}${endpoint}`;
+    return fetch(url, fetchOptions);
+  }
+  
+  // In development, try detected URL first, then fallback to all URLs
+  const urls = detectedBaseURL 
+    ? [detectedBaseURL]
+    : API_CONFIG.development.baseURLs;
+    
+  let lastError = null;
+  
+  for (const baseURL of urls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${baseURL}${endpoint}`, {
+        ...fetchOptions,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // If successful, cache this URL for future use
+      if (response.ok && !detectedBaseURL) {
+        detectedBaseURL = baseURL;
+        detectedSocketURL = baseURL.replace('/api', '');
+        console.log('✅ Cached working API:', detectedBaseURL);
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error;
+      console.log(`❌ Failed ${baseURL}: ${error.message}`);
+      continue;
+    }
+  }
+  
+  throw lastError || new Error('All API endpoints failed');
+};
 
 // Export all APIs
 export const authAPI = {
   login: async (credentials) => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await apiCall('/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(credentials),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Login failed: ${response.status}`);
@@ -51,19 +201,13 @@ export const authAPI = {
   
   register: async (userData) => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      const response = await apiCall('/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(userData),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Registration failed: ${response.status}`);
@@ -83,18 +227,12 @@ export const authAPI = {
     }
     
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      
-      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      const response = await apiCall('/auth/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -131,20 +269,14 @@ export const authAPI = {
     }
     
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      const response = await apiCall('/auth/profile', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Profile update failed: ${response.status}`);
@@ -159,19 +291,13 @@ export const authAPI = {
   
   resetPassword: async (email) => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      const response = await apiCall('/auth/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email }),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Reset failed: ${response.status}`);
@@ -191,20 +317,14 @@ export const authAPI = {
     }
     
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for image upload
-      
-      const response = await fetch(`${API_BASE_URL}/auth/upload-image`, {
+      const response = await apiCall('/auth/profile/image-base64', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ imageBase64, mimeType }),
-        signal: controller.signal,
       });
-      
-      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`Image upload failed: ${response.status}`);

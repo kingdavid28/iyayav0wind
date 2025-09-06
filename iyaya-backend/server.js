@@ -25,15 +25,36 @@ const startServer = async () => {
   }
 
   server.listen(config.port, '0.0.0.0', () => {
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    let networkIP = 'localhost';
+    
+    // Find the first non-internal IPv4 address
+    Object.keys(interfaces).forEach(name => {
+      interfaces[name].forEach(iface => {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          networkIP = iface.address;
+        }
+      });
+    });
+    
     console.log(`
 ============================================
 🚀 Server running in ${config.env} mode
-🔗 http://localhost:${config.port}
-🌐 Network: http://0.0.0.0:${config.port}
+🔗 Local: http://localhost:${config.port}
+🌐 Network: http://${networkIP}:${config.port}
+📱 Expo Go: Use http://${networkIP}:${config.port}
 📅 ${new Date().toLocaleString()}
 🗄️ Database: ${conn.connection.name}
 ============================================
     `);
+    
+    console.log('📋 Expo Go Setup:');
+    console.log(`1. Make sure your phone is on the same WiFi network`);
+    console.log(`2. Update frontend API config to use: ${networkIP}`);
+    console.log(`3. Run: npm run setup-network (in frontend)`);
+    console.log(`4. Restart Expo: npx expo start --clear`);
+    console.log('============================================\n');
   });
 };
 

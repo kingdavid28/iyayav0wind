@@ -112,9 +112,11 @@ npx expo start
 ```
 
 5. **Run on Device/Simulator**
-- Scan QR code with Expo Go app (Android/iOS)
-- Press 'i' for iOS Simulator
-- Press 'a' for Android Emulator
+- **Expo Go (Physical Device):** See [EXPO_GO_SETUP.md](./EXPO_GO_SETUP.md) for detailed setup
+- **Quick Expo Go Setup:** Run `npm run setup-network` then scan QR code
+- **iOS Simulator:** Press 'i' in Expo CLI
+- **Android Emulator:** Press 'a' in Expo CLI
+- **Network Issues:** Use `npx expo start --tunnel`
 
 ## Project Structure
 

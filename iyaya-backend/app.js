@@ -50,20 +50,69 @@ const messagesLimiter = rateLimit({
 
 app.use('/api', limiter);
 
-// Parse CORS origins from environment variable
+// Parse CORS origins from environment variable with Expo Go support
+const getExpoGoOrigins = () => {
+  const commonPorts = [19000, 19001, 19002, 19006, 8081];
+  const commonIPs = [
+    'localhost',
+    '127.0.0.1',
+    '192.168.1.10',   // Current network
+    '192.168.0.10',   // Common home network  
+    '10.0.0.10',      // Another common network
+    '172.16.0.10',    // Corporate network
+    '192.168.1.100',  // Extended range
+    '192.168.0.100',  // Extended range
+  ];
+  
+  const origins = [];
+  
+  // Add HTTP origins for all IP/port combinations
+  commonIPs.forEach(ip => {
+    commonPorts.forEach(port => {
+      origins.push(`http://${ip}:${port}`);
+    });
+  });
+  
+  // Add Expo Go specific patterns
+  origins.push(
+    'exp://192.168.1.10:19000',
+    'exp://192.168.0.10:19000', 
+    'exp://10.0.0.10:19000',
+    'exp://172.16.0.10:19000',
+    'exp://localhost:19000',
+    'exp://127.0.0.1:19000'
+  );
+  
+  return origins;
+};
+
 const corsOrigins = process.env.CORS_ORIGIN ? 
   process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : 
-  ['http://localhost:19006', 'http://127.0.0.1:19006', 'http://192.168.1.10:19006'];
+  getExpoGoOrigins();
 
-// CORS Configuration
+// CORS Configuration with Expo Go support
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, Expo Go, or curl requests)
     if (!origin) return callback(null, true);
     
     // Check if origin is in allowed list or wildcard is present
     if (corsOrigins.includes('*') || corsOrigins.includes(origin)) {
       return callback(null, true);
+    }
+    
+    // Allow Expo Go patterns (exp:// protocol)
+    if (origin.startsWith('exp://')) {
+      return callback(null, true);
+    }
+    
+    // Allow any localhost/127.0.0.1 origin for development
+    if (process.env.NODE_ENV === 'development') {
+      if (origin.includes('localhost') || origin.includes('127.0.0.1') || 
+          origin.includes('192.168.') || origin.includes('10.0.') || 
+          origin.includes('172.16.')) {
+        return callback(null, true);
+      }
     }
     
     // Format the error message consistently
