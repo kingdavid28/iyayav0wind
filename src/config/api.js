@@ -34,24 +34,26 @@ const API_CONFIG = {
   development: {
     // Support multiple IP configurations for Expo Go
     baseURLs: [
+      'http://10.84.54.117:5001/api',
+      'http://localhost:5001/api',
+      'http://127.0.0.1:5001/api',
       'http://192.168.1.10:5001/api',
       'http://192.168.0.10:5001/api', 
       'http://10.0.0.10:5001/api',
-      'http://172.16.0.10:5001/api',
-      'http://localhost:5001/api',
-      'http://127.0.0.1:5001/api'
+      'http://172.16.0.10:5001/api'
     ],
     socketURLs: [
+      'http://10.84.54.117:5001',
+      'http://localhost:5001',
+      'http://127.0.0.1:5001',
       'http://192.168.1.10:5001',
       'http://192.168.0.10:5001',
       'http://10.0.0.10:5001', 
-      'http://172.16.0.10:5001',
-      'http://localhost:5001',
-      'http://127.0.0.1:5001'
+      'http://172.16.0.10:5001'
     ],
     // Primary URLs (backward compatibility)
-    baseURL: 'http://192.168.1.10:5001/api',
-    socketURL: 'http://192.168.1.10:5001'
+    baseURL: 'http://10.84.54.117:5001/api',
+    socketURL: 'http://10.84.54.117:5001'
   },
   production: {
     baseURL: 'https://your-backend-url.com/api',
@@ -62,8 +64,8 @@ const API_CONFIG = {
 const ENV = __DEV__ ? 'development' : 'production';
 
 // Auto-detect working API URL in development
-let detectedBaseURL = null;
-let detectedSocketURL = null;
+let detectedBaseURL = 'http://10.84.54.117:5001/api';
+let detectedSocketURL = 'http://10.84.54.117:5001';
 
 const detectWorkingAPI = async () => {
   if (ENV === 'production' || detectedBaseURL) {
@@ -131,15 +133,28 @@ export { API_CONFIG };
 
 // API call wrapper with automatic failover for development
 const apiCall = async (endpoint, options = {}) => {
-  const { retryUrls = true, ...fetchOptions } = options;
+  const { retryUrls = true, timeout = 15000, ...fetchOptions } = options;
   
-  // In production, use single URL
+  // In production, use single URL with timeout
   if (ENV === 'production') {
     const url = `${API_CONFIG.production.baseURL}${endpoint}`;
-    return fetch(url, fetchOptions);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(url, {
+        ...fetchOptions,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
   }
   
-  // In development, try detected URL first, then fallback to all URLs
+  // In development, no timeout to prevent abort errors
   const urls = detectedBaseURL 
     ? [detectedBaseURL]
     : API_CONFIG.development.baseURLs;
@@ -148,15 +163,7 @@ const apiCall = async (endpoint, options = {}) => {
   
   for (const baseURL of urls) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${baseURL}${endpoint}`, {
-        ...fetchOptions,
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
+      const response = await fetch(`${baseURL}${endpoint}`, fetchOptions);
       
       // If successful, cache this URL for future use
       if (response.ok && !detectedBaseURL) {
@@ -297,6 +304,7 @@ export const authAPI = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email }),
+        // No timeout in development
       });
       
       if (!response.ok) {
@@ -306,6 +314,27 @@ export const authAPI = {
       return response.json();
     } catch (error) {
       console.error('Reset password failed:', error.message);
+      throw error;
+    }
+  },
+  
+  confirmPasswordReset: async (token, newPassword) => {
+    try {
+      const response = await apiCall('/auth/confirm-reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token, newPassword }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Password reset confirmation failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Confirm password reset failed:', error.message);
       throw error;
     }
   },
@@ -437,43 +466,68 @@ export const caregiversAPI = {
 // Jobs API
 export const jobsAPI = {
   getMyJobs: async () => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
     try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/jobs/my`, {
+      const response = await apiCall('/jobs/my', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
-      return response.json();
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
     } catch (error) {
-      console.log('Using mock jobs');
-      return { jobs: [] };
+      console.log('Backend unavailable, using mock jobs:', error.message);
+      return { 
+        data: {
+          jobs: []
+        }
+      };
     }
   },
   
   getAvailableJobs: async () => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
     try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/jobs`, {
+      const response = await apiCall('/jobs', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
       return response.json();
     } catch (error) {
-      console.log('Using mock available jobs');
-      return { jobs: [] };
+      console.log('Backend unavailable, using mock available jobs:', error.message);
+      return { data: { jobs: [] } };
     }
   },
   
   create: async (jobData) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
     try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/jobs`, {
+      const response = await apiCall('/jobs', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -481,11 +535,81 @@ export const jobsAPI = {
         },
         body: JSON.stringify(jobData),
       });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
       return response.json();
     } catch (error) {
-      console.log('Mock job creation');
-      return { success: true, job: { id: Date.now(), ...jobData } };
+      console.log('Backend unavailable, mock job creation:', error.message);
+      const mockJob = {
+        id: `job-${Date.now()}`,
+        _id: `job-${Date.now()}`,
+        ...jobData,
+        status: 'active',
+        createdAt: new Date().toISOString()
+      };
+      return { 
+        success: true, 
+        data: { job: mockJob }
+      };
+    }
+  },
+  
+  update: async (jobId, jobData) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall(`/jobs/${jobId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(jobData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Backend unavailable, mock job update:', error.message);
+      return { 
+        success: true, 
+        data: { job: { id: jobId, ...jobData } }
+      };
+    }
+  },
+  
+  delete: async (jobId) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall(`/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Backend unavailable, mock job deletion:', error.message);
+      return { success: true };
     }
   }
 };

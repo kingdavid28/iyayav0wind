@@ -33,7 +33,8 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
       return { uri: profileImage };
     }
     
-    const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+    // Use the correct backend server address
+    const baseUrl = 'http://10.84.54.117:5001';
     return { uri: `${baseUrl}${profileImage}` };
   };
   

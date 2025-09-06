@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Caregiver = require('../models/Caregiver');
 const ErrorResponse = require('../utils/errorResponse');
 const auditService = require('../services/auditService');
+const emailService = require('../services/emailService');
 const { jwtSecret, jwtExpiry, refreshTokenSecret, refreshTokenExpiry } = require('../config/auth');
 const fs = require('fs');
 const path = require('path');
@@ -543,7 +544,7 @@ exports.refreshToken = async (req, res, next) => {
   }
 };
 
-// Reset password
+// Request password reset
 exports.resetPassword = async (req, res, next) => {
   const { email } = req.body;
 
@@ -554,27 +555,124 @@ exports.resetPassword = async (req, res, next) => {
   try {
     const user = await User.findOne({ email });
 
+    // Always return success to prevent email enumeration
     if (!user) {
-      return next(new ErrorResponse('User not found', 404));
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a password reset link has been sent.'
+      });
     }
 
-    // Generate temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Generate secure reset token
+    const resetToken = await user.createPasswordResetToken();
     
-    // Hash and save temporary password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(tempPassword, salt);
+    try {
+      // Send email with reset link
+      await emailService.sendPasswordResetEmail(user.email, resetToken);
+      
+      // Log for development
+      if (process.env.NODE_ENV === 'development') {
+        const resetURL = `${process.env.FRONTEND_URL || 'http://localhost:19006'}/reset-password/${resetToken}`;
+        console.log(`🔑 Password reset for ${email}:`);
+        console.log(`Reset URL: ${resetURL}`);
+        console.log(`Token expires in 10 minutes`);
+      }
+      
+      res.status(200).json({
+        success: true,
+        message: 'Password reset link sent to your email.'
+      });
+    } catch (emailError) {
+      console.error('Email send failed:', emailError.message);
+      
+      // Fallback for development
+      if (process.env.NODE_ENV === 'development') {
+        const resetURL = `${process.env.FRONTEND_URL || 'http://localhost:19006'}/reset-password/${resetToken}`;
+        console.log(`🔑 Email failed, password reset for ${email}:`);
+        console.log(`Reset URL: ${resetURL}`);
+        
+        res.status(200).json({
+          success: true,
+          message: 'Password reset link generated. Check console in development mode.',
+          resetURL // Only in development
+        });
+      } else {
+        throw new Error('Failed to send reset email');
+      }
+    }
+  } catch (err) {
+    console.error('Reset password error:', err);
+    next(new ErrorResponse('Reset password failed', 500));
+  }
+};
+
+// Confirm password reset with token
+exports.confirmPasswordReset = async (req, res, next) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return next(new ErrorResponse('Token and new password are required', 400));
+  }
+
+  const minLength = process.env.NODE_ENV === 'production' ? 12 : 8;
+  if (newPassword.length < minLength) {
+    return next(new ErrorResponse(`Password must be at least ${minLength} characters`, 400));
+  }
+  
+  // Production password strength validation
+  if (process.env.NODE_ENV === 'production') {
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasNumber = /\d/.test(newPassword);
+    const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(newPassword);
+    
+    if (!hasUpper || !hasLower || !hasNumber || !hasSymbol) {
+      return next(new ErrorResponse('Password must contain uppercase, lowercase, number, and symbol', 400));
+    }
+  }
+
+  try {
+    // Hash the token to compare with stored hash
+    const hashedToken = require('crypto')
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return next(new ErrorResponse('Invalid or expired reset token', 400));
+    }
+
+    // Set new password
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    user.passwordChangedAt = Date.now();
+    
+    // Reset login attempts
+    user.loginAttempts = 0;
+    user.lockUntil = undefined;
+    
     await user.save();
 
-    console.log(`🔑 Temporary password for ${email}: ${tempPassword}`);
+    // Log security event
+    auditService.logSecurityEvent('PASSWORD_RESET_COMPLETED', {
+      userId: user._id.toString(),
+      email: user.email,
+      timestamp: new Date()
+    });
 
     res.status(200).json({
       success: true,
-      message: 'Temporary password generated. Check console for password.',
-      tempPassword // Remove in production
+      message: 'Password has been reset successfully. You can now log in with your new password.'
     });
   } catch (err) {
-    next(new ErrorResponse('Reset password failed', 500));
+    console.error('Confirm password reset error:', err);
+    next(new ErrorResponse('Password reset failed', 500));
   }
 };
 
@@ -589,5 +687,6 @@ module.exports = {
   updateProfile: exports.updateProfile,
   updateRole: exports.updateRole,
   uploadProfileImageBase64: exports.uploadProfileImageBase64,
-  resetPassword: exports.resetPassword
+  resetPassword: exports.resetPassword,
+  confirmPasswordReset: exports.confirmPasswordReset
 };

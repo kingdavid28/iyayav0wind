@@ -164,10 +164,15 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
       
       console.log('📱 [MOBILE] Job payload:', payload);
 
-      await jobsAPI.create(payload);
+      const response = await jobsAPI.create(payload);
+      console.log('📱 [MOBILE] Job creation response:', response);
 
       setLoading(false);
-      if (onJobPosted) onJobPosted();
+      
+      // Pass the created job data back to parent
+      const createdJob = response?.data?.job || { ...payload, id: Date.now(), _id: Date.now() };
+      if (onJobPosted) onJobPosted(createdJob);
+      
       onClose();
       
       // Show success message

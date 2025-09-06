@@ -230,6 +230,11 @@ router.post('/reset-password',
   authController.resetPassword
 );
 
+router.post('/confirm-reset-password',
+  strictLimiter,
+  authController.confirmPasswordReset
+);
+
 router.get('/me',
   profileLimiter,
   authenticate,

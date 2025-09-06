@@ -562,12 +562,47 @@ const ParentDashboard = () => {
   };
 
   const handleDeleteJob = async (jobId) => {
+    Alert.alert(
+      'Delete Job',
+      'Are you sure you want to delete this job posting?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await jobsAPI.delete(jobId);
+              
+              // Remove job from local state immediately
+              setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId && job._id !== jobId));
+              
+              Alert.alert('Success', 'Job deleted successfully');
+              await loadData(); // Refresh jobs list
+            } catch (error) {
+              console.error('Error deleting job:', error);
+              Alert.alert('Error', 'Failed to delete job');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleJobPosted = async (newJob) => {
     try {
-      await jobsAPI.delete(jobId);
-      await loadData(); // Refresh jobs list
+      // Add new job to local state immediately
+      setJobs(prevJobs => [newJob, ...prevJobs]);
+      setShowJobPostingModal(false);
+      Alert.alert('Success', 'Job posted successfully!');
+      
+      // Refresh data to sync with backend
+      await loadData();
     } catch (error) {
-      console.error('Error deleting job:', error);
-      Alert.alert('Error', 'Failed to delete job');
+      console.error('Error handling job post:', error);
     }
   };
 
@@ -776,10 +811,7 @@ const ParentDashboard = () => {
       <JobPostingModal
         visible={showJobPostingModal}
         onClose={() => setShowJobPostingModal(false)}
-        onJobPosted={() => {
-          loadData(); // Refresh jobs list
-          setShowJobPostingModal(false);
-        }}
+        onJobPosted={handleJobPosted}
       />
 
       <PaymentModal

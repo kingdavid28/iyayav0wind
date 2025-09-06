@@ -130,7 +130,7 @@ const ParentAuth = ({ navigation, route }) => {
         return result;
       } else if (mode === 'reset') {
         const result = await authAPI.resetPassword(email);
-        Alert.alert("Success", "Temporary password sent. Check console for password.");
+        Alert.alert("Reset Link Sent", "If an account with that email exists, a password reset link has been sent. Check the server console for the reset URL in development mode.");
         setMode('login');
         return result;
       }

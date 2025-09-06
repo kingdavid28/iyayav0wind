@@ -26,7 +26,10 @@ const UserSchema = new mongoose.Schema({
       function() { return !this.firebaseUid; }, 
       'Password is required for non-Firebase users'
     ],
-    minlength: [8, 'Minimum password length is 8 characters'],
+    minlength: [
+      process.env.NODE_ENV === 'production' ? 12 : 8, 
+      `Minimum password length is ${process.env.NODE_ENV === 'production' ? 12 : 8} characters`
+    ],
     select: false
   },
   role: {
