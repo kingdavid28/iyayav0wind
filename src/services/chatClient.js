@@ -1,6 +1,6 @@
 // Chat client wrapper: uses REST for history and optional realtime for live updates
 // Safe to import even if socket.io-client is not installed.
-import { messagesAPI } from '../config/api'
+import { messagingAPI } from '../config/api'
 import { initRealtime, getSocket, on as onSocket, emit as emitSocket } from './realtime'
 
 let pollIntervals = new Map() // conversationId -> intervalId
@@ -34,18 +34,18 @@ export async function fetchHistory(conversationId, { cursor, limit = 50 } = {}) 
   const params = {}
   if (cursor) params.cursor = cursor
   if (limit) params.limit = limit
-  const res = await messagesAPI.getMessages(conversationId, params)
+  const res = await messagingAPI.getMessages(conversationId, params)
   return res?.data || res
 }
 
 export async function fetchConversations() {
-  const res = await messagesAPI.getConversations()
+  const res = await messagingAPI.getConversations()
   return res?.data || res
 }
 
 export async function sendMessage(messageData) {
   // messageData should include conversationId, text, attachments[], clientMessageId
-  const res = await messagesAPI.sendMessage(messageData)
+  const res = await messagingAPI.sendMessage(messageData)
   const msg = res?.data || res
   // Optimistically echo via socket if available
   const sock = getSocket()
@@ -59,7 +59,7 @@ function startPolling(conversationId, handler) {
     try {
       const since = lastTimestamps.get(conversationId)
       const params = since ? { since } : {}
-      const res = await messagesAPI.getMessages(conversationId, params)
+      const res = await messagingAPI.getMessages(conversationId, params)
       const items = (res?.data || res || []).filter(Boolean)
       if (items.length > 0) {
         items.forEach(handler)

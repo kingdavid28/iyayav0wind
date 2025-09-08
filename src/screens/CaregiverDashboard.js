@@ -9,7 +9,7 @@ import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, 
 import { Button, Card, Chip, Searchbar } from "react-native-paper"
 import Toast from "../components/Toast"
 import { applicationsAPI, authAPI, bookingsAPI, caregiversAPI, jobsAPI, uploadsAPI } from "../config/api"
-import { API_CONFIG } from '../config/constants'
+import { getCurrentSocketURL } from '../config/api'
 import { useAuth } from "../contexts/AuthContext"
 import { useMessaging } from "../contexts/MessagingContext"
 import { usePrivacy } from "../components/Privacy/PrivacyManager"
@@ -77,7 +77,7 @@ export default function CaregiverDashboard({ onLogout }) {
   const [showJobDetails, setShowJobDetails] = useState(false)
   const [selectedApplication, setSelectedApplication] = useState(null)
   const [showApplicationDetails, setShowApplicationDetails] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(false)
+
   // Toast state
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
   const showToast = (message, type = 'success') => setToast({ visible: true, message, type })
@@ -236,6 +236,16 @@ export default function CaregiverDashboard({ onLogout }) {
     }
   ])
 
+  // Debug function to test profile image loading
+  const debugProfileImage = () => {
+    console.log('🔍 CaregiverDashboard Debug Info:');
+    console.log('- Current profile imageUrl:', profile.imageUrl);
+    console.log('- User ID:', user?.id);
+    console.log('- User role:', user?.role);
+    console.log('- Current socket URL:', getCurrentSocketURL());
+    console.log('- Profile object:', JSON.stringify(profile, null, 2));
+  };
+
   // Load profile data function
   const loadProfile = async () => {
     try {
@@ -253,8 +263,12 @@ export default function CaregiverDashboard({ onLogout }) {
         : await authAPI.getProfile();
       
       console.log('📋 Dashboard profile response:', response);
+      console.log('👤 User role:', user?.role, 'isCaregiver:', isCaregiver);
       
-      // Handle different response structures
+      // Debug profile image after API call
+      debugProfileImage();
+      
+      // Handle different response structures - prioritize enhanced profile data
       const p = response?.caregiver || response?.data?.caregiver || response?.provider || response || {};
       console.log('📊 Profile data extracted:', p);
       
@@ -279,33 +293,48 @@ export default function CaregiverDashboard({ onLogout }) {
           rating: p.rating || prev.rating,
           reviews: p.reviewCount || p.reviews || prev.reviews,
           imageUrl: (() => {
+            // Prioritize enhanced profile image fields
             const img = p.profileImage || p.imageUrl || p.avatarUrl || p.image || p.photoUrl || p.userId?.profileImage || prev.imageUrl;
-            console.log('🖼️ Raw image URL from API:', img);
+            console.log('🖼️ CaregiverDashboard - Raw image URL from profile:', img);
             
             // Handle null/undefined image
-            if (!img) return null;
+            if (!img) {
+              console.log('❌ No image URL found in profile data');
+              return null;
+            }
             
             // Convert relative URLs to absolute URLs
             let fullUrl = img;
             if (img.startsWith('/')) {
-              fullUrl = `${API_CONFIG.BASE_URL.replace('/api', '')}${img}`;
-              console.log('🔗 Converted to absolute URL:', fullUrl);
+              const baseUrl = getCurrentSocketURL();
+              fullUrl = `${baseUrl}${img}`;
+              console.log('🔗 Profile - Converted relative to absolute URL:', fullUrl);
+            } else if (!img.startsWith('http')) {
+              // Handle cases where image might be just a filename
+              const baseUrl = getCurrentSocketURL();
+              fullUrl = `${baseUrl}/uploads/${img}`;
+              console.log('🔗 Profile - Added uploads path:', fullUrl);
+            } else {
+              console.log('🔗 Profile - Using absolute URL as-is:', fullUrl);
             }
             
-            // Add timestamp to prevent caching
+            // Add timestamp to prevent caching issues
             const finalUrl = fullUrl.includes('?') 
               ? `${fullUrl}&t=${Date.now()}` 
               : `${fullUrl}?t=${Date.now()}`;
               
-            console.log('🔗 Final image URL:', finalUrl);
+            console.log('✅ Profile - Final processed image URL:', finalUrl);
             return finalUrl;
           })(),
         }))
         console.log('✅ Profile updated in dashboard');
+        // Debug after profile update
+        debugProfileImage();
       }
     } catch (e) {
       console.error('❌ Error loading profile in dashboard:', e);
       // keep default profile
+      debugProfileImage();
     }
   }
 
@@ -624,93 +653,7 @@ export default function CaregiverDashboard({ onLogout }) {
 
   // Note: bookings now come from state with mock fallback
 
-  // Pick image, upload, and save to profile
-  const handleChangeProfilePhoto = async () => {
-    try {
-      const isCaregiver = ['caregiver', 'provider'].includes(String(user?.role || '').toLowerCase())
-      // Ask permission (iOS specific; Android auto if manifest ok)
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please allow access to your photo library to change profile picture.')
-        return
-      }
-      // Launch picker
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        base64: true,
-      })
-      if (result.canceled) return
-      const asset = result.assets?.[0]
-      if (!asset?.base64) {
-        Alert.alert('Unable to read image', 'Please try a different photo.')
-        return
-      }
-      setUploadingImage(true)
-      const mimeType = asset.type === 'video' ? 'video/mp4' : (asset.mimeType || 'image/jpeg')
-      // Upload base64 to backend generic uploads
-      const uploadRes = await uploadsAPI.base64Upload({
-        imageBase64: `data:${mimeType};base64,${asset.base64}`,
-        mimeType,
-        folder: 'providers',
-        name: `avatar_${Date.now()}`,
-      })
-      let imageUrl = uploadRes?.url || uploadRes?.location || uploadRes?.secure_url
-      if (!imageUrl) throw new Error('Upload did not return a URL')
-      let finalUrl = imageUrl
 
-      // Persist to caregiver profile if caregiver; else to auth profile
-      try {
-        if (isCaregiver) {
-          await caregiversAPI.updateMyProfile({ imageUrl })
-        } else {
-          // for non-caregivers, prefer dedicated auth image endpoint
-          const authRes = await authAPI.uploadProfileImageBase64(`data:${mimeType};base64,${asset.base64}`, mimeType)
-          const authUrl = authRes?.data?.url || authRes?.url
-          if (authUrl) finalUrl = authUrl
-        }
-      } catch (e) {
-        const status = e?.response?.status
-        if (status === 403 || status === 404) {
-          // Fallback to auth profile if provider endpoint is forbidden/missing
-          try {
-            const authRes = await authAPI.uploadProfileImageBase64(`data:${mimeType};base64,${asset.base64}`, mimeType)
-            const authUrl = authRes?.data?.url || authRes?.url
-            if (authUrl) finalUrl = authUrl
-          } catch (inner) {
-            console.warn('Auth image upload failed:', inner?.response?.status || inner?.message)
-          }
-        } else {
-          console.warn('Save profile image failed:', status || e?.message)
-        }
-      }
-
-      // Try to refresh profile to get authoritative image URL from server
-      try {
-        if (user?.id) {
-          const fresh = await authAPI.getProfile()
-          const serverUrl = fresh?.imageUrl || fresh?.avatarUrl || fresh?.photoUrl || fresh?.profileImage || fresh?.data?.imageUrl || fresh?.data?.avatarUrl || fresh?.data?.photoUrl || fresh?.data?.profileImage
-          if (serverUrl) {
-            // Convert relative URLs to absolute URLs
-            finalUrl = serverUrl.startsWith('/') ? `${API_CONFIG.BASE_URL.replace('/api', '')}${serverUrl}` : serverUrl;
-          }
-        }
-      } catch (error) {
-        console.warn('Profile refresh error:', error);
-      }
-
-      // Update UI with final URL
-      setProfile((prev) => ({ ...prev, imageUrl: finalUrl }))
-      showToast('Photo updated successfully.', 'success')
-    } catch (e) {
-      console.error('Change profile photo failed:', e?.message || e)
-      Alert.alert('Upload failed', e?.message || 'Could not upload image. Please try again.')
-    } finally {
-      setUploadingImage(false)
-    }
-  }
 
   const handleSaveProfile = async () => {
     try {
@@ -924,6 +867,8 @@ export default function CaregiverDashboard({ onLogout }) {
               <Pressable style={styles.headerButton} onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}>
                 <Ionicons name="person-outline" size={22} color="#FFFFFF" />
               </Pressable>
+              
+
               <Pressable 
                 style={styles.headerButton} 
                 onPress={async () => {
@@ -993,16 +938,19 @@ export default function CaregiverDashboard({ onLogout }) {
       <View style={styles.header}>
         <View style={styles.profileHeader}>
           <View style={styles.profileImageContainer}>
-            <Pressable onPress={async () => { await handleChangeProfilePhoto() }} accessibilityLabel="Change profile photo" accessibilityRole="button">
+            <Pressable onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })} accessibilityLabel="View profile photo" accessibilityRole="button">
               {profile.imageUrl ? (
                 <Image 
                   source={{ uri: profile.imageUrl }} 
                   style={[styles.profileImage, { backgroundColor: '#f3f4f6' }]}
                   onError={(error) => {
-                    console.log('❌ Image load error:', error.nativeEvent.error);
-                    console.log('🔗 Failed URL:', profile.imageUrl);
+                    console.log('❌ CaregiverDashboard - Image load error:', error.nativeEvent.error);
+                    console.log('🔗 CaregiverDashboard - Failed URL:', profile.imageUrl);
+                    // Clear the broken image URL to show placeholder
+                    setProfile(prev => ({ ...prev, imageUrl: null }));
                   }}
-                  onLoad={() => console.log('✅ Image loaded successfully:', profile.imageUrl)}
+                  onLoad={() => console.log('✅ CaregiverDashboard - Image loaded successfully:', profile.imageUrl)}
+                  onLoadStart={() => console.log('🔄 CaregiverDashboard - Image loading started:', profile.imageUrl)}
                 />
               ) : (
                 <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e1e4e8' }]}>
@@ -1010,11 +958,7 @@ export default function CaregiverDashboard({ onLogout }) {
                 </View>
               )}
               <View style={{ position: 'absolute', right: 6, bottom: 6, backgroundColor: '#111827AA', borderRadius: 14, padding: 6 }}>
-                {uploadingImage ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Ionicons name="camera" size={16} color="#fff" />
-                )}
+                <Ionicons name="create" size={16} color="#fff" />
               </View>
             </Pressable>
             {profile.backgroundCheck === "Verified" && (
@@ -1022,114 +966,6 @@ export default function CaregiverDashboard({ onLogout }) {
                 <Ionicons name="checkmark" size={12} color="#fff" />
               </View>
             )}
-
-      {/* Application Details Modal */}
-      {showApplicationDetails && selectedApplication && (
-        <Modal
-          visible={showApplicationDetails}
-          onRequestClose={() => setShowApplicationDetails(false)}
-          transparent
-          animationType="slide"
-        >
-          <View style={styles.modalOverlay}>
-            <Card style={styles.editProfileModal}>
-              <Card.Content>
-                <Text style={styles.editProfileTitle}>{selectedApplication.jobTitle}</Text>
-                <Text style={styles.profileSectionText}>{selectedApplication.family}</Text>
-                <View style={{ marginTop: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="calendar" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>Applied: {new Date(selectedApplication.appliedDate).toLocaleDateString()}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>${selectedApplication.hourlyRate}/hr</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="information-circle" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>Status: {selectedApplication.status}</Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <Button mode="text" onPress={() => setShowApplicationDetails(false)}>Close</Button>
-                  {selectedApplication.status === 'accepted' && (
-                    <Button 
-                      mode="contained" 
-                      style={{ marginLeft: 8 }}
-                      onPress={() => handleMessageFamily(selectedApplication)}
-                    >
-                      Message Family
-                    </Button>
-                  )}
-                </View>
-              </Card.Content>
-            </Card>
-          </View>
-        </Modal>
-      )}
-
-      {/* Job Details Modal */}
-      {showJobDetails && selectedJob && (
-        <Modal
-          visible={showJobDetails}
-          onRequestClose={() => {
-            setShowJobDetails(false)
-            setSelectedJob(null)
-          }}
-          transparent
-          animationType="slide"
-        >
-          <View style={styles.modalOverlay}>
-            <Card style={styles.editProfileModal}>
-              <Card.Content>
-                <Text style={styles.editProfileTitle}>{selectedJob.title}</Text>
-                <View style={{ marginTop: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="home" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>{selectedJob.family}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="location" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>{selectedJob.location} • {selectedJob.distance}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="time" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>{selectedJob.schedule}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>${selectedJob.hourlyRate}/hr</Text>
-                  </View>
-                  {Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
-                    <View style={{ marginTop: 8 }}>
-                      <Text style={[styles.sectionSubtitle, { marginBottom: 6 }]}>Requirements</Text>
-                      {selectedJob.requirements.map((req, idx) => (
-                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                          <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                          <Text style={styles.profileSectionText}>{req}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <Button mode="text" onPress={() => { setShowJobDetails(false); setSelectedJob(null) }}>Close</Button>
-                  <Button
-                    mode="contained"
-                    style={{ marginLeft: 8 }}
-                    onPress={() => {
-                      setShowJobDetails(false)
-                      handleJobApplication(selectedJob)
-                    }}
-                  >
-                    Apply Now
-                  </Button>
-                </View>
-              </Card.Content>
-            </Card>
-          </View>
-        </Modal>
-      )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profile.name}</Text>
@@ -1495,6 +1331,114 @@ export default function CaregiverDashboard({ onLogout }) {
                     })}
                   >
                     Submit
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        </Modal>
+      )}
+
+      {/* Application Details Modal */}
+      {showApplicationDetails && selectedApplication && (
+        <Modal
+          visible={showApplicationDetails}
+          onRequestClose={() => setShowApplicationDetails(false)}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
+            <Card style={styles.editProfileModal}>
+              <Card.Content>
+                <Text style={styles.editProfileTitle}>{selectedApplication.jobTitle}</Text>
+                <Text style={styles.profileSectionText}>{selectedApplication.family}</Text>
+                <View style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="calendar" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>Applied: {new Date(selectedApplication.appliedDate).toLocaleDateString()}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>${selectedApplication.hourlyRate}/hr</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="information-circle" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>Status: {selectedApplication.status}</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Button mode="text" onPress={() => setShowApplicationDetails(false)}>Close</Button>
+                  {selectedApplication.status === 'accepted' && (
+                    <Button 
+                      mode="contained" 
+                      style={{ marginLeft: 8 }}
+                      onPress={() => handleMessageFamily(selectedApplication)}
+                    >
+                      Message Family
+                    </Button>
+                  )}
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        </Modal>
+      )}
+
+      {/* Job Details Modal */}
+      {showJobDetails && selectedJob && (
+        <Modal
+          visible={showJobDetails}
+          onRequestClose={() => {
+            setShowJobDetails(false)
+            setSelectedJob(null)
+          }}
+          transparent
+          animationType="slide"
+        >
+          <View style={styles.modalOverlay}>
+            <Card style={styles.editProfileModal}>
+              <Card.Content>
+                <Text style={styles.editProfileTitle}>{selectedJob.title}</Text>
+                <View style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="home" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>{selectedJob.family}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="location" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>{selectedJob.location} • {selectedJob.distance}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="time" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>{selectedJob.schedule}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
+                    <Text style={styles.profileSectionText}>${selectedJob.hourlyRate}/hr</Text>
+                  </View>
+                  {Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={[styles.sectionSubtitle, { marginBottom: 6 }]}>Requirements</Text>
+                      {selectedJob.requirements.map((req, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                          <Text style={styles.profileSectionText}>{req}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                  <Button mode="text" onPress={() => { setShowJobDetails(false); setSelectedJob(null) }}>Close</Button>
+                  <Button
+                    mode="contained"
+                    style={{ marginLeft: 8 }}
+                    onPress={() => {
+                      setShowJobDetails(false)
+                      handleJobApplication(selectedJob)
+                    }}
+                  >
+                    Apply Now
                   </Button>
                 </View>
               </Card.Content>

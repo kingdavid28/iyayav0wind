@@ -248,7 +248,7 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
             <View>
               <Text style={styles.label}>Hourly Rate (₱) *</Text>
               <View style={[styles.inputGroup, errors.rate && styles.inputError]}>
-                <DollarSign size={20} color="#6B7280" style={styles.inputIcon} />
+                <Text style={styles.pesoSign}>₱</Text>
                 <TextInput
                   style={[styles.input, styles.inputWithIcon]}
                   placeholder="e.g., 150"
@@ -583,6 +583,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputIcon: {
+    marginLeft: 12,
+  },
+  pesoSign: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
     marginLeft: 12,
   },
   inputWithIcon: {

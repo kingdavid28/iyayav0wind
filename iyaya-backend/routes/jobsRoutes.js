@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 
-// Mock jobs data for demonstration
-const mockJobs = [
+// Shared mock jobs data - persistent across requests
+let mockJobs = [
   {
     _id: 'job-1',
     title: 'Afternoon Childcare Needed',
@@ -56,13 +56,18 @@ router.get('/my', authenticate, async (req, res) => {
   }
 });
 
-// Get all available jobs
+// Get all available jobs (for caregivers to browse)
 router.get('/', authenticate, async (req, res) => {
   try {
+    // Return all active jobs for caregivers to browse
+    const availableJobs = mockJobs.filter(job => job.status === 'active');
+    
+    console.log(`Returning ${availableJobs.length} available jobs for caregiver browsing`);
+    
     res.json({
       success: true,
       data: {
-        jobs: mockJobs
+        jobs: availableJobs
       }
     });
   } catch (error) {
@@ -136,6 +141,52 @@ router.put('/:id', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update job'
+    });
+  }
+});
+
+// Apply to job (caregiver)
+router.post('/:id/apply', authenticate, async (req, res) => {
+  try {
+    const job = mockJobs.find(job => job._id === req.params.id);
+    
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: 'Job not found'
+      });
+    }
+    
+    if (job.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: 'This job is no longer accepting applications'
+      });
+    }
+    
+    // Mock application creation
+    const application = {
+      id: `app-${Date.now()}`,
+      jobId: req.params.id,
+      caregiverId: req.user.id,
+      message: req.body.message || '',
+      proposedRate: req.body.proposedRate || job.hourlyRate,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    
+    console.log(`Application submitted by caregiver: ${req.user.id} for job: ${req.params.id}`);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Application submitted successfully',
+      data: { application }
+    });
+  } catch (error) {
+    console.error('Error applying to job:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to apply to job'
     });
   }
 });

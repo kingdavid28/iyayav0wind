@@ -14,7 +14,7 @@ const authenticate = async (req, res, next) => {
       // Map app-facing roles to internal roles
       const mapped = incoming === 'caregiver' || incoming === 'provider'
         ? { role: 'caregiver', userType: 'caregiver' }
-        : { role: 'parent', userType: 'parent' }; // Fixed: use 'parent' instead of 'client'
+        : { role: 'parent', userType: 'parent' };
       
       req.user = {
         id: 'dev-bypass-uid',
@@ -28,7 +28,6 @@ const authenticate = async (req, res, next) => {
       console.log('🔧 Dev bypass user created:', req.user);
       
       try {
-        // Optionally map to an existing user if present
         const dbUser = await User.findOne({ email: req.user.email.toLowerCase() }).select('_id role userType');
         if (dbUser) {
           req.user.mongoId = dbUser._id;
@@ -59,15 +58,14 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // Verify as custom JWT (HS256)
+    // Try real JWT verification first
     try {
       const decoded = jwt.verify(token, jwtSecret, {
         algorithms: ['HS256'],
         ignoreExpiration: false
       });
 
-      // CRITICAL: Check if user still exists in database
-      const User = require('../models/User');
+      // Check if user still exists in database
       const user = await User.findById(decoded.id).select('role userType email');
       
       if (!user) {
@@ -95,20 +93,33 @@ const authenticate = async (req, res, next) => {
         userType: userType,
         email: user.email
       };
-      // For custom JWTs that carry Mongo id, expose it as mongoId
+      
       if (decoded.id) {
         req.user.mongoId = decoded.id;
       }
 
       return next();
     } catch (jwtError) {
+      // FALLBACK: Handle mock tokens only when real JWT fails
+      if (process.env.NODE_ENV === 'development' && token.includes('mock-signature')) {
+        console.log('🔧 Real JWT failed, using mock token fallback');
+        req.user = {
+          id: 'mock-user-123',
+          mongoId: 'mock-user-123',
+          role: 'parent',
+          userType: 'parent',
+          email: 'mock@example.com',
+          mock: true
+        };
+        return next();
+      }
+      
       console.error('JWT verification failed:', jwtError);
       throw new Error('Invalid token');
     }
   } catch (err) {
     console.error('Authentication error:', err.name, err.message);
     
-    // Enhanced error responses
     let errorMessage = 'Authentication failed';
     if (err.name === 'TokenExpiredError') {
       errorMessage = 'Token expired';
@@ -124,7 +135,6 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// Enhanced authorization middleware
 const authorize = (roles = []) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -138,7 +148,7 @@ const authorize = (roles = []) => {
       return res.status(403).json({
         success: false,
         error: `Requires one of these roles: ${roles.join(', ')}`,
-        yourRole: req.user.role, // Debug info
+        yourRole: req.user.role,
         requiredRoles: roles
       });
     }
@@ -146,7 +156,7 @@ const authorize = (roles = []) => {
     next();
   };
 };
-// In auth.js
+
 module.exports = {
   authenticate,
   authorize

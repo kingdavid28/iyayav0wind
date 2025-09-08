@@ -92,6 +92,12 @@ exports.applyToJob = async (req, res) => {
       { path: 'caregiverId', select: 'name avatar rating reviewCount' }
     ]);
 
+    // Update job status to pending if this is the first application
+    const applicationCount = await Application.countDocuments({ jobId });
+    if (applicationCount === 1) {
+      await Job.findByIdAndUpdate(jobId, { status: 'pending' });
+    }
+
     logger.info(`Application submitted by caregiver ${caregiverMongoId} for job ${jobId}`);
 
     res.status(201).json({ 
@@ -163,6 +169,20 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 
     await application.save();
+
+    // Update job status based on applications
+    const job = await Job.findById(application.jobId._id);
+    
+    // If this is the first application, change job status to pending
+    const applicationCount = await Application.countDocuments({ 
+      jobId: application.jobId._id,
+      status: { $in: ['pending', 'shortlisted'] }
+    });
+    
+    if (job.status === 'open' && applicationCount > 0) {
+      job.status = 'pending';
+      await job.save();
+    }
 
     // Update job status if application is accepted
     if (status === 'accepted' && previousStatus !== 'accepted') {

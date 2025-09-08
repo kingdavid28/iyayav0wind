@@ -26,7 +26,7 @@ const connectWithRetry = async (retries = 5, delay = 1000) => {
       process.env.MONGODB_URI || 'mongodb://localhost:27017/iyaya',
       {
         maxPoolSize: parseInt(process.env.MONGO_POOL_SIZE) || 10,
-        serverSelectionTimeoutMS: parseInt(process.env.MONGO_CONNECTION_TIMEOUT) || 5000,
+        serverSelectionTimeoutMS: parseInt(process.env.MONGO_CONNECTION_TIMEOUT) || 30000,
         socketTimeoutMS: parseInt(process.env.MONGO_SOCKET_TIMEOUT) || 45000,
         family: 4,
         retryWrites: true,

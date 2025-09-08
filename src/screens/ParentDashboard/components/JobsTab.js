@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Plus, Calendar, MapPin, Clock, DollarSign } from 'lucide-react-native';
+import { Plus, Calendar, MapPin, Clock } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
+import PesoSign from '../../../components/PesoSign';
 
 const JobsTab = ({ 
   jobs = [], 
@@ -9,7 +10,8 @@ const JobsTab = ({
   onRefresh, 
   onCreateJob,
   onEditJob,
-  onDeleteJob 
+  onDeleteJob,
+  onCompleteJob 
 }) => {
   const [filter, setFilter] = useState('all'); // all, active, completed
 
@@ -49,12 +51,20 @@ const JobsTab = ({
         </View>
         
         <View style={styles.jobDetailRow}>
-          <DollarSign size={16} color={colors.textSecondary} />
-          <Text style={styles.jobDetailText}>₱{job.hourlyRate || 350}/hour</Text>
+          <PesoSign size={16} color={colors.textSecondary} />
+          <Text style={styles.jobDetailText}>{job.hourlyRate || 350}/hour</Text>
         </View>
       </View>
 
       <View style={styles.jobActions}>
+        {(job.status === 'active' || job.status === 'pending') && (
+          <TouchableOpacity 
+            style={[styles.jobActionButton, styles.completeButton]}
+            onPress={() => onCompleteJob(job.id || job._id)}
+          >
+            <Text style={[styles.jobActionText, styles.completeText]}>Complete</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity 
           style={styles.jobActionButton}
           onPress={() => onEditJob(job)}

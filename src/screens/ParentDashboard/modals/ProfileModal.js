@@ -43,7 +43,7 @@ const ProfileModal = ({
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType?.Images || 'Images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -261,7 +261,7 @@ const profileModalStyles = {
     }),
     height: Platform.select({
       web: "50%",
-      default: "80%",
+      default: "75%",
     }),
     maxWidth: Platform.select({
       web: 500,

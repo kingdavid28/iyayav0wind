@@ -19,41 +19,50 @@ const getDevServerIP = () => {
     }
   }
   
-  // Fallback IPs in order of preference
-  return [
-    '192.168.1.10',   // Current network IP
-    '192.168.0.10',   // Common home network
-    '10.0.0.10',      // Another common network
-    '172.16.0.10',    // Corporate network
-    'localhost',      // Local development
-    '127.0.0.1'       // Localhost fallback
+  return null; // Will use dynamic detection
+};
+
+// Generate dynamic IP list based on common network ranges
+const generateIPList = () => {
+  const commonRanges = [
+    '192.168.1',   // Most common home network
+    '192.168.0',   // Alternative home network
+    '10.0.0',      // Corporate/VPN networks
+    '172.16.0',    // Private networks
+    '192.168.2',   // Router variations
+    '192.168.100', // Some ISP defaults
   ];
+  
+  const ips = [];
+  
+  // Add localhost first (most likely to work)
+  ips.push('localhost', '127.0.0.1');
+  
+  // Add common IPs for each range (1-20 for better coverage)
+  commonRanges.forEach(range => {
+    for (let i = 1; i <= 20; i++) {
+      ips.push(`${range}.${i}`);
+    }
+    for (let i = 100; i <= 120; i++) {
+      ips.push(`${range}.${i}`);
+    }
+  });
+  
+  return ips;
 };
 
 const API_CONFIG = {
   development: {
-    // Support multiple IP configurations for Expo Go
-    baseURLs: [
-      'http://10.84.54.117:5001/api',
-      'http://localhost:5001/api',
-      'http://127.0.0.1:5001/api',
-      'http://192.168.1.10:5001/api',
-      'http://192.168.0.10:5001/api', 
-      'http://10.0.0.10:5001/api',
-      'http://172.16.0.10:5001/api'
-    ],
-    socketURLs: [
-      'http://10.84.54.117:5001',
-      'http://localhost:5001',
-      'http://127.0.0.1:5001',
-      'http://192.168.1.10:5001',
-      'http://192.168.0.10:5001',
-      'http://10.0.0.10:5001', 
-      'http://172.16.0.10:5001'
-    ],
+    // Dynamic IP generation
+    get baseURLs() {
+      return generateIPList().map(ip => `http://${ip}:5000/api`);
+    },
+    get socketURLs() {
+      return generateIPList().map(ip => `http://${ip}:5000`);
+    },
     // Primary URLs (backward compatibility)
-    baseURL: 'http://10.84.54.117:5001/api',
-    socketURL: 'http://10.84.54.117:5001'
+    baseURL: 'http://localhost:5000/api',
+    socketURL: 'http://localhost:5000'
   },
   production: {
     baseURL: 'https://your-backend-url.com/api',
@@ -63,42 +72,72 @@ const API_CONFIG = {
 
 const ENV = __DEV__ ? 'development' : 'production';
 
-// Auto-detect working API URL in development
-let detectedBaseURL = 'http://10.84.54.117:5001/api';
-let detectedSocketURL = 'http://10.84.54.117:5001';
+// Auto-detect working API URL in development with caching
+let detectedBaseURL = null;
+let detectedSocketURL = null;
+let detectionInProgress = false;
+let lastDetectionTime = 0;
+const DETECTION_CACHE_DURATION = 300000; // 5 minutes
 
 const detectWorkingAPI = async () => {
-  if (ENV === 'production' || detectedBaseURL) {
+  if (ENV === 'production') return;
+  
+  // Use cached result if recent
+  const now = Date.now();
+  if (detectedBaseURL && (now - lastDetectionTime) < DETECTION_CACHE_DURATION) {
     return;
   }
   
-  const urls = API_CONFIG.development.baseURLs;
+  // Prevent multiple simultaneous detections
+  if (detectionInProgress) return;
+  detectionInProgress = true;
   
-  for (const baseURL of urls) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      
-      const response = await fetch(`${baseURL.replace('/api', '')}/api/health`, {
-        method: 'GET',
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        detectedBaseURL = baseURL;
-        detectedSocketURL = baseURL.replace('/api', '');
-        console.log('✅ Detected working API:', detectedBaseURL);
-        return;
+  try {
+    const urls = API_CONFIG.development.baseURLs;
+    console.log(`🔍 Testing ${urls.length} potential API endpoints...`);
+    
+    // Test URLs in parallel with timeout (increased to 30 for better coverage)
+    const testPromises = urls.slice(0, 30).map(async (baseURL) => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // Increased timeout
+        
+        const response = await fetch(`${baseURL.replace('/api', '')}/api/health`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          return {
+            baseURL,
+            socketURL: baseURL.replace('/api', ''),
+            success: true
+          };
+        }
+      } catch (error) {
+        // Ignore individual failures
       }
-    } catch (error) {
-      // Continue to next URL
-      continue;
+      return null;
+    });
+    
+    const results = await Promise.allSettled(testPromises);
+    const workingEndpoint = results
+      .filter(result => result.status === 'fulfilled' && result.value?.success)
+      .map(result => result.value)[0];
+    
+    if (workingEndpoint) {
+      detectedBaseURL = workingEndpoint.baseURL;
+      detectedSocketURL = workingEndpoint.socketURL;
+      lastDetectionTime = now;
+      console.log('✅ Detected working API:', detectedBaseURL);
+    } else {
+      console.warn('⚠️ No working API detected from', urls.length, 'endpoints');
     }
+  } finally {
+    detectionInProgress = false;
   }
-  
-  console.warn('⚠️ No working API detected, using default');
 };
 
 // Initialize detection
@@ -154,21 +193,24 @@ const apiCall = async (endpoint, options = {}) => {
     }
   }
   
-  // In development, no timeout to prevent abort errors
+  // In development, use smart URL selection
   const urls = detectedBaseURL 
     ? [detectedBaseURL]
-    : API_CONFIG.development.baseURLs;
+    : API_CONFIG.development.baseURLs.slice(0, 10); // Limit to first 10 for performance
     
+  console.log('🔍 Trying API URLs:', urls.length, 'endpoints');
   let lastError = null;
   
   for (const baseURL of urls) {
     try {
+      console.log(`🌐 Attempting: ${baseURL}${endpoint}`);
       const response = await fetch(`${baseURL}${endpoint}`, fetchOptions);
       
       // If successful, cache this URL for future use
       if (response.ok && !detectedBaseURL) {
         detectedBaseURL = baseURL;
         detectedSocketURL = baseURL.replace('/api', '');
+        lastDetectionTime = Date.now();
         console.log('✅ Cached working API:', detectedBaseURL);
       }
       
@@ -202,6 +244,21 @@ export const authAPI = {
       return response.json();
     } catch (error) {
       console.error('Login failed:', error.message);
+      // Only use mock login if backend is completely unreachable
+      if (ENV === 'development' && error.message.includes('Network request failed')) {
+        console.log('🔄 Backend unreachable, using mock login');
+        const mockUser = {
+          uid: 'mock-user-123',
+          email: credentials.email,
+          displayName: 'Mock User',
+          role: 'parent',
+          name: 'Mock User',
+          profileImage: null
+        };
+        const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJtb2NrLXVzZXItMTIzIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6InBhcmVudCIsImlhdCI6MTczNjI0NzAxN30.mock-signature-' + Date.now();
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, mockToken);
+        return { token: mockToken, user: mockUser };
+      }
       throw error;
     }
   },
@@ -254,6 +311,23 @@ export const authAPI = {
       return response.json();
     } catch (error) {
       console.error('Profile fetch failed:', error.message);
+      console.log('Token check:', { hasToken: !!token, tokenStart: token?.substring(0, 20), isMock: token?.includes('mock-signature') });
+      // Only use mock profile if backend is completely unreachable AND token is mock
+      if (ENV === 'development' && error.message.includes('Network request failed') && (token?.startsWith('mock-jwt-token') || token?.includes('mock-signature'))) {
+        console.log('🔄 Backend unreachable, using mock profile');
+        return {
+          data: {
+            uid: 'mock-user-123',
+            email: 'mock@example.com',
+            displayName: 'Mock User',
+            role: 'parent',
+            name: 'Mock User',
+            profileImage: null,
+            location: 'Mock Location',
+            contact: '+1234567890'
+          }
+        };
+      }
       throw error;
     }
   },
@@ -361,11 +435,8 @@ export const authAPI = {
       
       return response.json();
     } catch (error) {
-      console.log('Mock image upload:', error.message);
-      return { 
-        url: 'https://via.placeholder.com/150/0066cc/ffffff?text=Profile',
-        data: { url: 'https://via.placeholder.com/150/0066cc/ffffff?text=Profile' }
-      };
+      console.log('Profile image upload failed:', error.message);
+      throw error;
     }
   }
 };
@@ -399,10 +470,40 @@ export const caregiversAPI = {
         },
       });
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
-      return response.json();
+      const data = await response.json();
+      
+      // Ensure profile image URL is properly formatted
+      if (data?.caregiver?.profileImage) {
+        const img = data.caregiver.profileImage;
+        if (!img.startsWith('http')) {
+          const baseUrl = getCurrentSocketURL();
+          if (img.startsWith('/')) {
+            data.caregiver.profileImage = `${baseUrl}${img}`;
+          } else {
+            data.caregiver.profileImage = `${baseUrl}/uploads/${img}`;
+          }
+        }
+        console.log('🖼️ CaregiverAPI - Formatted profile image URL:', data.caregiver.profileImage);
+      }
+      
+      return data;
     } catch (error) {
-      console.log('Using mock caregiver profile');
-      return { profile: null };
+      console.log('Enhanced caregiver profile unavailable, using mock data:', error.message);
+      return { 
+        caregiver: {
+          name: 'Ana Dela Cruz',
+          email: 'ana@example.com',
+          phone: '+63 917 123 4567',
+          bio: 'Experienced caregiver with 5+ years of childcare experience.',
+          hourlyRate: 350,
+          experience: { years: 5, months: 6 },
+          skills: ['Infant Care', 'CPR Certified', 'First Aid', 'Meal Preparation'],
+          profileImage: null,
+          rating: 4.9,
+          reviewCount: 127,
+          location: 'Cebu City, Philippines'
+        }
+      };
     }
   },
   
@@ -709,11 +810,381 @@ export const applicationsAPI = {
   }
 };
 
-// Legacy Privacy API - Use settingsService instead
+// Privacy API
 export const privacyAPI = {
-  getPrivacyNotifications: () => console.warn('Use settingsService.getPrivacySettings() instead'),
-  getPrivacySettings: () => console.warn('Use settingsService.getPrivacySettings() instead'),
-  getPendingRequests: () => console.warn('Use settingsService.getPrivacySettings() instead'),
+  getPrivacySettings: async () => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Privacy settings unavailable:', error.message);
+      return { data: null };
+    }
+  },
+  
+  updatePrivacySettings: async (settings) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/settings', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Privacy settings update failed:', error.message);
+      return { success: false };
+    }
+  },
+  
+  requestInformation: async (requestData) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/request', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Information request failed:', error.message);
+      return { success: false };
+    }
+  },
+  
+  getPendingRequests: async () => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/requests/pending', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Pending requests unavailable:', error.message);
+      return { data: [] };
+    }
+  },
+  
+  respondToRequest: async (responseData) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/request/respond', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(responseData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Request response failed:', error.message);
+      return { success: false };
+    }
+  },
+  
+  getPrivacyNotifications: async () => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/notifications', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Privacy notifications unavailable:', error.message);
+      return { data: [] };
+    }
+  },
+  
+  markNotificationAsRead: async (notificationId) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall(`/privacy/notifications/${notificationId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Mark notification failed:', error.message);
+      return { success: false };
+    }
+  },
+  
+  grantPermission: async (targetUserId, viewerUserId, fields, expiresIn) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/grant', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targetUserId, viewerUserId, fields, expiresIn }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Grant permission failed:', error.message);
+      return { success: false };
+    }
+  },
+  
+  revokePermission: async (targetUserId, viewerUserId, fields) => {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    try {
+      const response = await apiCall('/privacy/revoke', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targetUserId, viewerUserId, fields }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Revoke permission failed:', error.message);
+      return { success: false };
+    }
+  }
+};
+
+// Messaging API with failure caching
+let messagingFailureCache = { failed: false, timestamp: 0 };
+const FAILURE_CACHE_DURATION = 300000; // 5 minutes
+
+export const messagingAPI = {
+  getConversations: async () => {
+    // Check cache to avoid repeated network calls
+    const now = Date.now();
+    if (messagingFailureCache.failed && (now - messagingFailureCache.timestamp) < FAILURE_CACHE_DURATION) {
+      console.log('⚠️ Messaging API cached failure, skipping call');
+      return { conversations: [] };
+    }
+    
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      if (!token) {
+        messagingFailureCache = { failed: true, timestamp: now };
+        return { conversations: [] };
+      }
+      
+      const response = await apiCall('/messages/conversations', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      // Reset failure cache on success
+      messagingFailureCache = { failed: false, timestamp: 0 };
+      return response.json();
+    } catch (error) {
+      console.log('Messaging API failed, caching failure');
+      // Cache failure to reduce repeated attempts
+      messagingFailureCache = { failed: true, timestamp: now };
+      return { conversations: [] };
+    }
+  },
+  
+  getMessages: async (conversationId) => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const response = await apiCall(`/messages/conversations/${conversationId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Using mock messages');
+      return { messages: [] };
+    }
+  },
+  
+  sendMessage: async (conversationId, message) => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const response = await apiCall(`/messages/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Mock message send');
+      return { success: true };
+    }
+  },
+  
+  createConversation: async (participantId) => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const response = await apiCall('/messages/conversations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ participantId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Mock conversation creation');
+      return { 
+        conversation: {
+          id: `conv-${Date.now()}`,
+          participants: [participantId],
+          messages: []
+        }
+      };
+    }
+  },
+  
+  markRead: async (conversationId) => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const response = await apiCall(`/messages/conversations/${conversationId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.log('Mock mark read');
+      return { success: true };
+    }
+  }
 };
 
 // Uploads API
@@ -746,12 +1217,8 @@ export const uploadsAPI = {
       
       return response.json();
     } catch (error) {
-      console.log('Mock base64 upload:', error.message);
-      return { 
-        url: 'https://via.placeholder.com/150/0066cc/ffffff?text=Uploaded',
-        location: 'https://via.placeholder.com/150/0066cc/ffffff?text=Uploaded',
-        secure_url: 'https://via.placeholder.com/150/0066cc/ffffff?text=Uploaded'
-      };
+      console.log('Base64 upload failed:', error.message);
+      throw error;
     }
   },
   

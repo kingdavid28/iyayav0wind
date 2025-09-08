@@ -1368,6 +1368,10 @@ jobActionButton: {
   borderColor: colors.border,
   backgroundColor: colors.surface,
 },
+completeButton: {
+  borderColor: colors.success,
+  backgroundColor: colors.success + '10',
+},
 deleteButton: {
   borderColor: colors.error,
   backgroundColor: colors.error + '10',
@@ -1376,6 +1380,9 @@ jobActionText: {
   ...typography.body2,
   color: colors.text,
   fontWeight: '500',
+},
+completeText: {
+  color: colors.success,
 },
 deleteText: {
   color: colors.error,

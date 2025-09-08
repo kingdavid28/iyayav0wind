@@ -126,7 +126,7 @@ class SettingsService {
   }
 
   async deleteUserData() {
-    return this.makeRequest('/data/delete', { method: 'DELETE' });
+    return this.makeRequest('/data/all', { method: 'DELETE' });
   }
 
   async getDataUsage() {

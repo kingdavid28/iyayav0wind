@@ -218,6 +218,7 @@ const mountRoutes = () => {
   apiRouter.use('/notifications', require('./routes/notificationRoutes'));
   apiRouter.use('/payments', require('./routes/paymentRoutes'));
   apiRouter.use('/data', require('./routes/dataRoutes'));
+  apiRouter.use('/availability', authenticate, require('./routes/availability'));
 
   // Admin Routes removed
   

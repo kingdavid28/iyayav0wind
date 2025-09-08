@@ -24,7 +24,7 @@ import { AlignCenter } from 'lucide-react-native';
 export default function WelcomeScreen() {
   const navigation = useNavigation();
   const isWeb = Platform.OS === 'web';
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const isLoggedIn = !!user;
   const role = user?.role;
   
@@ -76,14 +76,7 @@ export default function WelcomeScreen() {
           contentContainerStyle={styles.container}
           showsVerticalScrollIndicator={false}
         >
-          {/* Debug Auth Status Banner */}
-          {__DEV__ && (
-            <View style={{ padding: 8, alignItems: 'center' }}>
-              <Text style={{ color: '#6b7280' }}>
-                {isLoggedIn ? `Logged in${user?.email ? ` as ${user.email}` : ''}${user?.role ? ` (${user.role})` : ''}` : 'Logged out'}
-              </Text>
-            </View>
-          )}
+
 
           {/* Header Section */}
           <View style={styles.header}>

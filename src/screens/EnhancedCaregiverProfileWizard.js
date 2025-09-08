@@ -40,7 +40,8 @@ import CustomDateTimePicker from '../components/DateTimePicker';
 import TimePicker from '../components/TimePicker';
 import { useAuth } from '../contexts/AuthContext';
 import { jobsAPI, applicationsAPI, bookingsAPI, caregiversAPI, authAPI, uploadsAPI } from "../config/api";
-import { API_CONFIG, VALIDATION, CURRENCY, FEATURES } from '../config/constants';
+import { VALIDATION, CURRENCY, FEATURES } from '../config/constants';
+import { getCurrentSocketURL } from '../config/api';
 import { styles } from './styles/CaregiverProfileWizard.styles';
 import { getCurrentDeviceLocation, searchLocation, validateLocation, formatLocationForDisplay } from '../utils/locationUtils';
 
@@ -309,7 +310,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType?.Images || 'Images',
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -328,8 +329,9 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         const imageUrl = response?.data?.url || response?.url;
         
         if (imageUrl) {
+          const baseUrl = getCurrentSocketURL();
           const absoluteUrl = imageUrl.startsWith('/') 
-            ? `${API_CONFIG.BASE_URL.replace('/api', '')}${imageUrl}` 
+            ? `${baseUrl}${imageUrl}` 
             : imageUrl;
             
           const newImage = {
@@ -1053,7 +1055,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType?.Images || 'Images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -1094,11 +1096,21 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
             const imageUrl = response?.data?.url || response?.url;
             
             if (imageUrl) {
+              const baseUrl = getCurrentSocketURL();
               const absoluteUrl = imageUrl.startsWith('/') 
-                ? `${API_CONFIG.BASE_URL.replace('/api', '')}${imageUrl}` 
+                ? `${baseUrl}${imageUrl}` 
                 : imageUrl;
               setProfileImageError(false);
               updateFormData('profileImage', absoluteUrl);
+              
+              // Immediately update caregiver profile so dashboard shows the image
+              try {
+                await caregiversAPI.updateMyProfile({ profileImage: absoluteUrl });
+                console.log('✅ Profile image saved to caregiver profile immediately');
+              } catch (error) {
+                console.log('⚠️ Failed to save to caregiver profile immediately, will save on submit');
+              }
+              
               showSnackbar('Profile image updated successfully');
             }
           } catch (error) {
@@ -1134,7 +1146,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
               <Image 
                 source={{ 
                   uri: formData.profileImage.startsWith('/') 
-                    ? `${API_CONFIG.BASE_URL.replace('/api', '')}${formData.profileImage}` 
+                    ? `${getCurrentSocketURL()}${formData.profileImage}` 
                     : formData.profileImage,
                   cache: 'reload'
                 }}
@@ -1863,7 +1875,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
               <Image 
                 source={{ 
                   uri: formData.profileImage.startsWith('/') 
-                    ? `${API_CONFIG.BASE_URL.replace('/api', '')}${formData.profileImage}` 
+                    ? `${getCurrentSocketURL()}${formData.profileImage}` 
                     : formData.profileImage,
                   cache: 'reload'
                 }}

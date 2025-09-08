@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import messageService from '../services/notificationService';
-import { messagesAPI } from '../config/api';
+import { messagingAPI } from '../config/api';
 import { initRealtime, on as onSocket, emit as emitSocket, getSocket } from '../services/realtime';
 import { subscribeToNewMessages, fetchHistory, fetchConversations, sendMessage as chatSendMessage } from '../services/chatClient';
 
@@ -241,7 +241,7 @@ export const MessagingProvider = ({ children }) => {
         setMessages((prev) => prev.map((m) => ({ ...m, read: true, readAt: new Date().toISOString() })));
       }
       if (activeConversation?.id) {
-        try { await messagesAPI.markRead(activeConversation.id); } catch (error) {
+        try { await messagingAPI.markRead(activeConversation.id); } catch (error) {
           // Ignore mark read errors
           console.warn('Mark read failed:', error);
         }

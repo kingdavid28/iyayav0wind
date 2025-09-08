@@ -45,6 +45,11 @@ export const AuthProvider = ({ children }) => {
           // Only process non-empty errors
           if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
             console.log("Token invalid or network timeout, removing from storage:", e.message);
+            // Auto-logout on 401 errors to force fresh login
+            if (e.message?.includes('401') || e.message?.includes('Profile fetch failed')) {
+              console.log('🔄 Auto-logout due to invalid token');
+              setHasLoggedOut(true);
+            }
             // Don't set error for network timeouts - just continue without auth
             if (!e.message?.includes('timeout') && !e.message?.includes('Authentication required') && !e.message?.includes('No auth token found')) {
               setError(e?.message || "Authentication check failed");
@@ -86,7 +91,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setHasLoggedOut(false);
       
-      console.log('🔐 Attempting login with:', { email, baseURL: 'http://192.168.1.10:3000/api' });
+      console.log('🔐 Attempting login with:', { email });
       const res = await authAPI.login({ email, password });
       console.log('✅ Login response:', res);
       

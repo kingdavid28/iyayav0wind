@@ -2,21 +2,28 @@ import React from 'react';
 import { View, Text, Image, Platform } from 'react-native';
 import { User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getCurrentSocketURL } from '../../../config/api';
 
 const MobileProfileSection = ({ greetingName, profileImage, profileContact, profileLocation, activeTab }) => {
   // Handle image URI construction
   const getImageSource = () => {
+    console.log('🖼️ MobileProfileSection - profileImage:', profileImage);
+    
     if (!profileImage || profileImage.trim() === '' || profileImage === 'null' || profileImage === 'undefined') {
+      console.log('🖼️ MobileProfileSection - No valid profile image');
       return null;
     }
     
     if (profileImage.startsWith('http')) {
+      console.log('🖼️ MobileProfileSection - Using full URL:', profileImage);
       return { uri: profileImage };
     }
     
-    // Use the correct backend server address
-    const baseUrl = 'http://10.84.54.117:5001';
-    return { uri: `${baseUrl}${profileImage}` };
+    // Use dynamic API URL
+    const baseUrl = getCurrentSocketURL();
+    const fullUrl = `${baseUrl}${profileImage}`;
+    console.log('🖼️ MobileProfileSection - Constructed URL:', fullUrl);
+    return { uri: fullUrl };
   };
   
   const imageSource = getImageSource();

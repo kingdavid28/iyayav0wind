@@ -111,8 +111,8 @@ export function InformationRequests({ user, userType, colors }) {
           <Text style={styles.loadingText}>Loading...</Text>
         ) : (
           <>
-            {activeTab === 'pending' && pendingRequests.map(renderRequest)}
-            {activeTab === 'sent' && sentRequests.map(renderRequest)}
+            {activeTab === 'pending' && pendingRequests.map((request) => renderRequest(request))}
+            {activeTab === 'sent' && sentRequests.map((request) => renderRequest(request))}
             {((activeTab === 'pending' && pendingRequests.length === 0) || 
               (activeTab === 'sent' && sentRequests.length === 0)) && (
               <Text style={styles.emptyText}>No requests found</Text>

@@ -6,9 +6,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { caregiversAPI, jobsAPI, authAPI, bookingsAPI } from '../../config/api';
 import { formatAddress } from '../../utils/addressUtils';
 import { styles } from '../styles/ParentDashboard.styles';
-// Privacy components temporarily disabled due to backend API not implemented
-// import PrivacyProvider from '../../components/Privacy/PrivacyManager';
-// import ProfileDataProvider from '../../components/Privacy/ProfileDataManager';
+// Privacy components
+import PrivacyProvider from '../../components/Privacy/PrivacyManager';
+import ProfileDataProvider from '../../components/Privacy/ProfileDataManager';
 
 import Header from './components/Header';
 import NavigationTabs from './components/NavigationTabs';
@@ -561,6 +561,39 @@ const ParentDashboard = () => {
     setShowJobPostingModal(true);
   };
 
+  const handleCompleteJob = async (jobId) => {
+    Alert.alert(
+      'Complete Job',
+      'Mark this job as completed?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Complete',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await jobsAPI.update(jobId, { status: 'completed' });
+              
+              // Update job status in local state immediately
+              setJobs(prevJobs => prevJobs.map(job => 
+                (job.id === jobId || job._id === jobId) 
+                  ? { ...job, status: 'completed' }
+                  : job
+              ));
+              
+              Alert.alert('Success', 'Job marked as completed');
+            } catch (error) {
+              console.error('Error completing job:', error);
+              Alert.alert('Error', 'Failed to complete job');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleDeleteJob = async (jobId) => {
     Alert.alert(
       'Delete Job',
@@ -734,6 +767,7 @@ const ParentDashboard = () => {
             onCreateJob={handleCreateJob}
             onEditJob={handleEditJob}
             onDeleteJob={handleDeleteJob}
+            onCompleteJob={handleCompleteJob}
           />
         );
       default:
@@ -742,7 +776,9 @@ const ParentDashboard = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <PrivacyProvider>
+      <ProfileDataProvider>
+        <View style={styles.container}>
       <Header 
         navigation={navigation} 
         onProfilePress={() => setShowProfileModal(true)} 
@@ -829,7 +865,9 @@ const ParentDashboard = () => {
         childrenList={children.length ? children : SAMPLE_CHILDREN}
         onConfirm={handleBookingConfirm}
       />
-    </View>
+        </View>
+      </ProfileDataProvider>
+    </PrivacyProvider>
   );
 };
 

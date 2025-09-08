@@ -10,6 +10,7 @@ import PrivacyNotificationModal from '../../../components/Privacy/PrivacyNotific
 import { SettingsModal } from '../../../components/SettingsModal';
 import { RequestInfoModal } from '../../../components/RequestInfoModal';
 import { useMessaging } from '../../../contexts/MessagingContext';
+import { getCurrentSocketURL } from '../../../config/api';
 
 const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfileEdit, profileName, profileImage, profileContact, profileLocation, setActiveTab }) => {
   // Use real privacy system
@@ -33,8 +34,8 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
       return { uri: profileImage };
     }
     
-    // Use the correct backend server address
-    const baseUrl = 'http://10.84.54.117:5001';
+    // Use dynamic API URL
+    const baseUrl = getCurrentSocketURL();
     return { uri: `${baseUrl}${profileImage}` };
   };
   

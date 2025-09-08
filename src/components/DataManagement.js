@@ -126,7 +126,11 @@ export function DataManagement({ user, userType, colors }) {
         {loading ? (
           <Text style={styles.loadingText}>Loading...</Text>
         ) : data.length > 0 ? (
-          data.map((item, index) => renderItem({ item, index }))
+          data.map((item, index) => (
+            <View key={item.id || item._id || index}>
+              {renderItem({ item, index })}
+            </View>
+          ))
         ) : (
           <Text style={styles.emptyText}>No data available</Text>
         )}

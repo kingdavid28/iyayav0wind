@@ -49,7 +49,7 @@ router.post('/export',
 );
 
 // Delete all user data
-router.delete('/delete',
+router.delete('/all',
   rateLimiter({ windowMs: 24 * 60 * 60 * 1000, max: 1 }), // 1 delete per day
   async (req, res) => {
     try {
