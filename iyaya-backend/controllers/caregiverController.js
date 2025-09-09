@@ -449,6 +449,13 @@ exports.updateCaregiverProfile = async (req, res) => {
       updatedAt: new Date()
     };
 
+    console.log('🔄 Caregiver profile update data:', {
+      userId: userMongoId,
+      hasProfileImage: !!profileImage,
+      profileImageUrl: profileImage,
+      updateFields: Object.keys(updateData).filter(key => updateData[key] !== undefined)
+    });
+
     // Remove undefined fields
     Object.keys(updateData).forEach(key => {
       if (updateData[key] === undefined) {
@@ -456,11 +463,16 @@ exports.updateCaregiverProfile = async (req, res) => {
       }
     });
 
-    const caregiver = await Caregiver.findOneAndUpdate(
+    let caregiver = await Caregiver.findOneAndUpdate(
       { userId: userMongoId },
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: true, upsert: false }
     ).populate('userId', 'name email');
+    
+    console.log('🔄 Caregiver profile update result:', {
+      found: !!caregiver,
+      profileImage: caregiver?.profileImage
+    });
 
     if (!caregiver) {
       // Auto-create with default template then merge with user data

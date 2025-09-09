@@ -1006,7 +1006,8 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         await AsyncStorage.removeItem(`@enhanced_caregiver_profile_draft_${user?.id}`);
       }
       
-      navigation.goBack();
+      // Navigate back with refresh params
+      navigation.navigate('CaregiverDashboard', { refreshProfile: Date.now() });
     } catch (error) {
       console.error('Profile submission failed:', error);
       console.error('Error details:', {
@@ -1079,11 +1080,21 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
           
           const imageUrl = response?.url;
           if (imageUrl) {
+            const baseUrl = getCurrentSocketURL();
             const absoluteUrl = imageUrl.startsWith('/') 
-              ? `${API_CONFIG.BASE_URL.replace('/api', '')}${imageUrl}` 
+              ? `${baseUrl}${imageUrl}` 
               : imageUrl;
             setProfileImageError(false);
             updateFormData('profileImage', absoluteUrl);
+            
+            // Update caregiver profile immediately
+            try {
+              await caregiversAPI.updateMyProfile({ profileImage: imageUrl });
+              console.log('✅ Caregiver profile updated with image');
+            } catch (error) {
+              console.log('⚠️ Failed to update caregiver profile:', error.message);
+            }
+            
             showSnackbar('Profile image updated successfully');
           } else {
             throw new Error('No URL returned from upload');
@@ -1103,12 +1114,12 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
               setProfileImageError(false);
               updateFormData('profileImage', absoluteUrl);
               
-              // Immediately update caregiver profile so dashboard shows the image
+              // Update caregiver profile immediately
               try {
-                await caregiversAPI.updateMyProfile({ profileImage: absoluteUrl });
-                console.log('✅ Profile image saved to caregiver profile immediately');
+                await caregiversAPI.updateMyProfile({ profileImage: imageUrl });
+                console.log('✅ Caregiver profile updated with image');
               } catch (error) {
-                console.log('⚠️ Failed to save to caregiver profile immediately, will save on submit');
+                console.log('⚠️ Failed to update caregiver profile:', error.message);
               }
               
               showSnackbar('Profile image updated successfully');

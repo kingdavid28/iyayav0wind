@@ -49,7 +49,7 @@ function QuickAction({ icon, label, color = '#2563EB', bgColor = '#EFF6FF', onPr
 
 const { width } = Dimensions.get("window")
 
-export default function CaregiverDashboard({ onLogout }) {
+export default function CaregiverDashboard({ onLogout, route }) {
   const navigation = useNavigation()
   const { user, signOut } = useAuth()
   const isTablet = width >= 768
@@ -87,6 +87,7 @@ export default function CaregiverDashboard({ onLogout }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
   // Default profile as fallback - rich mock data for better UX
   const defaultProfile = {
@@ -257,30 +258,68 @@ export default function CaregiverDashboard({ onLogout }) {
       
       const isCaregiver = (user?.role === 'caregiver');
       
-      // Only call caregiver endpoint if role is caregiver; otherwise use auth profile
-      const response = isCaregiver
-        ? await caregiversAPI.getMyProfile()
-        : await authAPI.getProfile();
+      // Get both caregiver and user profiles to check for image
+      let caregiverProfile = null;
+      let userProfile = null;
       
-      console.log('📋 Dashboard profile response:', response);
-      console.log('👤 User role:', user?.role, 'isCaregiver:', isCaregiver);
+      if (isCaregiver) {
+        try {
+          const caregiverResponse = await caregiversAPI.getMyProfile();
+          caregiverProfile = caregiverResponse?.caregiver || caregiverResponse?.data?.caregiver || caregiverResponse || {};
+        } catch (error) {
+          console.log('No caregiver profile found:', error.message);
+        }
+      }
       
-      // Debug profile image after API call
-      debugProfileImage();
+      try {
+        const userResponse = await authAPI.getProfile();
+        userProfile = userResponse?.data || userResponse || {};
+      } catch (error) {
+        console.log('Failed to get user profile:', error.message);
+      }
       
-      // Handle different response structures - prioritize enhanced profile data
-      const p = response?.caregiver || response?.data?.caregiver || response?.provider || response || {};
+      console.log('📋 Caregiver profile:', caregiverProfile);
+      console.log('👤 User profile:', userProfile);
+      
+      // Merge profiles, prioritizing caregiver profile data
+      const p = { ...userProfile, ...caregiverProfile };
       console.log('📊 Profile data extracted:', p);
       
-      // Force refresh by adding a timestamp to the image URL to prevent caching
-      const imageUrlWithTimestamp = (url) => {
-        if (!url) return null;
-        return url.includes('?') 
-          ? `${url}&t=${Date.now()}` 
-          : `${url}?t=${Date.now()}`;
-      };
-      
-      if (p && (p.name || p.hourlyRate || p.experience)) {
+      if (p && (p.name || p.hourlyRate || p.experience || caregiverProfile || userProfile)) {
+        // Check for profile image in both profiles
+        const rawImageUrl = caregiverProfile?.profileImage || userProfile?.profileImage || p.profileImage || p.imageUrl || p.avatarUrl || p.image || p.photoUrl || p.userId?.profileImage;
+        console.log('🖼️ CaregiverDashboard - Raw image URL:', rawImageUrl);
+        
+        let processedImageUrl = null;
+        if (rawImageUrl) {
+          const baseUrl = getCurrentSocketURL();
+          
+          if (rawImageUrl.startsWith('http')) {
+            // Already absolute URL
+            processedImageUrl = rawImageUrl;
+          } else if (rawImageUrl.startsWith('/')) {
+            // Relative URL - convert to absolute
+            processedImageUrl = `${baseUrl}${rawImageUrl}`;
+          } else {
+            // Filename only - add uploads path
+            processedImageUrl = `${baseUrl}/uploads/${rawImageUrl}`;
+          }
+          
+          // Add cache-busting timestamp for fresh load
+          const timestamp = Date.now();
+          processedImageUrl = processedImageUrl.includes('?') 
+            ? `${processedImageUrl}&t=${timestamp}` 
+            : `${processedImageUrl}?t=${timestamp}`;
+            
+          console.log('✅ CaregiverDashboard - Final image URL:', processedImageUrl);
+        }
+        
+        // Force refresh if image URL changed
+        if (processedImageUrl !== profile.imageUrl) {
+          console.log('🔄 Profile image URL changed, forcing refresh');
+          setImageRefreshKey(prev => prev + 1);
+        }
+        
         setProfile((prev) => ({
           ...prev,
           name: p.name || p.userId?.name || prev.name,
@@ -292,218 +331,38 @@ export default function CaregiverDashboard({ onLogout }) {
           bio: p.bio || prev.bio,
           rating: p.rating || prev.rating,
           reviews: p.reviewCount || p.reviews || prev.reviews,
-          imageUrl: (() => {
-            // Prioritize enhanced profile image fields
-            const img = p.profileImage || p.imageUrl || p.avatarUrl || p.image || p.photoUrl || p.userId?.profileImage || prev.imageUrl;
-            console.log('🖼️ CaregiverDashboard - Raw image URL from profile:', img);
-            
-            // Handle null/undefined image
-            if (!img) {
-              console.log('❌ No image URL found in profile data');
-              return null;
-            }
-            
-            // Convert relative URLs to absolute URLs
-            let fullUrl = img;
-            if (img.startsWith('/')) {
-              const baseUrl = getCurrentSocketURL();
-              fullUrl = `${baseUrl}${img}`;
-              console.log('🔗 Profile - Converted relative to absolute URL:', fullUrl);
-            } else if (!img.startsWith('http')) {
-              // Handle cases where image might be just a filename
-              const baseUrl = getCurrentSocketURL();
-              fullUrl = `${baseUrl}/uploads/${img}`;
-              console.log('🔗 Profile - Added uploads path:', fullUrl);
-            } else {
-              console.log('🔗 Profile - Using absolute URL as-is:', fullUrl);
-            }
-            
-            // Add timestamp to prevent caching issues
-            const finalUrl = fullUrl.includes('?') 
-              ? `${fullUrl}&t=${Date.now()}` 
-              : `${fullUrl}?t=${Date.now()}`;
-              
-            console.log('✅ Profile - Final processed image URL:', finalUrl);
-            return finalUrl;
-          })(),
-        }))
-        console.log('✅ Profile updated in dashboard');
-        // Debug after profile update
-        debugProfileImage();
+          imageUrl: processedImageUrl,
+        }));
+        console.log('✅ Profile updated in dashboard with image:', processedImageUrl);
       }
     } catch (e) {
       console.error('❌ Error loading profile in dashboard:', e);
       // keep default profile
-      debugProfileImage();
     }
   }
 
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-      
-      const refreshData = async () => {
-        try {
-          // Load profile data
-          await loadProfile();
-          
-          // Load other data
-          await Promise.all([
-            // Fetch jobs with graceful fallback
-            // Fetch jobs (no auth required for browsing)
-            (async () => {
-              try {
-                const res = await jobsAPI.getAvailableJobs();
-                const apiJobs = Array.isArray(res?.jobs) ? res.jobs : [];
-                if (apiJobs.length && isActive) {
-                  setJobs(apiJobs.map(j => ({
-                    id: j._id || j.id,
-                    title: j.title || '',
-                    family: j.employerName || 'Family',
-                    location: j.location || '',
-                    distance: j.distance ? `${j.distance} km away` : '',
-                    hourlyRate: j.hourlyRate || 0,
-                    schedule: j.schedule || '',
-                    requirements: j.requirements || [],
-                    postedDate: j.postedDate || new Date().toISOString(),
-                    urgent: j.urgent || false,
-                    children: Array.isArray(j.children) ? j.children.length : (j.children || 0),
-                    ages: j.ages || "",
-                  })));
-                }
-              } catch (e) {
-                if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
-                  console.error('Error fetching jobs:', e);
-                }
-                // keep existing jobs on error
-              }
-            })(),
-            
-            // Fetch applications if caregiver
-            (async () => {
-              const isCaregiver = (user?.role === 'caregiver');
-              if (!isCaregiver) return;
-              
-              // Check if user is authenticated
-              if (!user?.id) {
-                console.log('[INFO] No user authentication, skipping applications fetch in focus effect');
-                return;
-              }
-              
-              try {
-                const res = await applicationsAPI.getMyApplications();
-                const list = Array.isArray(res?.applications) ? res.applications : Array.isArray(res) ? res : [];
-                if (list.length && isActive) {
-                  setApplications(list.map(a => ({
-                    id: a._id || a.id || Date.now(),
-                    jobId: a.jobId || a.job?._id || a.job?.id,
-                    jobTitle: a.jobTitle || a.job?.title || "",
-                    family: a.family || a.job?.employerName || "",
-                    status: a.status || "pending",
-                    appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
-                    hourlyRate: a.hourlyRate || a.expectedRate || undefined,
-                  })));
-                }
-              } catch (e) {
-                if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
-                  console.error('Error fetching applications:', e);
-                }
-                // keep existing applications on error
-              }
-            })(),
-            
-            // Fetch bookings if caregiver
-            (async () => {
-              const isCaregiver = (user?.role === 'caregiver');
-              if (!isCaregiver) return;
-              
-              // Check if user is authenticated
-              if (!user?.id) {
-                console.log('[INFO] No user authentication, skipping bookings fetch in focus effect');
-                return;
-              }
-              
-              try {
-                console.log('[INFO] Fetching bookings...');
-                const res = await bookingsAPI.getMy();
-                const list = Array.isArray(res?.bookings) ? res.bookings : Array.isArray(res) ? res : [];
-                if (list.length && isActive) {
-                  setBookings(list.map((b, idx) => ({
-                    id: b._id || b.id || idx + 1,
-                    family: b.family || b.customerName || "Family",
-                    date: b.date || b.startDate || new Date().toISOString(),
-                    time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ""),
-                    status: b.status || "pending",
-                    children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
-                    location: b.address || b.location || "",
-                  })));
-                }
-              } catch (error) {
-                console.error('❌ Error loading profile data:', error);
-                if (error && (typeof error !== 'object' || Object.keys(error).length > 0)) {
-                  console.warn('Booking fetch error:', error);
-                }
-              }
-            })()
-          ]);
-        } catch (error) {
-          console.error('Error refreshing dashboard data:', error);
-        }
-      };
-      
-      // Initial load
-      refreshData();
-      
-      // Set up interval to refresh every 30 seconds while screen is focused
-      const intervalId = setInterval(refreshData, 30000);
-      
-      // Cleanup function
-      return () => {
-        isActive = false;
-        clearInterval(intervalId);
-      };
-    }, [user?.id]) // Only recreate if user ID changes
+      console.log('🔄 CaregiverDashboard focused - loading profile');
+      loadProfile();
+    }, [user?.id])
   );
 
-  // Initial data load with mock data
+
+
+  // Listen for route params to force refresh
+  useEffect(() => {
+    if (route?.params?.refreshProfile) {
+      console.log('🔄 CaregiverDashboard - Force refresh triggered by route params');
+      loadProfile();
+      // Clear the param to prevent repeated refreshes
+      navigation.setParams({ refreshProfile: undefined });
+    }
+  }, [route?.params?.refreshProfile]);
+
+  // Initial data load
   useEffect(() => {
     setApplications(initialApplications);
-    
-    // Initial data fetch
-    const fetchInitialData = async () => {
-      try {
-        // Load profile data
-        await loadProfile();
-        
-        // Load jobs (no auth required for browsing)
-        try {
-          const jobsRes = await jobsAPI.getAvailableJobs();
-          const apiJobs = Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [];
-          if (apiJobs.length) {
-            setJobs(apiJobs.map(j => ({
-              id: j._id || j.id,
-              title: j.title || j.name || "Care Job",
-              family: j.employerName || j.family || "Family",
-              location: j.location || "",
-              distance: j.distance ? `${j.distance} km away` : "",
-              hourlyRate: j.rate || j.salary || 0,
-              schedule: j.workingHours || j.schedule || "",
-              requirements: Array.isArray(j.requirements) ? j.requirements : [],
-              postedDate: j.postedDate || j.postedTime || new Date().toISOString(),
-              urgent: j.urgent || false,
-              children: Array.isArray(j.children) ? j.children.length : (j.children || 0),
-              ages: j.ages || "",
-            })));
-          }
-        } catch (jobError) {
-          console.log('Jobs fetch failed, using mock data:', jobError.message);
-        }
-      } catch (error) {
-        console.error('Error in initial data fetch:', error);
-      }
-    };
-    
-    fetchInitialData();
   }, []);
 
   // Fetch applications and bookings when component mounts or user role changes
@@ -941,7 +800,11 @@ export default function CaregiverDashboard({ onLogout }) {
             <Pressable onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })} accessibilityLabel="View profile photo" accessibilityRole="button">
               {profile.imageUrl ? (
                 <Image 
-                  source={{ uri: profile.imageUrl }} 
+                  key={`profile-image-${imageRefreshKey}`} // Force re-render when key changes
+                  source={{ 
+                    uri: profile.imageUrl,
+                    cache: 'reload' // Force reload from server
+                  }} 
                   style={[styles.profileImage, { backgroundColor: '#f3f4f6' }]}
                   onError={(error) => {
                     console.log('❌ CaregiverDashboard - Image load error:', error.nativeEvent.error);

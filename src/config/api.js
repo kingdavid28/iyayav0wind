@@ -24,32 +24,42 @@ const getDevServerIP = () => {
 
 // Generate dynamic IP list based on common network ranges
 const generateIPList = () => {
-  const commonRanges = [
-    '192.168.1',   // Most common home network
-    '192.168.0',   // Alternative home network
-    '10.0.0',      // Corporate/VPN networks
-    '172.16.0',    // Private networks
-    '192.168.2',   // Router variations
-    '192.168.100', // Some ISP defaults
-  ];
-  
   const ips = [];
   
   // Add localhost first (most likely to work)
   ips.push('localhost', '127.0.0.1');
   
-  // Add common IPs for each range (1-20 for better coverage)
+  // Add most common network IPs first for faster detection
+  const priorityIPs = [
+    '10.207.238.117', // Current network IP
+    '192.168.1.1', '192.168.1.10', '192.168.1.100',
+    '192.168.0.1', '192.168.0.10', '192.168.0.100',
+    '10.0.0.1', '10.0.0.10', '10.0.0.100',
+    '172.16.0.1', '172.16.0.10', '172.16.0.100'
+  ];
+  
+  ips.push(...priorityIPs);
+  
+  // Add extended range for thorough coverage
+  const commonRanges = [
+    '10.207.238',  // Current network range
+    '192.168.1',   // Most common home network
+    '192.168.0',   // Alternative home network
+    '10.0.0',      // Corporate/VPN networks
+    '172.16.0',    // Private networks
+    '192.168.2',   // Router variations
+  ];
+  
   commonRanges.forEach(range => {
-    for (let i = 1; i <= 20; i++) {
-      ips.push(`${range}.${i}`);
-    }
-    for (let i = 100; i <= 120; i++) {
-      ips.push(`${range}.${i}`);
+    for (let i = 2; i <= 50; i++) {
+      if (!ips.includes(`${range}.${i}`)) {
+        ips.push(`${range}.${i}`);
+      }
     }
   });
   
   return ips;
-};
+}
 
 const API_CONFIG = {
   development: {
@@ -475,6 +485,7 @@ export const caregiversAPI = {
       // Ensure profile image URL is properly formatted
       if (data?.caregiver?.profileImage) {
         const img = data.caregiver.profileImage;
+        console.log('🖼️ CaregiverAPI - Raw profile image from backend:', img);
         if (!img.startsWith('http')) {
           const baseUrl = getCurrentSocketURL();
           if (img.startsWith('/')) {
@@ -483,7 +494,9 @@ export const caregiversAPI = {
             data.caregiver.profileImage = `${baseUrl}/uploads/${img}`;
           }
         }
-        console.log('🖼️ CaregiverAPI - Formatted profile image URL:', data.caregiver.profileImage);
+        console.log('🖼️ CaregiverAPI - Final formatted profile image URL:', data.caregiver.profileImage);
+      } else {
+        console.log('⚠️ CaregiverAPI - No profile image found in response');
       }
       
       return data;
