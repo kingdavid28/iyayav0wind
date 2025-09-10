@@ -229,7 +229,7 @@ const mountRoutes = () => {
 mountRoutes();
 
 // ============================================
-// Health Check
+// Health Check & Development Endpoints
 // ============================================
 const authController = require('./controllers/auth');
 // Use the standard authenticate middleware so we resolve Firebase or JWT and
@@ -244,6 +244,8 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+
 
 // ============================================
 // Error Handler

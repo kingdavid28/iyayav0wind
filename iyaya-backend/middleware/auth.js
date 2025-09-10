@@ -58,7 +58,21 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // Try real JWT verification first
+    // Check for mock token first in development (before JWT verification)
+    if (process.env.NODE_ENV === 'development' && token.includes('mock-signature')) {
+      console.log('🔧 Mock token detected, bypassing JWT verification');
+      req.user = {
+        id: 'mock-user-123',
+        mongoId: 'mock-user-123',
+        role: 'parent',
+        userType: 'parent',
+        email: 'mock@example.com',
+        mock: true
+      };
+      return next();
+    }
+
+    // Try real JWT verification only for non-mock tokens
     try {
       const decoded = jwt.verify(token, jwtSecret, {
         algorithms: ['HS256'],
@@ -100,21 +114,7 @@ const authenticate = async (req, res, next) => {
 
       return next();
     } catch (jwtError) {
-      // FALLBACK: Handle mock tokens only when real JWT fails
-      if (process.env.NODE_ENV === 'development' && token.includes('mock-signature')) {
-        console.log('🔧 Real JWT failed, using mock token fallback');
-        req.user = {
-          id: 'mock-user-123',
-          mongoId: 'mock-user-123',
-          role: 'parent',
-          userType: 'parent',
-          email: 'mock@example.com',
-          mock: true
-        };
-        return next();
-      }
-      
-      console.error('JWT verification failed:', jwtError);
+      console.error('JWT verification failed:', jwtError.message);
       throw new Error('Invalid token');
     }
   } catch (err) {

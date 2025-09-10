@@ -254,6 +254,8 @@ export const authAPI = {
       return response.json();
     } catch (error) {
       console.error('Login failed:', error.message);
+      
+
       // Only use mock login if backend is completely unreachable
       if (ENV === 'development' && error.message.includes('Network request failed')) {
         console.log('🔄 Backend unreachable, using mock login');
@@ -456,7 +458,7 @@ export const caregiversAPI = {
   getProviders: async () => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/caregivers`, {
+      const response = await apiCall('/caregivers', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -465,8 +467,8 @@ export const caregiversAPI = {
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
       return response.json();
     } catch (error) {
-      console.log('Using mock caregivers');
-      return { caregivers: [] };
+      console.log('❌ Caregivers API failed:', error.message);
+      throw error; // Don't fallback to mock, let caller handle
     }
   },
   
@@ -600,12 +602,8 @@ export const jobsAPI = {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.log('Backend unavailable, using mock jobs:', error.message);
-      return { 
-        data: {
-          jobs: []
-        }
-      };
+      console.log('❌ My Jobs API failed:', error.message);
+      throw error; // Don't fallback to mock, let caller handle
     }
   },
   
@@ -627,10 +625,12 @@ export const jobsAPI = {
         throw new Error(`Failed: ${response.status}`);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('✅ Jobs API response:', data);
+      return data;
     } catch (error) {
-      console.log('Backend unavailable, using mock available jobs:', error.message);
-      return { data: { jobs: [] } };
+      console.log('❌ Jobs API failed:', error.message);
+      throw error; // Don't fallback to mock, let caller handle
     }
   },
   
@@ -651,23 +651,14 @@ export const jobsAPI = {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed: ${response.status}`);
       }
       
       return response.json();
     } catch (error) {
-      console.log('Backend unavailable, mock job creation:', error.message);
-      const mockJob = {
-        id: `job-${Date.now()}`,
-        _id: `job-${Date.now()}`,
-        ...jobData,
-        status: 'active',
-        createdAt: new Date().toISOString()
-      };
-      return { 
-        success: true, 
-        data: { job: mockJob }
-      };
+      console.log('❌ Job creation failed:', error.message);
+      throw error; // Don't fallback to mock, let caller handle
     }
   },
   
@@ -733,7 +724,7 @@ export const bookingsAPI = {
   getMyBookings: async () => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/bookings/my`, {
+      const response = await apiCall('/bookings/my', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -742,32 +733,41 @@ export const bookingsAPI = {
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
       return response.json();
     } catch (error) {
-      console.log('Using mock bookings');
-      return { bookings: [] };
+      console.log('❌ Bookings API failed:', error.message);
+      throw error;
+    }
+  },
+  
+  create: async (bookingData) => {
+    try {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const response = await apiCall('/bookings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingData),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.log('❌ Booking creation failed:', error.message);
+      throw error;
     }
   },
   
   getMy: async () => {
-    try {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/bookings/my`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
-      return response.json();
-    } catch (error) {
-      console.log('Using mock bookings');
-      return { bookings: [] };
-    }
+    return bookingsAPI.getMyBookings();
   },
   
   uploadPaymentProof: async (bookingId, imageBase64, mimeType) => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/payment-proof`, {
+      const response = await apiCall(`/bookings/${bookingId}/payment-proof`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -778,8 +778,8 @@ export const bookingsAPI = {
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
       return response.json();
     } catch (error) {
-      console.log('Mock payment proof upload');
-      return { success: true, url: 'https://via.placeholder.com/300x200?text=Payment+Proof' };
+      console.log('❌ Payment proof upload failed:', error.message);
+      throw error;
     }
   }
 };
@@ -789,36 +789,46 @@ export const applicationsAPI = {
   getMyApplications: async () => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/applications/my`, {
+      const response = await apiCall('/applications/my', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
       return response.json();
     } catch (error) {
-      console.log('Using mock applications');
-      return { applications: [] };
+      console.log('❌ Applications API failed:', error.message);
+      throw error; // Don't fallback to mock, let caller handle
     }
   },
   
   apply: async (data) => {
     try {
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      const response = await fetch(`${API_BASE_URL}/applications`, {
+      const response = await apiCall('/applications', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
-      return response.json();
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || `Application failed: ${response.status}`);
+      }
+      
+      return result;
     } catch (error) {
-      console.log('Mock application submission');
-      return { success: true };
+      console.error('Application submission error:', error.message);
+      throw error;
     }
   }
 };

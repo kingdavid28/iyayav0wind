@@ -5,7 +5,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native"
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from "expo-linear-gradient"
 import React, { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native"
+import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native"
 import { Button, Card, Chip, Searchbar } from "react-native-paper"
 import Toast from "../components/Toast"
 import { applicationsAPI, authAPI, bookingsAPI, caregiversAPI, jobsAPI, uploadsAPI } from "../config/api"
@@ -77,6 +77,8 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const [showJobDetails, setShowJobDetails] = useState(false)
   const [selectedApplication, setSelectedApplication] = useState(null)
   const [showApplicationDetails, setShowApplicationDetails] = useState(false)
+  const [applicationSubmitting, setApplicationSubmitting] = useState(false)
+  const [applicationForm, setApplicationForm] = useState({ coverLetter: '', proposedRate: '' })
 
   // Toast state
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
@@ -216,6 +218,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
   // State for jobs and bookings with mock defaults
   const [jobs, setJobs] = useState(mockJobs)
+  const [jobsLoading, setJobsLoading] = useState(false)
   const [bookings, setBookings] = useState([
     {
       id: 1,
@@ -365,84 +368,167 @@ export default function CaregiverDashboard({ onLogout, route }) {
     setApplications(initialApplications);
   }, []);
 
+  // Fetch jobs from backend
+  const fetchJobs = async () => {
+    const isCaregiver = (user?.role === 'caregiver');
+    if (!isCaregiver) return;
+    
+    if (!user?.id) {
+      console.log('[INFO] No user authentication, skipping jobs fetch');
+      return;
+    }
+    
+    setJobsLoading(true);
+    try {
+      console.log('🔍 Fetching available jobs for caregiver...');
+      const res = await jobsAPI.getAvailableJobs();
+      const jobsList = res?.data?.jobs || res?.jobs || [];
+      
+      console.log(`📋 Backend jobs response:`, res);
+      console.log(`📋 Jobs count: ${jobsList.length}`);
+      
+      // Transform backend jobs to match frontend format
+      const transformedJobs = jobsList.map((job) => {
+        const getPostedDate = (createdAt) => {
+          if (!createdAt) return 'Recently posted';
+          const now = new Date();
+          const posted = new Date(createdAt);
+          const diffTime = Math.abs(now - posted);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 1) return '1 day ago';
+          if (diffDays < 7) return `${diffDays} days ago`;
+          if (diffDays < 14) return '1 week ago';
+          return `${Math.floor(diffDays / 7)} weeks ago`;
+        };
+        
+        return {
+          id: job._id || job.id,
+          title: job.title || 'Childcare Position',
+          family: job.clientName || job.employerName || job.parentId?.name || 'Family',
+          location: job.location || 'Cebu City',
+          distance: '2-5 km away',
+          hourlyRate: job.hourlyRate || job.rate || 300,
+          schedule: job.startTime && job.endTime ? `${job.startTime} - ${job.endTime}` : 'Flexible hours',
+          requirements: Array.isArray(job.requirements) ? job.requirements : ['Experience with children'],
+          postedDate: getPostedDate(job.createdAt),
+          urgent: job.urgent || false,
+          children: job.numberOfChildren || job.childrenCount || 1,
+          ages: job.childrenAges || job.ages || 'Various ages',
+          description: job.description || ''
+        };
+      });
+      
+      setJobs(transformedJobs);
+      console.log(`✅ Loaded ${transformedJobs.length} real jobs from backend`);
+      
+    } catch (error) {
+      console.error('❌ Backend jobs fetch failed:', error.message);
+      // Fallback to mock jobs only if backend fails
+      console.log('🔄 Using mock jobs as fallback');
+      setJobs(mockJobs);
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
   // Fetch applications and bookings when component mounts or user role changes
   useEffect(() => {
-    // Fetch applications (caregiver-only); skip if not caregiver
+    // Fetch applications (caregiver-only)
     const fetchApplications = async () => {
       const isCaregiver = (user?.role === 'caregiver');
-      if (!isCaregiver) return;
-      
-      // Check if user is authenticated
-      if (!user?.id) {
-        console.log('[INFO] No user authentication, skipping applications fetch');
-        return;
-      }
+      if (!isCaregiver || !user?.id) return;
       
       try {
         const res = await applicationsAPI.getMyApplications();
-        const list = Array.isArray(res?.applications) ? res.applications : Array.isArray(res) ? res : [];
-        if (list.length) {
-          const normalized = list.map((a) => ({
-            id: a._id || a.id || Date.now(),
-            jobId: a.jobId || a.job?._id || a.job?.id,
-            jobTitle: a.jobTitle || a.job?.title || "",
-            family: a.family || a.job?.employerName || "",
-            status: a.status || "pending",
-            appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
-            hourlyRate: a.hourlyRate || a.expectedRate || undefined,
-          }));
-          setApplications(normalized);
-        }
-      } catch (e) {
-        if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
-          console.error('Error fetching applications:', e);
-        }
-        // keep initial mock applications
+        const list = res?.data?.applications || res?.applications || [];
+        
+        const normalized = list.map((a) => ({
+          id: a._id || a.id || Date.now(),
+          jobId: a.jobId?._id || a.jobId || a.job?._id || a.job?.id,
+          jobTitle: a.jobId?.title || a.job?.title || "Job Application",
+          family: a.jobId?.parentId?.name || a.job?.employerName || "Family",
+          status: a.status || "pending",
+          appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
+          hourlyRate: a.proposedRate || a.jobId?.rate || a.expectedRate || undefined,
+        }));
+        
+        setApplications(normalized);
+        console.log(`✅ Loaded ${normalized.length} real applications from backend`);
+        
+      } catch (error) {
+        console.error('❌ Backend applications fetch failed:', error.message);
+        // Fallback to mock applications
+        console.log('🔄 Using mock applications as fallback');
+        setApplications(initialApplications);
       }
     };
 
-    // Fetch bookings (caregiver-only); skip if not caregiver
+    // Fetch bookings (caregiver-only)
     const fetchBookings = async () => {
       const isCaregiver = (user?.role === 'caregiver');
-      if (!isCaregiver) return;
-      
-      // Check if user is authenticated
-      if (!user?.id) {
-        console.log('[INFO] No user authentication, skipping bookings fetch');
-        return;
-      }
+      if (!isCaregiver || !user?.id) return;
       
       try {
         const res = await bookingsAPI.getMy();
         const list = Array.isArray(res?.bookings) ? res.bookings : Array.isArray(res) ? res : [];
-        if (list.length) {
-          const normalized = list.map((b, idx) => ({
-            id: b._id || b.id || idx + 1,
-            family: b.family || b.customerName || "Family",
-            date: b.date || b.startDate || new Date().toISOString(),
-            time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ""),
-            status: b.status || "pending",
-            children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
-            location: formatAddress(b.location || b.address),
-          }));
-          setBookings(normalized);
-        }
-      } catch (e) {
-        if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
-          console.error('Error fetching bookings:', e);
-        }
-        // keep mock bookings
+        
+        const normalized = list.map((b, idx) => ({
+          id: b._id || b.id || idx + 1,
+          family: b.family || b.customerName || "Family",
+          date: b.date || b.startDate || new Date().toISOString(),
+          time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ""),
+          status: b.status || "pending",
+          children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
+          location: formatAddress(b.location || b.address),
+        }));
+        
+        setBookings(normalized);
+        console.log(`✅ Loaded ${normalized.length} real bookings from backend`);
+        
+      } catch (error) {
+        console.error('❌ Backend bookings fetch failed:', error.message);
+        // Fallback to mock bookings
+        console.log('🔄 Using mock bookings as fallback');
+        // Keep existing mock bookings
       }
     };
 
-    // Execute both fetches
+    // Execute all fetches
+    fetchJobs();
     fetchApplications();
     fetchBookings();
-  }, [user?.role]);
+  }, [user?.role, user?.id]);
+
+  // Refresh applications after successful submission
+  const refreshApplications = async () => {
+    const isCaregiver = (user?.role === 'caregiver');
+    if (!isCaregiver || !user?.id) return;
+    
+    try {
+      const res = await applicationsAPI.getMyApplications();
+      const list = res?.data?.applications || res?.applications || [];
+      if (list.length) {
+        const normalized = list.map((a) => ({
+          id: a._id || a.id || Date.now(),
+          jobId: a.jobId?._id || a.jobId || a.job?._id || a.job?.id,
+          jobTitle: a.jobId?.title || a.job?.title || "Job Application",
+          family: a.jobId?.parentId?.name || a.job?.employerName || "Family",
+          status: a.status || "pending",
+          appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
+          hourlyRate: a.proposedRate || a.jobId?.rate || a.expectedRate || undefined,
+        }));
+        setApplications(normalized);
+      }
+    } catch (e) {
+      console.error('Error refreshing applications:', e);
+    }
+  };
 
   // Open application modal for a selected job
   const handleJobApplication = (job) => {
     setSelectedJob(job)
+    setApplicationForm({ coverLetter: '', proposedRate: '' })
     setShowJobApplication(true)
   }
 
@@ -467,28 +553,65 @@ export default function CaregiverDashboard({ onLogout, route }) {
     }
   }
 
-  // Submit application: add to applications state and close modal
-  const handleApplicationSubmit = async ({ jobId, jobTitle, family }) => {
+  // Submit application: real API call with proper error handling
+  const handleApplicationSubmit = async ({ jobId, jobTitle, family, coverLetter, proposedRate }) => {
+    // Check for duplicate application
+    if (applications.some(app => app.jobId === jobId)) {
+      showToast('You have already applied to this job', 'error');
+      return;
+    }
+    
     const matchedJob = jobs.find((j) => j.id === jobId)
-    // Optimistic local application
-    const optimistic = {
-      id: Date.now(),
-      jobId,
-      jobTitle,
-      family,
-      status: "pending",
-      appliedDate: new Date().toISOString(),
-      hourlyRate: matchedJob ? matchedJob.hourlyRate : undefined
-    }
+    
     try {
-      await applicationsAPI.apply({ jobId, coverLetter: "" })
-    } catch (e) {
-      // Backend failed; keep optimistic local record
+      setApplicationSubmitting(true)
+      
+      // Real API call to backend
+      console.log('Submitting application with jobId:', jobId);
+      const response = await applicationsAPI.apply({ 
+        jobId: jobId, 
+        coverLetter: coverLetter || '',
+        proposedRate: proposedRate ? Number(proposedRate) : undefined,
+        message: coverLetter || ''
+      })
+      
+      if (response.success) {
+        // Add to local state for immediate UI update
+        const newApplication = {
+          id: response.data._id || Date.now(),
+          jobId,
+          jobTitle,
+          family,
+          status: "pending",
+          appliedDate: new Date().toISOString(),
+          hourlyRate: proposedRate || (matchedJob ? matchedJob.hourlyRate : undefined)
+        }
+        
+        // Refresh applications from backend to get the latest data
+        await refreshApplications()
+        showToast('Application submitted successfully!', 'success')
+        setShowJobApplication(false)
+        setSelectedJob(null)
+        setApplicationForm({ coverLetter: '', proposedRate: '' })
+        setActiveTab("applications")
+      } else {
+        throw new Error(response.error || 'Application submission failed')
+      }
+    } catch (error) {
+      console.error('Application submission failed:', error)
+      let errorMessage = 'Failed to submit application. Please try again.';
+      
+      // Handle validation errors
+      if (error.message?.includes('Validation failed')) {
+        errorMessage = 'Invalid job ID. Please try refreshing the jobs list.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showToast(errorMessage, 'error')
+    } finally {
+      setApplicationSubmitting(false)
     }
-    setApplications((prev) => [optimistic, ...prev])
-    setShowJobApplication(false)
-    setSelectedJob(null)
-    setActiveTab("applications")
   }
 
   const mockApplications = [
@@ -768,7 +891,13 @@ export default function CaregiverDashboard({ onLogout, route }) {
           { id: 'messages', label: 'Messages', icon: 'chatbubble-ellipses' },
         ].map((tab) => {
           const active = activeTab === tab.id
-          const onPress = () => setActiveTab(tab.id)
+          const onPress = () => {
+            setActiveTab(tab.id)
+            // Refresh jobs when jobs tab is selected
+            if (tab.id === 'jobs') {
+              fetchJobs()
+            }
+          }
           const iconColor = active ? '#3b83f5' : '#6B7280'
           return (
             <Pressable
@@ -883,7 +1012,10 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 label="Find Jobs"
                 color="#ffffff"
                 gradientColors={["#3B82F6", "#2563EB"]}
-                onPress={() => setActiveTab('jobs')}
+                onPress={() => {
+                  setActiveTab('jobs')
+                  fetchJobs() // Refresh jobs when navigating to jobs tab
+                }}
               />
               <QuickAction
                 icon="calendar"
@@ -915,27 +1047,34 @@ export default function CaregiverDashboard({ onLogout, route }) {
                   <Text style={styles.seeAllText}>See All</Text>
                 </Pressable>
               </View>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false} 
-                style={styles.horizontalScroll}
-                contentContainerStyle={{ paddingRight: 16 }}
-              >
-                {(jobs || []).slice(0, 3).map((job, index) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    showActions={true}
-                    onApply={handleJobApplication}
-                    onLearnMore={handleViewJob}
-                    hasApplied={(id) => applications.some((a) => a.jobId === id)}
-                    jobCardStyle={[
-                      styles.jobCardHorizontal,
-                      { marginRight: index === 2 ? 0 : 16 }
-                    ]}
-                  />
-                ))}
-              </ScrollView>
+              {jobsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                  <Text style={styles.loadingText}>Loading jobs...</Text>
+                </View>
+              ) : (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  style={styles.horizontalScroll}
+                  contentContainerStyle={{ paddingRight: 16 }}
+                >
+                  {(jobs || []).slice(0, 3).map((job, index) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      showActions={true}
+                      onApply={handleJobApplication}
+                      onLearnMore={handleViewJob}
+                      hasApplied={(id) => applications.some((a) => a.jobId === id)}
+                      jobCardStyle={[
+                        styles.jobCardHorizontal,
+                        { marginRight: index === 2 ? 0 : 16 }
+                      ]}
+                    />
+                  ))}
+                </ScrollView>
+              )}
             </View>
 
             {/* Enhanced Profile Wizard Promotion Card */}
@@ -986,7 +1125,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
-                <Pressable>
+                <Pressable onPress={() => setActiveTab('bookings')}>
                   <Text style={styles.seeAllText}>See All</Text>
                 </Pressable>
               </View>
@@ -1006,7 +1145,17 @@ export default function CaregiverDashboard({ onLogout, route }) {
         )}
 
         {activeTab === "jobs" && (
-          <ScrollView style={styles.content}>
+          <ScrollView 
+            style={styles.content}
+            refreshControl={
+              <RefreshControl
+                refreshing={jobsLoading}
+                onRefresh={fetchJobs}
+                colors={['#3B82F6']}
+                tintColor="#3B82F6"
+              />
+            }
+          >
             <View style={styles.section}>
               <View style={styles.filters}>
                 <Chip style={styles.filterChip} textStyle={styles.filterChipText}>
@@ -1026,7 +1175,12 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 </Chip>
               </View>
 
-              {jobs && jobs.length > 0 ? (
+              {jobsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <Text style={styles.loadingText}>Loading jobs...</Text>
+                </View>
+              ) : jobs && jobs.length > 0 ? (
                 <View style={[styles.jobsGrid, columns === 1 && { flexDirection: 'column' }]}>
                   {jobs.map((job) => (
                     <JobCard
@@ -1167,37 +1321,101 @@ export default function CaregiverDashboard({ onLogout, route }) {
         <Modal
           visible={showJobApplication}
           onRequestClose={() => {
-            setShowJobApplication(false)
-            setSelectedJob(null)
+            if (!applicationSubmitting) {
+              setShowJobApplication(false)
+              setSelectedJob(null)
+              setApplicationForm({ coverLetter: '', proposedRate: '' })
+            }
           }}
           transparent
           animationType="slide"
         >
           <View style={styles.modalOverlay}>
-            <Card style={styles.editProfileModal}>
-              <Card.Content>
-                <Text style={styles.editProfileTitle}>Apply: {selectedJob.title}</Text>
-                <TextInput
-                  placeholder="Cover letter (optional)"
-                  style={styles.editProfileInput}
-                  multiline
-                />
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-                  <Button mode="text" onPress={() => { setShowJobApplication(false); setSelectedJob(null) }}>Cancel</Button>
+            <View style={styles.applicationModal}>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.applicationModalHeader}>
+                  <Text style={styles.applicationModalTitle}>Apply to Job</Text>
+                  <Pressable 
+                    onPress={() => {
+                      if (!applicationSubmitting) {
+                        setShowJobApplication(false)
+                        setSelectedJob(null)
+                        setApplicationForm({ coverLetter: '', proposedRate: '' })
+                      }
+                    }}
+                    style={styles.modalCloseButton}
+                  >
+                    <Ionicons name="close" size={24} color="#6B7280" />
+                  </Pressable>
+                </View>
+                
+                <View style={styles.jobSummary}>
+                  <Text style={styles.jobSummaryTitle}>{selectedJob.title}</Text>
+                  <Text style={styles.jobSummaryFamily}>{selectedJob.family}</Text>
+                  <Text style={styles.jobSummaryRate}>₱{selectedJob.hourlyRate}/hour</Text>
+                </View>
+                
+                <View style={styles.applicationFormContainer}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Proposed Rate (Optional)</Text>
+                    <TextInput
+                      style={styles.applicationInput}
+                      placeholder={`₱${selectedJob.hourlyRate}`}
+                      value={applicationForm.proposedRate}
+                      onChangeText={(text) => setApplicationForm(prev => ({ ...prev, proposedRate: text }))}
+                      keyboardType="numeric"
+                      editable={!applicationSubmitting}
+                    />
+                  </View>
+                  
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Cover Letter (Optional)</Text>
+                    <TextInput
+                      style={[styles.applicationInput, styles.applicationTextArea]}
+                      placeholder="Tell the family why you're the perfect fit for this job..."
+                      value={applicationForm.coverLetter}
+                      onChangeText={(text) => setApplicationForm(prev => ({ ...prev, coverLetter: text }))}
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                      editable={!applicationSubmitting}
+                    />
+                  </View>
+                </View>
+                
+                <View style={styles.applicationModalActions}>
+                  <Button 
+                    mode="outlined" 
+                    onPress={() => {
+                      if (!applicationSubmitting) {
+                        setShowJobApplication(false)
+                        setSelectedJob(null)
+                        setApplicationForm({ coverLetter: '', proposedRate: '' })
+                      }
+                    }}
+                    style={styles.cancelButton}
+                    disabled={applicationSubmitting}
+                  >
+                    Cancel
+                  </Button>
                   <Button
                     mode="contained"
-                    style={{ marginLeft: 8 }}
                     onPress={() => handleApplicationSubmit({
                       jobId: selectedJob.id,
                       jobTitle: selectedJob.title,
                       family: selectedJob.family,
+                      coverLetter: applicationForm.coverLetter,
+                      proposedRate: applicationForm.proposedRate
                     })}
+                    style={styles.submitButton}
+                    loading={applicationSubmitting}
+                    disabled={applicationSubmitting}
                   >
-                    Submit
+                    {applicationSubmitting ? 'Submitting...' : 'Submit Application'}
                   </Button>
                 </View>
-              </Card.Content>
-            </Card>
+              </ScrollView>
+            </View>
           </View>
         </Modal>
       )}

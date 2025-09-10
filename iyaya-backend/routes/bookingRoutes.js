@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticate, authorize } = require('../utils/auth');
 const { body, param } = require('express-validator');
 const bookingController = require('../controllers/bookingController');
+const bookingControllerNew = require('../controllers/bookingController');
 const rateLimit = require('express-rate-limit');
 
 // All booking routes require authentication
@@ -124,11 +125,11 @@ const validatePaymentProof = [
 ];
 
 // Routes - in correct order (specific before parameterized)
-router.post('/', bookingLimiter, sanitizeInput, validateBooking, bookingController.createBooking);
-router.get('/my', bookingController.getMyBookings);
+router.post('/', bookingLimiter, sanitizeInput, validateBooking, bookingControllerNew.createBooking);
+router.get('/my', bookingControllerNew.getMyBookings);
 router.get('/:id', validateBookingId, bookingController.getBookingById);
 router.patch('/:id/status', validateBookingId, sanitizeInput, validateStatusUpdate, bookingController.updateBookingStatus);
-router.post('/:id/payment-proof', validateBookingId, validatePaymentProof, bookingController.uploadPaymentProof);
+router.post('/:id/payment-proof', validateBookingId, validatePaymentProof, bookingControllerNew.uploadPaymentProof);
 router.delete('/:id', validateBookingId, bookingController.cancelBooking);
 
 module.exports = router;

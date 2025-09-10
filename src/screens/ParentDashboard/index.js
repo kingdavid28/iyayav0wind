@@ -205,10 +205,17 @@ const ParentDashboard = () => {
   const handleFetchBookings = useCallback(async () => {
     try {
       setRefreshing(true);
+      console.log('🔍 Fetching bookings from backend...');
+      
       const normalizedBookings = await fetchAndProcessBookings(bookingsAPI);
       setBookings(normalizedBookings);
-    } catch (err) {
-      console.warn('[fetchAndProcessBookings] failed:', err?.message || err);
+      console.log(`✅ Loaded ${normalizedBookings.length} real bookings from backend`);
+      
+    } catch (error) {
+      console.error('❌ Backend bookings fetch failed:', error.message);
+      // Fallback to empty bookings
+      console.log('🔄 Using empty bookings as fallback');
+      setBookings([]);
     } finally {
       setRefreshing(false);
     }
@@ -216,11 +223,13 @@ const ParentDashboard = () => {
 
   const fetchCaregivers = useCallback(async () => {
     try {
-      setLoading(true);
-      const response = await caregiversAPI.getProviders();
-      const caregivers = response.data?.caregivers || [];
+      setCaregiversLoading(true);
+      console.log('🔍 Fetching caregivers from backend...');
       
-      const transformedCaregivers = caregivers.map(caregiver => ({
+      const response = await caregiversAPI.getProviders();
+      const caregiversList = response.data?.caregivers || response.caregivers || [];
+      
+      const transformedCaregivers = caregiversList.map(caregiver => ({
         ...caregiver,
         id: caregiver.id || caregiver._id,
         name: caregiver.name || 'Unnamed Caregiver',
@@ -235,18 +244,65 @@ const ParentDashboard = () => {
       }));
       
       setCaregivers(transformedCaregivers);
+      console.log(`✅ Loaded ${transformedCaregivers.length} real caregivers from backend`);
       return transformedCaregivers;
+      
     } catch (error) {
-      console.error('Error fetching caregivers:', error);
-      // Ensure we don't throw objects as errors
-      if (error && typeof error === 'object' && !error.message) {
-        throw new Error(`API Error: ${JSON.stringify(error)}`);
+      console.error('❌ Backend caregivers fetch failed:', error.message);
+      // Fallback to sample caregivers
+      console.log('🔄 Using sample caregivers as fallback');
+      setCaregivers(SAMPLE_CAREGIVERS);
+      return SAMPLE_CAREGIVERS;
+    } finally {
+      setCaregiversLoading(false);
+    }
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading profile data from backend...');
+      
+      const profile = await authAPI.getProfile();
+      console.log('📋 Backend profile response:', profile);
+      setUserData(profile.data);
+
+      // Initialize profile form data from API response
+      if (profile.data) {
+        setProfileName(profile.data.name || '');
+        setProfileContact(profile.data.email || profile.data.contact || '');
+        setProfileLocation(profile.data.location || '');
+        
+        const imageUrl = profile.data.profileImage || 
+                        profile.data.avatar || 
+                        profile.data.user?.profileImage || 
+                        profile.data.user?.avatar || 
+                        profile.profileImage ||
+                        profile.avatar ||
+                        '';
+        setProfileImage(imageUrl);
+        console.log('🖼️ Profile image loaded:', imageUrl);
       }
-      throw error;
+
+      // Load jobs from backend
+      const jobsResponse = await jobsAPI.getMyJobs();
+      const jobsList = jobsResponse?.data?.jobs || jobsResponse?.jobs || [];
+      setJobs(jobsList);
+      console.log(`✅ Loaded ${jobsList.length} real jobs from backend`);
+      
+    } catch (error) {
+      console.error('❌ Backend profile/jobs fetch failed:', error.message);
+      // Set fallback values if backend fails
+      console.log('🔄 Using fallback profile data');
+      setProfileName('User');
+      setProfileContact('No email available');
+      setProfileLocation('Location not set');
+      setProfileImage('');
+      setJobs([]); // Empty jobs array as fallback
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   const fetchMyChildren = useCallback(async () => {
     try {
@@ -258,57 +314,7 @@ const ParentDashboard = () => {
     }
   }, []);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Loading profile data...');
-      const profile = await authAPI.getProfile();
-      console.log('📋 Profile API response:', profile);
-      setUserData(profile.data);
 
-      // Initialize profile form data from API response
-      if (profile.data) {
-        setProfileName(profile.data.name || '');
-        setProfileContact(profile.data.email || profile.data.contact || '');
-        setProfileLocation(profile.data.location || '');
-        // Handle nested user object structure from API response
-        const imageUrl = profile.data.profileImage || 
-                        profile.data.avatar || 
-                        profile.data.user?.profileImage || 
-                        profile.data.user?.avatar || 
-                        profile.profileImage ||
-                        profile.avatar ||
-                        '';
-        setProfileImage(imageUrl);
-        console.log('🖼️ Initial profile image loaded:', imageUrl);
-        
-        // Debug log to check values
-        console.log('Profile data loaded:', {
-          name: profile.data.name,
-          email: profile.data.email,
-          contact: profile.data.contact,
-          location: profile.data.location,
-          profileImage: profile.data.profileImage,
-          avatar: profile.data.avatar
-        });
-        
-        console.log('Setting profileImage state to:', imageUrl);
-        console.log('Full profile.data object:', JSON.stringify(profile.data, null, 2));
-      }
-
-      const jobsResponse = await jobsAPI.getMyJobs();
-      setJobs(jobsResponse?.data?.jobs || []);
-    } catch (error) {
-      console.error('❌ Error loading profile data:', error);
-      // Set default values if profile loading fails
-      setProfileName('User');
-      setProfileContact('No email available');
-      setProfileLocation('Location not set');
-      setProfileImage('');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

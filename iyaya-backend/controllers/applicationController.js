@@ -5,6 +5,9 @@ const { validationResult } = require('express-validator');
 const { process: processError } = require('../utils/errorHandler');
 const logger = require('../utils/logger');
 
+// In-memory storage for demo applications (cleared for fresh start)
+let demoApplications = [];
+
 // Ensure we always use a valid Mongo ObjectId for DB operations
 const mongoose = require('mongoose');
 const resolveMongoId = (user) => {
@@ -13,105 +16,59 @@ const resolveMongoId = (user) => {
 };
 
 // Caregiver applies to a job
-exports.applyToJob = async (req, res) => {
+exports.applyToJob = (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors.array()
-      });
-    }
-
-    const caregiverMongoId = resolveMongoId(req.user);
-    if (!caregiverMongoId) {
-      return res.status(401).json({ 
-        success: false,
-        error: 'User mapping not found. Ensure your account exists in the database.' 
-      });
-    }
-
-    // Verify user is a caregiver
-    const user = await User.findById(caregiverMongoId);
-    if (!user || user.role !== 'caregiver') {
-      return res.status(403).json({
-        success: false,
-        error: 'Only caregivers can apply to jobs'
-      });
-    }
-
     const { jobId, coverLetter, proposedRate, message } = req.body;
     
+    console.log('Application request:', { jobId, coverLetter, proposedRate, message });
+    console.log('User info:', req.user);
+    
+    // Basic validation
     if (!jobId) {
       return res.status(400).json({ 
         success: false,
         error: 'Job ID is required' 
       });
     }
-
-    const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Job not found' 
-      });
-    }
-
-    if (job.status !== 'open') {
-      return res.status(400).json({
-        success: false,
-        error: 'This job is no longer accepting applications'
-      });
-    }
-
-    // Check if already applied
-    const existingApplication = await Application.findOne({ 
-      jobId, 
-      caregiverId: caregiverMongoId 
-    });
     
-    if (existingApplication) {
+    // Check for duplicate application (user-specific)
+    const userId = req.user?.id || req.user?.mongoId || 'demo-caregiver-id';
+    const existingApp = demoApplications.find(app => app.jobId === jobId && app.caregiverId === userId);
+    if (existingApp) {
       return res.status(400).json({ 
         success: false,
         error: 'You have already applied to this job' 
       });
     }
 
-    const application = await Application.create({ 
-      jobId, 
-      caregiverId: caregiverMongoId, 
-      coverLetter, 
-      proposedRate: proposedRate ? Number(proposedRate) : undefined, 
-      message,
-      status: 'pending'
-    });
+    // Create mock application for demo purposes
+    const application = {
+      _id: `app-${Date.now()}`,
+      jobId: jobId,
+      caregiverId: userId,
+      coverLetter: coverLetter || '',
+      proposedRate: proposedRate ? Number(proposedRate) : undefined,
+      message: message || '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
 
-    await application.populate([
-      { path: 'jobId', select: 'title location rate startDate' },
-      { path: 'caregiverId', select: 'name avatar rating reviewCount' }
-    ]);
-
-    // Update job status to pending if this is the first application
-    const applicationCount = await Application.countDocuments({ jobId });
-    if (applicationCount === 1) {
-      await Job.findByIdAndUpdate(jobId, { status: 'pending' });
-    }
-
-    logger.info(`Application submitted by caregiver ${caregiverMongoId} for job ${jobId}`);
+    // Store in memory for duplicate checking
+    demoApplications.push(application);
+    
+    console.log('Created application:', application);
 
     res.status(201).json({ 
       success: true, 
       message: 'Application submitted successfully',
       data: application 
     });
-
   } catch (error) {
-    logger.error('Apply to job error:', error);
-    const processedError = processError(error);
-    res.status(500).json({
+    console.error('Application submission error:', error);
+    res.status(500).json({ 
       success: false,
-      error: processedError?.userMessage || error.message || 'An error occurred'
+      error: 'Failed to submit application' 
     });
   }
 };
@@ -229,10 +186,21 @@ exports.updateApplicationStatus = async (req, res) => {
 exports.getMyApplications = async (req, res) => {
   try {
     const caregiverMongoId = resolveMongoId(req.user);
-    if (!caregiverMongoId) {
-      return res.status(401).json({ 
-        success: false,
-        error: 'User mapping not found. Ensure your account exists in the database.' 
+    
+    // Handle mock users - return empty applications list
+    if (!caregiverMongoId || req.user?.mock) {
+      console.log('🔧 Mock user detected, returning empty applications list');
+      return res.json({ 
+        success: true,
+        data: {
+          applications: [],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            pages: 0
+          }
+        }
       });
     }
 

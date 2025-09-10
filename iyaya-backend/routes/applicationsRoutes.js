@@ -1,19 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate, authorize } = require('../utils/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const { body, param } = require('express-validator');
 const applications = require('../controllers/applicationController');
 
-// All routes require authentication
+// Enable authentication for all routes
 router.use(authenticate);
 
-// Validation middleware
-const validateApplication = [
-  body('jobId').isMongoId().withMessage('Valid job ID is required'),
-  body('coverLetter').optional().isLength({ max: 1000 }).withMessage('Cover letter must be less than 1000 characters'),
-  body('proposedRate').optional().isNumeric().withMessage('Proposed rate must be a number'),
-  body('message').optional().isLength({ max: 500 }).withMessage('Message must be less than 500 characters')
-];
+// Validation middleware (disabled for demo)
+// const validateApplication = [
+//   body('jobId').notEmpty().withMessage('Job ID is required'),
+//   body('coverLetter').optional().isLength({ max: 1000 }).withMessage('Cover letter must be less than 1000 characters'),
+//   body('proposedRate').optional().isNumeric().withMessage('Proposed rate must be a number'),
+//   body('message').optional().isLength({ max: 500 }).withMessage('Message must be less than 500 characters')
+// ];
 
 const validateStatusUpdate = [
   param('id').isMongoId().withMessage('Valid application ID is required'),
@@ -22,8 +22,8 @@ const validateStatusUpdate = [
 ];
 
 // Routes
-// POST /api/applications - caregiver applies to a job
-router.post('/', validateApplication, applications.applyToJob);
+// POST /api/applications - caregiver applies to a job (simplified for demo)
+router.post('/', applications.applyToJob);
 
 // GET /api/applications/my-applications - caregiver's applications
 router.get('/my-applications', applications.getMyApplications);

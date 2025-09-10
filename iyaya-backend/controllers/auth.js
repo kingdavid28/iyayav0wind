@@ -344,20 +344,27 @@ exports.getCurrentUser = async (req, res, next) => {
 // User login
 exports.login = async (req, res, next) => {
   const { email, password } = req.body;
+  console.log('🌐 Login request received:', { email, hasPassword: !!password });
 
   // Validate email & password
   if (!email || !password) {
-    return next(new ErrorResponse('Please provide an email and password', 400));
+    console.log('❌ Missing credentials:', { email: !!email, password: !!password });
+    return res.status(400).json({ success: false, error: 'Please provide an email and password' });
   }
 
   try {
+    // Check total user count first
+    const userCount = await User.countDocuments();
+    console.log('📊 Total users in database:', userCount);
+
     // Check for user
     const user = await User.findOne({ email }).select('+password');
     console.log('🔍 Login attempt for:', email, 'User found:', !!user);
 
     if (!user) {
       console.log('❌ User not found in database for email:', email);
-      return next(new ErrorResponse('Invalid credentials', 401));
+
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
     // Check if password matches
@@ -366,7 +373,7 @@ exports.login = async (req, res, next) => {
 
     if (!isMatch) {
       console.log('❌ Invalid password for user:', email);
-      return next(new ErrorResponse('Invalid credentials', 401));
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
 
     // Generate tokens
@@ -383,20 +390,29 @@ exports.login = async (req, res, next) => {
     console.log('✅ Login successful for user:', email, 'ID:', user._id);
     res.status(200).json({
       success: true,
-      token: accessToken
+      token: accessToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
     });
   } catch (err) {
-    next(new ErrorResponse('Login failed', 500));
+    console.error('💥 Login error:', err);
+    res.status(500).json({ success: false, error: 'Login failed: ' + err.message });
   }
 };
 
 // User registration
 exports.register = async (req, res, next) => {
   const { name, email, password, role } = req.body;
+  console.log('📝 Registration request:', { name, email, role, hasPassword: !!password });
 
   try {
     // Normalize incoming role to internal values
     const { role: internalRole, userType } = normalizeIncomingRole(role);
+    console.log('🔄 Normalized role:', { input: role, internal: internalRole, userType });
 
     // Create user
     const user = await User.create({
@@ -406,6 +422,7 @@ exports.register = async (req, res, next) => {
       role: internalRole,
       userType
     });
+    console.log('✅ User created:', user.email, 'with role:', user.role);
 
     // If registering as caregiver, auto-create a minimal caregiver profile using real name
     if (internalRole === 'caregiver') {
@@ -465,13 +482,20 @@ exports.register = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
+    console.log('✅ Registration successful for:', user.email);
     res.status(201).json({
       success: true,
-      token: accessToken
+      token: accessToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
     });
   } catch (err) {
     // Provide clearer error responses for common failure cases
-    console.error('Registration error:', err && (err.message || err));
+    console.error('💥 Registration error:', err && (err.message || err));
     // Duplicate email error from Mongo/Mongoose (various shapes)
     const msg = (err && err.message) || '';
     const isDupCode = err && (err.code === 11000 || err.code === 'E11000');
@@ -485,7 +509,7 @@ exports.register = async (req, res, next) => {
       const details = Object.values(err.errors || {}).map(e => e.message);
       return res.status(400).json({ success: false, error: 'Validation error', details });
     }
-    return next(new ErrorResponse('Registration failed', 500));
+    return res.status(500).json({ success: false, error: 'Registration failed: ' + err.message });
   }
 };
 

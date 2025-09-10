@@ -895,4 +895,111 @@ export const styles = StyleSheet.create({
     color: '#2E7D32',
     fontWeight: '600',
   },
+  // Modal overlay
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Loading states
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  // Application Modal Styles
+  applicationModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    margin: 20,
+    maxHeight: '85%',
+    width: '90%',
+    alignSelf: 'center',
+    ...shadows.lg,
+  },
+  applicationModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  applicationModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jobSummary: {
+    padding: 20,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  jobSummaryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  jobSummaryFamily: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  jobSummaryRate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  applicationFormContainer: {
+    padding: 20,
+  },
+  applicationInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    color: '#111827',
+    width: '100%',
+    flex: 0,
+  },
+  applicationTextArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  applicationModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    borderColor: '#D1D5DB',
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: '#2563EB',
+  },
 });

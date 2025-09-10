@@ -64,12 +64,13 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
 
   // Set parent ID when component mounts
   useEffect(() => {
-    if (user?.uid) {
+    const userId = user?.uid || user?.id;
+    if (userId) {
       setJobData(prev => ({
         ...prev,
-        parentId: user.uid,
-        parentName: user.displayName || 'Parent',
-        parentPhoto: user.photoURL || null
+        parentId: userId,
+        parentName: user.displayName || user.name || 'Parent',
+        parentPhoto: user.photoURL || user.profileImage || null
       }));
     }
   }, [user]);
@@ -158,7 +159,7 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
         workingHours: jobData.workingHours,
         requirements: jobData.requirements || [],
         children: jobData.children || [],
-        parentId: user?.uid,
+        parentId: user?.uid || user?.id,
         status: 'open'
       };
       
