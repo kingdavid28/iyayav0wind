@@ -5,6 +5,7 @@ import { styles } from '../../styles/ParentDashboard.styles';
 import QuickActions from './QuickActions';
 import ChildrenSection from './ChildrenSection';
 import BookingsSection from './BookingsSection';
+import MobileProfileSection from './MobileProfileSection';
 
 const HomeTab = ({ 
   bookings, 
@@ -12,7 +13,12 @@ const HomeTab = ({
   quickActions, 
   onAddChild, 
   onEditChild, 
-  onViewBookings 
+  onViewBookings,
+  greetingName,
+  profileImage,
+  profileContact,
+  profileLocation,
+  userData
 }) => {
   return (
     <View style={{ flex: 1 }}>
@@ -23,6 +29,14 @@ const HomeTab = ({
         bounces={true}
         scrollEventThrottle={16}
       >
+        <MobileProfileSection 
+          greetingName={greetingName}
+          profileImage={profileImage}
+          profileContact={profileContact}
+          profileLocation={profileLocation}
+          activeTab="home"
+          userData={userData}
+        />
         <QuickActions actions={quickActions} />
         <ChildrenSection children={children} onAddChild={onAddChild} onEditChild={onEditChild} />
         <BookingsSection bookings={bookings} onViewBookings={onViewBookings} />

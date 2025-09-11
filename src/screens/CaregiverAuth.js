@@ -13,6 +13,7 @@ import {
   Dimensions,
   StyleSheet,
   Keyboard,
+  Linking,
 } from 'react-native';
 import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
 import { TextInput, Button } from 'react-native-paper';
@@ -21,109 +22,93 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useApp, ACTION_TYPES } from '../contexts/AppContext';
 import { authAPI } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
-import { CommonActions } from '@react-navigation/native';
-import { validateForm, validationRules } from '../utils/validation';
-import { useApi } from '../hooks/useApi';
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
+import { useAuthForm } from '../hooks/useAuthForm';
+import { useAuthSubmit } from '../hooks/useAuthSubmit';
+import CustomDateTimePicker from '../components/DateTimePicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../config/constants';
+import { navigateToUserDashboard } from '../utils/navigationUtils';
 
 const CaregiverAuth = ({ navigation }) => {
   const [mode, setMode] = useState('login');
   const { dispatch } = useApp();
-  const { user: authUser, login, signup } = useAuth();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    name: '',
-    phone: '',
-    confirmPassword: ''
-  });
-  const [formErrors, setFormErrors] = useState({});
-  const { loading: isSubmitting, execute } = useApi();
+  const { user: authUser, login, signup, verifyEmailToken } = useAuth();
+  const { formData, formErrors, handleChange, validateForm: validateCurrentForm, resetForm } = useAuthForm();
+  const { handleSubmit: handleAuthSubmit, isSubmitting } = useAuthSubmit(navigation);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // When auth user reflects a logged-in state, reset stack to caregiver dashboard
-  useEffect(() => {
-    if (authUser) {
-      try {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'CaregiverDashboard' }],
-          })
-        );
-      } catch (error) {
-        console.warn('Navigation error:', error);
+  // Execute function for handling async operations
+  const execute = async (asyncFunc, options = {}) => {
+    try {
+      const result = await asyncFunc();
+      return result;
+    } catch (error) {
+      if (options.onError) {
+        options.onError(error);
+      } else {
+        console.error('Error:', error);
       }
-    }
-  }, [authUser, navigation]);
-
-  // Handle form field changes
-  const handleChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Clear error when user types
-    if (formErrors[field]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [field]: null
-      }));
+      throw error;
     }
   };
 
-  // Validate form using validation system
-  const validateCurrentForm = () => {
-    let rules = {};
-    
-    if (mode === 'login') {
-      rules = validationRules.userLogin;
-    } else if (mode === 'signup') {
-      rules = {
-        ...validationRules.userRegistration,
-        confirmPassword: (value) => {
-          if (value !== formData.password) {
-            return 'Passwords do not match';
-          }
-          return null;
-        }
-      };
-    } else if (mode === 'reset') {
-      rules = { email: validationRules.userRegistration.email };
-    }
-    
-    const errors = validateForm(formData, rules);
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  // Navigate when user becomes authenticated
+  useFocusEffect(
+    React.useCallback(() => {
+      if (authUser?.role) {
+        const timer = setTimeout(() => {
+          navigateToUserDashboard(navigation, authUser.role);
+        }, 50);
+        return () => clearTimeout(timer);
+      }
+    }, [authUser, navigation])
+  );
 
-  const handleSubmit = async () => {
+  const handleFormSubmit = async () => {
     try {
       Keyboard.dismiss();
     } catch (e) {
       // Keyboard might not be available on web
     }
     
-    if (!validateCurrentForm()) {
+    if (!validateCurrentForm(mode)) {
       return;
     }
     
-    const { email, password, name, phone } = formData;
+    const { email, password, firstName, lastName, middleInitial, birthDate, phone } = formData;
+    const fullName = `${firstName} ${middleInitial ? middleInitial + '. ' : ''}${lastName}`.trim();
     
     const result = await execute(async () => {
       if (mode === 'signup') {
-        const result = await signup({ email, password, name, phone, role: 'caregiver' });
+        // Proceed with signup - backend will handle duplicate emails
+        console.log('🚀 Proceeding with signup for:', email, 'as caregiver');
         
-        // Set role to caregiver
-        try { 
-          await authAPI.setRole('caregiver'); 
-        } catch (error) {
-          console.warn('Role setting error:', error);
+        const result = await signup({ 
+          email, 
+          password, 
+          name: fullName,
+          firstName,
+          lastName,
+          middleInitial,
+          birthDate,
+          phone, 
+          role: 'caregiver' 
+        });
+        
+        // Show verification message only if verification is required
+        if (result?.requiresVerification) {
+          Alert.alert(
+            "Account Created!", 
+            "Please check your email for a verification link. Click the link to activate your account and access the dashboard.",
+            [{ text: "OK" }]
+          );
+        } else if (result?.success && result?.user?.role) {
+          // If no verification required, navigate immediately
+          navigateToUserDashboard(navigation, result.user.role);
         }
         
-        // Inform user to verify email
-        Alert.alert('Account Created', 'Your caregiver account has been created successfully!');
         return result;
       } else if (mode === 'reset') {
         const result = await authAPI.resetPassword(email);
@@ -133,33 +118,43 @@ const CaregiverAuth = ({ navigation }) => {
       } else {
         const result = await login(email, password);
         
-        // Set role to caregiver
-        try { 
-          await authAPI.setRole('caregiver'); 
-        } catch (error) {
-          console.warn('Role setting error:', error);
+        // Don't override role - use the role from login response
+        
+        // Navigate after successful login
+        if (result?.success && result?.user?.role) {
+          navigateToUserDashboard(navigation, result.user.role);
         }
         
         return result;
       }
     }, {
       onError: (error) => {
-        Alert.alert("Error", error?.message || "Authentication failed");
+        const errorMessage = error?.message || "Authentication failed";
+        if (errorMessage.includes('already exists') || errorMessage.includes('duplicate') || errorMessage.includes('E11000')) {
+          Alert.alert("Email Already Exists", "This email is already registered. Please use a different email or try signing in.");
+        } else if (errorMessage.includes('verify your email') || errorMessage.includes('verification')) {
+          Alert.alert("Email Not Verified", "Please check your email and click the verification link before logging in.");
+        } else {
+          Alert.alert("Error", errorMessage);
+        }
       }
     });
   };
 
   const toggleAuthMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login');
-    setFormData({
-      email: '',
-      password: '',
-      name: '',
-      phone: '',
-      confirmPassword: ''
-    });
-    setFormErrors({});
+    resetForm();
   };
+
+  const onSubmit = () => {
+    const formWithRole = { ...formData, role: 'caregiver' };
+    const result = handleAuthSubmit(mode, formWithRole, validateCurrentForm);
+    if (mode === 'reset' && result) {
+      setMode('login');
+    }
+  };
+
+
 
   const keyboardOffset = Platform.select({ ios: 80, android: 0 });
 
@@ -220,39 +215,73 @@ const CaregiverAuth = ({ navigation }) => {
             </View>
 
             <View style={styles.formContainer}>
+              <Text style={styles.requiredFieldsNote}>* Required fields</Text>
+              <Text style={styles.emailNote}>Please use a unique email address that hasn't been registered before.</Text>
+              <Text style={styles.passwordNote}>Password must be at least 12 characters with uppercase, lowercase, number, and symbol.</Text>
               {mode === 'signup' && (
                 <>
-                <TextInput
-                  label="Full Name"
-                  value={formData.name}
-                  onChangeText={(text) => handleChange('name', text)}
-                  mode="outlined"
-                  style={styles.input}
-                  left={<TextInput.Icon icon="account" color="#2563eb" />}
-                  theme={{ colors: { primary: '#2563eb', background: 'white' } }}
-                  accessibilityLabel="Full name input"
-                  error={!!formErrors.name}
-                />
-                {formErrors.name ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.name}</Text> : null}
-                
-                <TextInput
-                  label="Phone Number"
-                  value={formData.phone}
-                  onChangeText={(text) => handleChange('phone', text)}
-                  mode="outlined"
-                  style={styles.input}
-                  keyboardType="phone-pad"
-                  left={<TextInput.Icon icon="phone" color="#2563eb" />}
-                  theme={{ colors: { primary: '#2563eb', background: 'white' } }}
-                  accessibilityLabel="Phone number input"
-                  error={!!formErrors.phone}
-                />
-                {formErrors.phone ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.phone}</Text> : null}
+                  <TextInput
+                    label="First Name *"
+                    value={formData.firstName}
+                    onChangeText={(text) => handleChange('firstName', text)}
+                    mode="outlined"
+                    style={styles.input}
+                    left={<TextInput.Icon icon="account" color="#2563eb" />}
+                    theme={{ colors: { primary: '#2563eb', background: 'white' } }}
+                    error={!!formErrors.firstName}
+                  />
+                  {formErrors.firstName && <Text style={styles.errorText}>{formErrors.firstName}</Text>}
+                  
+                  <View style={styles.nameRow}>
+                    <TextInput
+                      label="Last Name *"
+                      value={formData.lastName}
+                      onChangeText={(text) => handleChange('lastName', text)}
+                      mode="outlined"
+                      style={[styles.input, styles.lastNameInput]}
+                      theme={{ colors: { primary: '#2563eb', background: 'white' } }}
+                      error={!!formErrors.lastName}
+                    />
+                    <TextInput
+                      label="M.I."
+                      value={formData.middleInitial}
+                      onChangeText={(text) => handleChange('middleInitial', text.toUpperCase())}
+                      mode="outlined"
+                      style={[styles.input, styles.middleInitialInput]}
+                      maxLength={1}
+                      theme={{ colors: { primary: '#2563eb', background: 'white' } }}
+                    />
+                  </View>
+                  {formErrors.lastName && <Text style={styles.errorText}>{formErrors.lastName}</Text>}
+                  
+                  <CustomDateTimePicker
+                    label="Birth Date *"
+                    value={formData.birthDate ? new Date(formData.birthDate) : null}
+                    onDateChange={(date) => handleChange('birthDate', date.toISOString().split('T')[0])}
+                    mode="date"
+                    placeholder="Select birth date"
+                    maximumDate={new Date()}
+                    error={formErrors.birthDate}
+                    style={styles.input}
+                  />
+                  
+                  <TextInput
+                    label="Phone Number *"
+                    value={formData.phone}
+                    onChangeText={(text) => handleChange('phone', text)}
+                    mode="outlined"
+                    style={styles.input}
+                    keyboardType="phone-pad"
+                    left={<TextInput.Icon icon="phone" color="#2563eb" />}
+                    theme={{ colors: { primary: '#2563eb', background: 'white' } }}
+                    error={!!formErrors.phone}
+                  />
+                  {formErrors.phone && <Text style={styles.errorText}>{formErrors.phone}</Text>}
                 </>
               )}
 
               <TextInput
-                label="Email"
+                label="Email *"
                 value={formData.email}
                 onChangeText={(text) => handleChange('email', text)}
                 mode="outlined"
@@ -265,13 +294,13 @@ const CaregiverAuth = ({ navigation }) => {
                 accessibilityLabel="Email input"
                 error={!!formErrors.email}
               />
-              {formErrors.email ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.email}</Text> : null}
+              {formErrors.email && <Text style={styles.errorText}>{formErrors.email}</Text>}
 
               {/* Passwords (skip for reset mode) */}
               {mode !== 'reset' && (
                 <>
               <TextInput
-                label="Password"
+                label="Password *"
                 value={formData.password}
                 onChangeText={(text) => handleChange('password', text)}
                 mode="outlined"
@@ -288,11 +317,11 @@ const CaregiverAuth = ({ navigation }) => {
                 accessibilityLabel="Password input"
                 error={!!formErrors.password}
               />
-              {formErrors.password ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.password}</Text> : null}
+              {formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
 
               {mode === 'signup' && (
                 <TextInput
-                  label="Confirm Password"
+                  label="Confirm Password *"
                   value={formData.confirmPassword}
                   onChangeText={(text) => handleChange('confirmPassword', text)}
                   mode="outlined"
@@ -310,13 +339,13 @@ const CaregiverAuth = ({ navigation }) => {
                   error={!!formErrors.confirmPassword}
                 />
               )}
-              {formErrors.confirmPassword ? <Text style={{ color: 'red', marginBottom: 8 }}>{formErrors.confirmPassword}</Text> : null}
+              {formErrors.confirmPassword && <Text style={styles.errorText}>{formErrors.confirmPassword}</Text>}
                 </>
               )}
 
               <Button 
                 mode="contained" 
-                onPress={handleSubmit}
+                onPress={handleFormSubmit}
                 loading={isSubmitting}
                 disabled={isSubmitting}
                 style={[styles.authButton, styles.caregiverAuthButton]}
@@ -332,6 +361,8 @@ const CaregiverAuth = ({ navigation }) => {
                   <TouchableOpacity onPress={() => setMode('reset')} accessibilityLabel="Switch to reset password">
                     <Text style={styles.smallLink}>Forgot password?</Text>
                   </TouchableOpacity>
+                  
+
                   <View style={styles.authFooter}>
                 <Text style={styles.authFooterText}>
                   {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
@@ -475,6 +506,41 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     textAlign: 'center',
     marginTop: 8,
+  },
+  requiredFieldsNote: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 16,
+    fontStyle: 'italic',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  lastNameInput: {
+    flex: 3,
+    marginRight: 8,
+  },
+  middleInitialInput: {
+    flex: 1,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginBottom: 8,
+    marginTop: -8,
+  },
+  emailNote: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  passwordNote: {
+    fontSize: 11,
+    color: '#2563eb',
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
 });
 

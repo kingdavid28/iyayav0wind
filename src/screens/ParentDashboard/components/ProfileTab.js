@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { User, Edit2, Settings, Shield, Bell, LogOut, Phone, Mail, MapPin } from 'lucide-react-native';
+import { User, Edit2, Settings, Shield, Bell, LogOut, Phone, Mail, MapPin, Calendar } from 'lucide-react-native';
+import { useAuth } from '../../../contexts/AuthContext';
+import { calculateAge } from '../../../utils/dateUtils';
 import { styles } from '../../styles/ParentDashboard.styles';
 
 const ProfileTab = ({ 
@@ -12,6 +14,8 @@ const ProfileTab = ({
   profileLocation,
   greetingName 
 }) => {
+  const { user } = useAuth();
+  const userAge = user?.birthDate ? calculateAge(user.birthDate) : null;
   const profileSections = [
     {
       title: 'Personal Information',
@@ -23,9 +27,21 @@ const ProfileTab = ({
           action: () => onProfileEdit?.()
         },
         {
+          icon: Calendar,
+          label: 'Age',
+          value: userAge ? `${userAge} years old` : 'Not set',
+          action: () => onProfileEdit?.()
+        },
+        {
+          icon: Phone,
+          label: 'Phone Number',
+          value: user?.phone || 'Not set',
+          action: () => onProfileEdit?.()
+        },
+        {
           icon: Mail,
           label: 'Email',
-          value: profileContact || 'Not set',
+          value: user?.email || profileContact || 'Not set',
           action: () => onProfileEdit?.()
         },
         {
@@ -122,9 +138,19 @@ const ProfileTab = ({
             <Text style={profileStyles.summaryName}>
               {greetingName || profileName || 'Parent User'}
             </Text>
+            {userAge && (
+              <Text style={profileStyles.summaryAge}>
+                🎂 {userAge} years old
+              </Text>
+            )}
             <Text style={profileStyles.summaryEmail}>
-              {profileContact || 'No email set'}
+              📧 {user?.email || profileContact || 'No email set'}
             </Text>
+            {user?.phone && (
+              <Text style={profileStyles.summaryPhone}>
+                📱 {user.phone}
+              </Text>
+            )}
             <Text style={profileStyles.summaryLocation}>
               📍 {profileLocation || 'Location not set'}
             </Text>
@@ -260,7 +286,29 @@ const profileStyles = {
       default: 6,
     }),
   },
+  summaryAge: {
+    fontSize: Platform.select({
+      web: 14,
+      default: 16,
+    }),
+    color: '#6b7280',
+    marginBottom: Platform.select({
+      web: 2,
+      default: 4,
+    }),
+  },
   summaryEmail: {
+    fontSize: Platform.select({
+      web: 14,
+      default: 16,
+    }),
+    color: '#6b7280',
+    marginBottom: Platform.select({
+      web: 2,
+      default: 4,
+    }),
+  },
+  summaryPhone: {
     fontSize: Platform.select({
       web: 14,
       default: 16,

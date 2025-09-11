@@ -31,7 +31,7 @@ const BookingsSection = ({ bookings, onViewBookings }) => {
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleContainer}>
           <Clock size={20} color={colors.info} />
-          <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
+          <Text style={styles.sectionTitle}>Book a caregiver</Text>
         </View>
         {upcoming.length > 0 && (
           <TouchableOpacity onPress={onViewBookings}>

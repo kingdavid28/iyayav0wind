@@ -34,6 +34,7 @@ const validateAvailabilityUpdate = [
 router.get('/', profileController.getProfile);
 router.put('/', validateProfileUpdate, profileController.updateProfile);
 router.post('/image', profileController.updateProfileImage);
+router.get('/children', profileController.getChildren);
 router.put('/children', validateChildrenUpdate, profileController.updateChildren);
 router.get('/availability', profileController.getAvailability);
 router.put('/availability', validateAvailabilityUpdate, profileController.updateAvailability);

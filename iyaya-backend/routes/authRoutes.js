@@ -235,6 +235,32 @@ router.post('/confirm-reset-password',
   authController.confirmPasswordReset
 );
 
+router.post('/check-email',
+  authLimiter,
+  authController.checkEmailExists
+);
+
+router.get('/verify-email/:token',
+  authController.verifyEmail
+);
+
+router.post('/resend-verification',
+  authLimiter,
+  authController.resendVerification
+);
+
+router.post('/firebase-sync',
+  authController.firebaseSync
+);
+
+router.get('/firebase-profile',
+  authController.getFirebaseProfile
+);
+
+router.post('/send-custom-verification',
+  authController.sendCustomVerification
+);
+
 router.get('/me',
   profileLimiter,
   authenticate,
@@ -262,6 +288,12 @@ router.patch('/role',
 
 // Upload profile image via base64
 router.post('/profile/image-base64',
+  authenticate,
+  authController.uploadProfileImageBase64
+);
+
+// Alternative route for profile image upload
+router.post('/upload-profile-image',
   authenticate,
   authController.uploadProfileImageBase64
 );

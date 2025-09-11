@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate, authorize } = require('../utils/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const { body, param } = require('express-validator');
 const bookingController = require('../controllers/bookingController');
 const bookingControllerNew = require('../controllers/bookingController');

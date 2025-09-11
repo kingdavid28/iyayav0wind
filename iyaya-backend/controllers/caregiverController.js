@@ -12,51 +12,47 @@ const resolveMongoId = (user) => {
   return mongoose.isValidObjectId(id) ? id : null;
 };
 
-// Default profile template with rich mock data for new caregivers
+// Empty profile template for new caregivers
 const getDefaultProfileTemplate = () => ({
-  name: "Ana Dela Cruz",
-  bio: "Experienced and caring childcare provider with over 5 years of experience. I specialize in toddler care and creating engaging activities for children. CPR and First Aid certified.",
-  skills: ["Toddlers", "Meal Prep", "Light Housekeeping"],
-  hourlyRate: 25,
-  experience: { years: 5, description: "5+ years of professional childcare experience" },
-  education: [
-    { institution: "University of Cebu", degree: "Early Childhood Education", year: "2018" }
-  ],
-  languages: ["English", "Filipino"],
-  certifications: ["CPR Certified", "First Aid", "Child Development"],
-  ageCareRanges: ["0-2 years", "3-5 years"],
+  name: "",
+  bio: "",
+  skills: [],
+  hourlyRate: 0,
+  experience: { years: 0, months: 0, description: "" },
+  education: [],
+  languages: [],
+  certifications: [],
+  ageCareRanges: [],
   availability: {
-    flexible: true,
-    days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    flexible: false,
+    days: [],
     weeklySchedule: {
-      Monday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-      Tuesday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-      Wednesday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-      Thursday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-      Friday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
+      Monday: { available: false, timeSlots: [] },
+      Tuesday: { available: false, timeSlots: [] },
+      Wednesday: { available: false, timeSlots: [] },
+      Thursday: { available: false, timeSlots: [] },
+      Friday: { available: false, timeSlots: [] },
       Saturday: { available: false, timeSlots: [] },
       Sunday: { available: false, timeSlots: [] }
     }
   },
-  emergencyContacts: [
-    { name: "Maria Santos", relationship: "Sister", phone: "+63 917 123 4567" }
-  ],
+  emergencyContacts: [],
   verification: {
-    profileComplete: true,
-    identityVerified: true,
-    certificationsVerified: true,
-    referencesVerified: true,
-    trustScore: 95,
-    badges: ["Top Rated", "Background Verified", "CPR Certified"]
+    profileComplete: false,
+    identityVerified: false,
+    certificationsVerified: false,
+    referencesVerified: false,
+    trustScore: 0,
+    badges: []
   },
   backgroundCheck: {
-    status: "approved",
+    status: "not_started",
     provider: "internal",
-    checkTypes: ["identity", "criminal", "reference"]
+    checkTypes: []
   },
-  rating: 4.9,
-  reviewCount: 127,
-  location: "Cebu City, Philippines"
+  rating: 0,
+  reviewCount: 0,
+  location: ""
 });
 
 // Get current caregiver's profile (Optimized)
@@ -161,100 +157,22 @@ exports.getCaregiverProfile = async (req, res) => {
 // Search caregivers with filters (public info only) - Optimized
 exports.searchCaregivers = async (req, res) => {
   try {
-    const { skills, minRate, maxRate, daysAvailable, search, page = 1, limit = 10 } = req.query;
+    const { skills, minRate, maxRate, daysAvailable, search, page = 1, limit = 50 } = req.query;
     console.log('🔍 Caregiver search request:', { skills, minRate, maxRate, daysAvailable, search, page, limit });
     
     // First check if we have any caregivers at all
     const totalCaregivers = await Caregiver.countDocuments();
     console.log('📊 Total caregivers in database:', totalCaregivers);
     
-    // If no caregivers exist, return sample data for testing
+    // If no caregivers exist, return empty array
     if (totalCaregivers === 0) {
-      console.log('❌ No caregivers found in database, returning sample data');
-      const sampleCaregivers = [
-        {
-          _id: 'sample1',
-          id: 'sample1',
-          name: 'Sarah Johnson',
-          skills: ['Childcare', 'Cooking', 'Cleaning'],
-          experience: { years: 5, months: 0, description: '5+ years of childcare experience' },
-          hourlyRate: 25,
-          availability: { days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
-          rating: 4.8,
-          reviewCount: 124,
-          location: 'Cebu City',
-          ageCareRanges: ['INFANT', 'TODDLER', 'PRESCHOOL'],
-          avatar: null,
-          verified: true
-        },
-        {
-          _id: 'sample2',
-          id: 'sample2',
-          name: 'Maria Garcia',
-          skills: ['Childcare', 'Tutoring', 'First Aid'],
-          experience: { years: 3, months: 6, description: 'Experienced with special needs children' },
-          hourlyRate: 22,
-          availability: { days: ['Monday', 'Wednesday', 'Friday', 'Saturday'] },
-          rating: 4.6,
-          reviewCount: 96,
-          location: 'Mandaue, Cebu',
-          ageCareRanges: ['TODDLER', 'PRESCHOOL', 'SCHOOL_AGE'],
-          avatar: null,
-          verified: true
-        },
-        {
-          _id: 'sample3',
-          id: 'sample3',
-          name: 'Ana Dela Cruz',
-          skills: ['Infant Care', 'CPR Certified', 'Meal Prep'],
-          experience: { years: 7, months: 0, description: 'Specialized in infant care with CPR certification' },
-          hourlyRate: 30,
-          availability: { days: ['Tuesday', 'Thursday', 'Saturday', 'Sunday'] },
-          rating: 4.9,
-          reviewCount: 87,
-          location: 'Lahug, Cebu',
-          ageCareRanges: ['INFANT', 'TODDLER'],
-          avatar: null,
-          verified: true
-        },
-        {
-          _id: 'sample4',
-          id: 'sample4',
-          name: 'Grace Santos',
-          skills: ['Toddler Care', 'Arts & Crafts', 'Educational Activities'],
-          experience: { years: 4, months: 0, description: 'Creative caregiver specializing in educational activities' },
-          hourlyRate: 20,
-          availability: { days: ['Monday', 'Tuesday', 'Wednesday', 'Friday'] },
-          rating: 4.7,
-          reviewCount: 152,
-          location: 'Talisay, Cebu',
-          ageCareRanges: ['TODDLER', 'PRESCHOOL'],
-          avatar: null,
-          verified: false
-        },
-        {
-          _id: 'sample5',
-          id: 'sample5',
-          name: 'Jennifer Lee',
-          skills: ['Tutoring', 'Language Skills', 'Homework Help'],
-          experience: { years: 6, months: 0, description: 'Experienced tutor and caregiver for school-age children' },
-          hourlyRate: 28,
-          availability: { days: ['Monday', 'Wednesday', 'Thursday', 'Friday'] },
-          rating: 4.8,
-          reviewCount: 203,
-          location: 'IT Park, Cebu',
-          ageCareRanges: ['PRESCHOOL', 'SCHOOL_AGE'],
-          avatar: null,
-          verified: true
-        }
-      ];
-      
+      console.log('❌ No caregivers found in database, returning empty array');
       return res.json({
         success: true,
-        count: sampleCaregivers.length,
-        totalPages: 1,
+        count: 0,
+        totalPages: 0,
         currentPage: 1,
-        caregivers: sampleCaregivers
+        caregivers: []
       });
     }
     
@@ -340,7 +258,25 @@ exports.searchCaregivers = async (req, res) => {
 // Get caregiver details (public info + conditional contact info)
 exports.getCaregiverDetails = async (req, res) => {
   try {
-    const caregiver = await Caregiver.findById(req.params.id)
+    const { id } = req.params;
+    
+    // Handle special case for "my-profile" - redirect to profile endpoint
+    if (id === 'my-profile') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Use /profile endpoint for your own profile' 
+      });
+    }
+    
+    // Validate ObjectId format
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid caregiver ID format' 
+      });
+    }
+    
+    const caregiver = await Caregiver.findById(id)
       .populate('userId', 'name profileImage email phone role userType')
       .populate('reviews.userId', 'name profileImage');
     if (!caregiver) {
@@ -608,7 +544,7 @@ exports.refreshToken = async (req, res) => {
       });
     }
 
-    const decoded = jwt.verify(refreshToken, refreshTokenSecret);
+    const decoded = jwt.verify(refreshToken, refreshTokenSecret, { algorithms: ['HS256'] });
     const user = await User.findById(decoded.id);
 
     if (!user || user.tokenVersion !== decoded.tokenVersion) {

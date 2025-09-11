@@ -202,7 +202,7 @@ export default function EnhancedChatScreen() {
       }
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType?.Images || 'Images',
+        mediaTypes: [ImagePicker.MediaType.Images],
         allowsEditing: false,
         quality: 0.8,
         allowsMultipleSelection: true

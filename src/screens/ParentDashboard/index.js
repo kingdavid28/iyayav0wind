@@ -3,7 +3,8 @@ import { View, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import { useAuth } from '../../contexts/AuthContext';
-import { caregiversAPI, jobsAPI, authAPI, bookingsAPI } from '../../config/api';
+import { caregiversAPI, authAPI } from '../../config/api';
+import { jobsAPI, bookingsAPI, childrenAPI } from '../../config/api';
 import { formatAddress } from '../../utils/addressUtils';
 import { styles } from '../styles/ParentDashboard.styles';
 // Privacy components
@@ -26,6 +27,7 @@ import BookingModal from './modals/BookingModal';
 import PaymentModal from './modals/PaymentModal';
 import ChildModal from './modals/ChildModal';
 
+
 // Import services
 // import { userService } from '../../services/userService';
 import { useApp } from '../../contexts/AppContext';
@@ -35,40 +37,9 @@ import { fetchAndProcessBookings } from '../../utils/bookingUtils';
 // import { getCaregiverDisplayName } from '../../utils/caregiverUtils';
 import { applyFilters, countActiveFilters } from '../../utils/caregiverUtils';
 
-// Sample data
-const SAMPLE_CHILDREN = [
-  {
-    id: 'child-1',
-    name: 'Maya',
-    age: 4,
-    avatar: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=200&h=200&fit=crop',
-    allergies: 'Peanuts',
-  },
-  {
-    id: 'child-2',
-    name: 'Miguel',
-    age: 6,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
-    allergies: '',
-  },
-];
-
-const SAMPLE_CAREGIVERS = [
-  {
-    id: '507f1f77bcf86cd799439011',
-    name: 'Ana Dela Cruz',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop',
-    rating: 4.8,
-    reviewCount: 124,
-    hourlyRate: 350,
-    location: 'Cebu City',
-    specialties: ['Infant Care', 'CPR Certified'],
-    skills: ['Infant Care', 'CPR Certified'],
-    experience: 5,
-    verified: true
-  },
-  // ... other sample caregivers
-];
+// No sample data - all data comes from database
+const SAMPLE_CHILDREN = [];
+const SAMPLE_CAREGIVERS = [];
 
 const ParentDashboard = () => {
   const navigation = useNavigation();
@@ -112,9 +83,12 @@ const ParentDashboard = () => {
   const [paymentBase64, setPaymentBase64] = useState('');
   const [paymentMime, setPaymentMime] = useState('image/jpeg');
 
+
+
   // Child form state
   const [childName, setChildName] = useState('');
   const [childAge, setChildAge] = useState('');
+  const [childAllergies, setChildAllergies] = useState('');
   const [childNotes, setChildNotes] = useState('');
   const [editingChildId, setEditingChildId] = useState(null);
 
@@ -226,7 +200,7 @@ const ParentDashboard = () => {
       setCaregiversLoading(true);
       console.log('🔍 Fetching caregivers from backend...');
       
-      const response = await caregiversAPI.getProviders();
+      const response = await caregiversAPI.getCaregivers();
       const caregiversList = response.data?.caregivers || response.caregivers || [];
       
       const transformedCaregivers = caregiversList.map(caregiver => ({
@@ -249,10 +223,10 @@ const ParentDashboard = () => {
       
     } catch (error) {
       console.error('❌ Backend caregivers fetch failed:', error.message);
-      // Fallback to sample caregivers
-      console.log('🔄 Using sample caregivers as fallback');
-      setCaregivers(SAMPLE_CAREGIVERS);
-      return SAMPLE_CAREGIVERS;
+      // No fallback - show empty state when backend fails
+      console.log('🔄 No caregivers available - backend unavailable');
+      setCaregivers([]);
+      return [];
     } finally {
       setCaregiversLoading(false);
     }
@@ -306,11 +280,16 @@ const ParentDashboard = () => {
 
   const fetchMyChildren = useCallback(async () => {
     try {
-      // Children data is now loaded through the main loadData() function
-      // This function now just sets sample data as fallback
-      setChildren(SAMPLE_CHILDREN);
+      console.log('🔍 Fetching children from backend...');
+      const response = await childrenAPI.getMyChildren();
+      const childrenList = response?.data?.children || response?.children || [];
+      
+      console.log(`✅ Loaded ${childrenList.length} children from backend`);
+      setChildren(childrenList);
     } catch (err) {
-      setChildren(SAMPLE_CHILDREN);
+      console.error('❌ Backend children fetch failed:', err.message);
+      console.log('🔄 No children available - backend unavailable');
+      setChildren([]);
     }
   }, []);
 
@@ -331,6 +310,8 @@ const ParentDashboard = () => {
       setRefreshing(false);
     }
   }, [loadData, fetchCaregivers, handleFetchBookings, fetchMyChildren]);
+
+
 
   // Initial data load
   const didInitRef = useRef(false);
@@ -362,14 +343,16 @@ const ParentDashboard = () => {
     setEditingChildId(null);
     setChildName('');
     setChildAge('');
+    setChildAllergies('');
     setChildNotes('');
     setShowChildModal(true);
   }, []);
 
   const openEditChild = useCallback((child) => {
-    setEditingChildId(child.id);
+    setEditingChildId(child._id || child.id);
     setChildName(child.name || '');
     setChildAge(String(child.age ?? ''));
+    setChildAllergies(child.allergies || '');
     setChildNotes(child.preferences || '');
     setShowChildModal(true);
   }, []);
@@ -379,26 +362,39 @@ const ParentDashboard = () => {
     if (!trimmedName) return;
     
     const ageNum = Number(childAge || 0);
-    let next;
+    const childData = {
+      name: trimmedName,
+      age: ageNum,
+      allergies: childAllergies || '',
+      preferences: childNotes || ''
+    };
     
-    if (editingChildId) {
-      next = children.map((c) =>
-        c.id === editingChildId ? { ...c, name: trimmedName, age: ageNum, preferences: childNotes } : c
-      );
-    } else {
-      next = [
-        ...children,
-        { id: `child-${Date.now()}`, name: trimmedName, age: ageNum, preferences: childNotes },
-      ];
+    try {
+      if (editingChildId) {
+        // Update existing child
+        await childrenAPI.update(editingChildId, childData);
+        console.log('✅ Child updated successfully');
+      } else {
+        // Create new child
+        await childrenAPI.create(childData);
+        console.log('✅ Child created successfully');
+      }
+      
+      // Refresh children list
+      await fetchMyChildren();
+      
+      // Close modal and reset form
+      setShowChildModal(false);
+      setEditingChildId(null);
+      setChildName('');
+      setChildAge('');
+      setChildAllergies('');
+      setChildNotes('');
+    } catch (error) {
+      console.error('❌ Child save failed:', error.message);
+      Alert.alert('Error', 'Failed to save child. Please try again.');
     }
-    
-    setChildren(next);
-    setShowChildModal(false);
-    setEditingChildId(null);
-    setChildName('');
-    setChildAge('');
-    setChildNotes('');
-  }, [childName, childAge, childNotes, editingChildId, children]);
+  }, [childName, childAge, childAllergies, childNotes, editingChildId, fetchMyChildren]);
 
   // Caregiver interaction functions
   const handleViewCaregiver = (caregiver) => {
@@ -442,12 +438,12 @@ const ParentDashboard = () => {
         name: childData.name,
         age: childData.age,
         preferences: childData.preferences || '',
-        allergies: childData.allergies || 'None'
+        allergies: childData.allergies || ''
       } : {
         name: childName,
         age: 0,
         preferences: '',
-        allergies: 'None'
+        allergies: ''
       };
     });
 
@@ -723,6 +719,11 @@ const ParentDashboard = () => {
             onAddChild={openAddChild}
             onEditChild={openEditChild}
             onViewBookings={() => setActiveTab('bookings')}
+            greetingName={greetingName}
+            profileImage={profileImage}
+            profileContact={profileContact}
+            profileLocation={profileLocation}
+            userData={userData}
           />
         );
       case 'search':
@@ -805,14 +806,6 @@ const ParentDashboard = () => {
         navigation={navigation}
       />
       
-      <MobileProfileSection 
-        greetingName={greetingName}
-        profileImage={profileImage}
-        profileContact={profileContact}
-        profileLocation={profileLocation}
-        activeTab={activeTab}
-      />
-      
       {renderActiveTab()}
 
       {/* Modals */}
@@ -823,6 +816,8 @@ const ParentDashboard = () => {
         setChildName={setChildName}
         childAge={childAge}
         setChildAge={setChildAge}
+        childAllergies={childAllergies}
+        setChildAllergies={setChildAllergies}
         childNotes={childNotes}
         setChildNotes={setChildNotes}
         onSave={handleAddOrSaveChild}
@@ -868,7 +863,7 @@ const ParentDashboard = () => {
         visible={isBookingModalVisible}
         onClose={() => setIsBookingModalVisible(false)}
         caregiver={selectedCaregiver}
-        childrenList={children.length ? children : SAMPLE_CHILDREN}
+        childrenList={children}
         onConfirm={handleBookingConfirm}
       />
         </View>

@@ -43,7 +43,7 @@ const ProfileModal = ({
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType?.Images || 'Images',
+        mediaTypes: [ImagePicker.MediaType.Images],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,

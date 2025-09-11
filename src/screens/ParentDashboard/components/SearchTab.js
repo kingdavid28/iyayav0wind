@@ -4,6 +4,7 @@ import { SlidersHorizontal, Search } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import CaregiverCard from './CaregiverCard';
 
+
 const SearchTab = ({
   searchQuery,
   filteredCaregivers,
@@ -27,7 +28,7 @@ const SearchTab = ({
     <View style={[styles.caregiversContent, { flex: 1 }]}>
       {/* Header and Filter Button */}
       <View style={searchTabStyles.headerContainer}>
-        <Text style={searchTabStyles.headerTitle}>Find Caregivers</Text>
+        <Text style={searchTabStyles.headerTitle}>Find iYaya</Text>
         <TouchableOpacity 
           style={[searchTabStyles.filterButton, activeFilters > 0 && searchTabStyles.filterButtonActive]}
           onPress={onOpenFilter}
@@ -92,7 +93,7 @@ const SearchTab = ({
             <Text style={styles.sectionTitle}>
               {showSearchResults 
                 ? `Search Results (${displayData.length})` 
-                : `Available Caregivers (${displayData.length})`}
+                : `Available iYaya (${displayData.length})`}
             </Text>
           }
           ItemSeparatorComponent={() => <View style={{ height: 5 }} />}

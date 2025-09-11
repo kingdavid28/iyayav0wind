@@ -65,7 +65,7 @@ const ProfileManagement = ({ visible, onClose }) => {
       }
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType?.Images || 'Images',
+        mediaTypes: [ImagePicker.MediaType.Images],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -75,13 +75,13 @@ const ProfileManagement = ({ visible, onClose }) => {
       if (!result.canceled) {
         const asset = result.assets[0];
         const mimeType = asset.mimeType || 'image/jpeg';
-        const dataUrl = asset.base64 ? `data:${mimeType};base64,${asset.base64}` : null;
-        if (!dataUrl) {
+        const imageBase64 = asset.base64;
+        if (!imageBase64) {
           Alert.alert('Error', 'Failed to read image data');
           return;
         }
 
-        const resp = await authAPI.uploadProfileImageBase64(dataUrl, mimeType);
+        const resp = await authAPI.uploadProfileImageBase64(imageBase64, mimeType);
         const url = resp?.data?.url || resp?.url;
         const absoluteUrl = url && url.startsWith('/') ? `${API_CONFIG.BASE_URL}${url}` : url;
         setProfile(prev => ({ ...prev, photoURL: absoluteUrl || prev.photoURL }));

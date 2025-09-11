@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Button, Text, IconButton } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadsAPI } from '../../config/api';
+import { uploadsAPI, authAPI } from '../../config/api';
 
 // Platform-specific FileSystem import
 const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
@@ -21,7 +21,7 @@ const DocumentUpload = ({ label, documentType, onUploadComplete, initialUri = ''
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaType?.Images || 'Images',
+        mediaTypes: [ImagePicker.MediaType.Images],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -55,11 +55,21 @@ const DocumentUpload = ({ label, documentType, onUploadComplete, initialUri = ''
       const name = `${documentType}_${Date.now()}`;
       const folder = 'verification_documents';
 
-      const res = await uploadsAPI.base64Upload({ imageBase64, mimeType, folder, name });
-      if (!res?.success || !res?.url) throw new Error('Upload failed');
+      // Try uploadsAPI first, fallback to authAPI
+      let res;
+      try {
+        res = await uploadsAPI.base64Upload({ imageBase64, mimeType, folder, name });
+      } catch (uploadError) {
+        console.log('Upload API failed, trying auth API:', uploadError.message);
+        res = await authAPI.uploadProfileImageBase64(imageBase64, mimeType);
+      }
+      
+      const url = res?.data?.url || res?.url;
+      if (!res?.success && !url) throw new Error('Upload failed');
+      
       setUploadProgress(100);
-      setDocumentUri(res.url);
-      onUploadComplete(res.url, documentType);
+      setDocumentUri(url);
+      onUploadComplete(url, documentType);
       setIsUploading(false);
     } catch (error) {
       console.error('Upload error:', error);

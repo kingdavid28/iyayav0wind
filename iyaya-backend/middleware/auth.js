@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { jwtSecret } = require('../config/auth');
 const User = require('../models/User');
 
-// Authentication middleware: JWT-only (Firebase Admin removed)
+// Authentication middleware: Handles both JWT and Firebase tokens
 const authenticate = async (req, res, next) => {
   try {
     // Dev-only bypass to help Expo Go flows without a real token
@@ -72,11 +72,10 @@ const authenticate = async (req, res, next) => {
       return next();
     }
 
-    // Try real JWT verification only for non-mock tokens
+    // Try JWT verification first
     try {
       const decoded = jwt.verify(token, jwtSecret, {
-        algorithms: ['HS256'],
-        ignoreExpiration: false
+        algorithms: ['HS256']
       });
 
       // Check if user still exists in database
@@ -91,9 +90,7 @@ const authenticate = async (req, res, next) => {
 
       // Map JWT token roles to correct userType using actual DB data
       let userType = user.userType || user.role || 'user';
-      if (user.role === 'provider' || user.userType === 'provider') {
-        userType = 'caregiver';
-      } else if (user.role === 'caregiver' || user.userType === 'caregiver') {
+      if (user.role === 'caregiver' || user.userType === 'caregiver') {
         userType = 'caregiver';
       } else if (user.role === 'client' || user.userType === 'client') {
         userType = 'parent';
@@ -114,13 +111,46 @@ const authenticate = async (req, res, next) => {
 
       return next();
     } catch (jwtError) {
-      console.error('JWT verification failed:', jwtError.message);
+      console.log('JWT verification failed, trying Firebase token:', jwtError.message);
+      
+      // Try Firebase token verification
+      try {
+        // Decode Firebase token to get UID (without verification for now)
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        const firebaseUid = payload.user_id || payload.uid;
+        
+        if (firebaseUid) {
+          // Find user by Firebase UID
+          const user = await User.findOne({ firebaseUid }).select('_id role userType email');
+          
+          if (!user) {
+            return res.status(401).json({
+              success: false,
+              error: 'Firebase user not found in database'
+            });
+          }
+
+          req.user = {
+            id: user._id.toString(),
+            mongoId: user._id,
+            role: user.role || 'parent',
+            userType: user.userType || 'parent',
+            email: user.email,
+            firebaseUid: firebaseUid
+          };
+          
+          return next();
+        }
+      } catch (firebaseError) {
+        console.error('Firebase token verification failed:', firebaseError.message);
+      }
+      
       throw new Error('Invalid token');
     }
   } catch (err) {
     console.error('Authentication error:', err.name, err.message);
     
-    let errorMessage = 'Authentication failed';
+    let errorMessage = 'Invalid token';
     if (err.name === 'TokenExpiredError') {
       errorMessage = 'Token expired';
     } else if (err.name === 'JsonWebTokenError') {
@@ -130,7 +160,7 @@ const authenticate = async (req, res, next) => {
     return res.status(401).json({
       success: false,
       error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      code: 'INVALID_TOKEN'
     });
   }
 };

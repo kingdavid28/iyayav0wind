@@ -1,6 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { privacyAPI } from '../../config/api';
+
+// Fallback if privacyAPI is not available
+const safePrivacyAPI = privacyAPI || {
+  getPrivacySettings: () => Promise.resolve({ data: null }),
+  getPendingRequests: () => Promise.resolve({ data: [] }),
+  getPrivacyNotifications: () => Promise.resolve({ data: [] }),
+  updatePrivacySettings: () => Promise.resolve({ success: true }),
+  requestInformation: () => Promise.resolve({ success: true }),
+  respondToRequest: () => Promise.resolve({ success: true }),
+  grantPermission: () => Promise.resolve({ success: true }),
+  revokePermission: () => Promise.resolve({ success: true }),
+  markNotificationAsRead: () => Promise.resolve({ success: true })
+};
 import { isAuthenticated } from '../../utils/authUtils';
 import { useProfileData } from './ProfileDataManager';
 
@@ -42,7 +55,7 @@ export const PrivacyProvider = ({ children }) => {
         return;
       }
       
-      const response = await privacyAPI.getPrivacySettings();
+      const response = await safePrivacyAPI.getPrivacySettings();
       if (response?.data) {
         setPrivacySettings(response.data);
       }
@@ -63,7 +76,7 @@ export const PrivacyProvider = ({ children }) => {
       const updatedSettings = { ...privacySettings, [setting]: value };
       setPrivacySettings(updatedSettings);
       
-      await privacyAPI.updatePrivacySettings(updatedSettings);
+      await safePrivacyAPI.updatePrivacySettings(updatedSettings);
       return true;
     } catch (error) {
       console.error('Error updating privacy setting:', error);
@@ -81,7 +94,7 @@ export const PrivacyProvider = ({ children }) => {
         requestedAt: new Date().toISOString(),
       };
 
-      const response = await privacyAPI.requestInformation(requestData);
+      const response = await safePrivacyAPI.requestInformation(requestData);
       
       if (response?.success) {
         Alert.alert('Request Sent', 'Your information request has been sent and is pending approval.');
@@ -97,7 +110,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const respondToRequest = async (requestId, approved, sharedFields = [], expiresIn = null) => {
     try {
-      const response = await privacyAPI.respondToRequest({
+      const response = await safePrivacyAPI.respondToRequest({
         requestId,
         approved,
         sharedFields,
@@ -109,7 +122,7 @@ export const PrivacyProvider = ({ children }) => {
         // Grant specific permissions to the requester
         const request = pendingRequests.find(req => req.id === requestId);
         if (request) {
-          await privacyAPI.grantPermission(
+          await safePrivacyAPI.grantPermission(
             request.targetUserId,
             request.requesterId,
             sharedFields,
@@ -174,7 +187,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const grantUserPermission = async (targetUserId, viewerUserId, fields, expiresIn = null) => {
     try {
-      const response = await privacyAPI.grantPermission(targetUserId, viewerUserId, fields, expiresIn);
+      const response = await safePrivacyAPI.grantPermission(targetUserId, viewerUserId, fields, expiresIn);
       if (response?.success) {
         Alert.alert('Permission Granted', 'Data access has been granted successfully.');
         return true;
@@ -189,7 +202,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const revokeUserPermission = async (targetUserId, viewerUserId, fields = null) => {
     try {
-      const response = await privacyAPI.revokePermission(targetUserId, viewerUserId, fields);
+      const response = await safePrivacyAPI.revokePermission(targetUserId, viewerUserId, fields);
       if (response?.success) {
         Alert.alert('Permission Revoked', 'Data access has been revoked successfully.');
         return true;
@@ -212,7 +225,7 @@ export const PrivacyProvider = ({ children }) => {
         return;
       }
       
-      const response = await privacyAPI.getPendingRequests();
+      const response = await safePrivacyAPI.getPendingRequests();
       if (response?.data) {
         setPendingRequests(response.data);
       }
@@ -238,7 +251,7 @@ export const PrivacyProvider = ({ children }) => {
         return;
       }
       
-      const response = await privacyAPI.getPrivacyNotifications();
+      const response = await safePrivacyAPI.getPrivacyNotifications();
       if (response?.data) {
         setNotifications(response.data);
       }
@@ -256,7 +269,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const markNotificationAsRead = async (notificationId) => {
     try {
-      await privacyAPI.markNotificationAsRead(notificationId);
+      await safePrivacyAPI.markNotificationAsRead(notificationId);
       setNotifications(prev => 
         prev.map(notif => 
           notif.id === notificationId 

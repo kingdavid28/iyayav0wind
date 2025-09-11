@@ -14,8 +14,8 @@ const ChildrenSection = ({ children, onAddChild, onEditChild }) => {
       </View>
       
       <View style={styles.childrenList}>
-        {children.map((child) => (
-          <View key={child.id} style={[styles.childCard, { backgroundColor: colors.backgroundLight }]}>
+        {children.map((child, index) => (
+          <View key={child.id || child._id || index} style={[styles.childCard, { backgroundColor: colors.backgroundLight }]}>
             <View style={[styles.childIcon, { backgroundColor: colors.secondaryLight }]}>
               <Baby size={24} color={colors.secondary} />
             </View>

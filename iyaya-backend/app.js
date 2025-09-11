@@ -9,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const { rateLimit } = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
-const { authenticate, authorize } = require('./utils/auth');
+const { authenticate, authorize } = require('./middleware/auth');
 const config = require('./config/env');
 
 const app = express();
@@ -25,10 +25,7 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => process.env.NODE_ENV === 'development' || (req.user?.role === 'admin') || (req.originalUrl?.startsWith('/api/messages')),
-  keyGenerator: (req, res) => {
-    // Use express-rate-limit's built-in IPv6 handling
-    return rateLimit.ipKeyGenerator(req, res);
-  }
+  // Use default IP-based key generation
 });
 
 // Dedicated limiter for messages endpoints: higher cap and key per authenticated user
@@ -38,11 +35,9 @@ const messagesLimiter = rateLimit({
   message: { success: false, error: 'Too many message requests, please slow down temporarily' },
   standardHeaders: true,
   keyGenerator: (req, res) => {
-    // Use user ID if authenticated, otherwise fall back to IP with IPv6 handling
+    // Use user ID if authenticated, otherwise fall back to IP
     if (req.user?.id) return req.user.id;
-    const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
-    // Use express-rate-limit's built-in IPv6 handling
-    return rateLimit.ipKeyGenerator(req, res);
+    return req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
   },
   legacyHeaders: false,
   skip: (req) => process.env.NODE_ENV === 'development', // Skip rate limiting in development
@@ -187,6 +182,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve verification page
+app.get('/verify.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'verify.html'));
+});
 // Serve uploaded files with proper headers
 app.use('/uploads', (req, res, next) => {
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -211,6 +211,7 @@ const mountRoutes = () => {
   apiRouter.use('/bookings', authenticate, require('./routes/bookingRoutes'));
   apiRouter.use('/jobs', require('./routes/jobsRoutes'));
   apiRouter.use('/applications', require('./routes/applicationsRoutes'));
+  apiRouter.use('/children', require('./routes/childrenRoutes'));
   apiRouter.use('/uploads', authenticate, require('./routes/uploadsRoutes'));
   // Apply authenticate BEFORE messagesLimiter so keyGenerator can use req.user
   apiRouter.use('/messages', authenticate, messagesLimiter, require('./routes/messagesRoutes'));

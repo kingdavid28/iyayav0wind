@@ -3,8 +3,20 @@ import { View, Text, Image, Platform } from 'react-native';
 import { User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCurrentSocketURL } from '../../../config/api';
+import { useAuth } from '../../../contexts/AuthContext';
+import { calculateAge, formatBirthDate } from '../../../utils/dateUtils';
 
-const MobileProfileSection = ({ greetingName, profileImage, profileContact, profileLocation, activeTab }) => {
+const MobileProfileSection = ({ greetingName, profileImage, profileContact, profileLocation, activeTab, userData }) => {
+  const { user } = useAuth();
+  
+  // Use userData prop if available, fallback to user context
+  const profileData = userData || user;
+  
+  const userAge = profileData?.birthDate ? calculateAge(profileData.birthDate) : null;
+  const fullName = profileData?.name || greetingName;
+  const displayName = profileData?.firstName && profileData?.lastName 
+    ? `${profileData.firstName} ${profileData.middleInitial ? profileData.middleInitial + '. ' : ''}${profileData.lastName}`.trim()
+    : fullName;
   // Handle image URI construction
   const getImageSource = () => {
     console.log('🖼️ MobileProfileSection - profileImage:', profileImage);
@@ -28,8 +40,8 @@ const MobileProfileSection = ({ greetingName, profileImage, profileContact, prof
   
   const imageSource = getImageSource();
 
-  // Only render on mobile platforms and Home tab
-  if (Platform.OS === 'web' || activeTab !== 'home') {
+  // Only render on mobile platforms
+  if (Platform.OS === 'web') {
     return null;
   }
 
@@ -63,11 +75,20 @@ const MobileProfileSection = ({ greetingName, profileImage, profileContact, prof
           
           <View style={styles.mobileProfileInfo}>
             <Text style={styles.mobileWelcomeText}>
-              {greetingName ? `Welcome back, ${greetingName}! 👋` : 'Welcome back! 👋'}
+              {displayName ? `Welcome back, ${displayName}! 👋` : 'Welcome back! 👋'}
             </Text>
             <View style={styles.mobileProfileDetails}>
-              <Text style={styles.mobileProfileDetailText}>📧 {profileContact || 'No email'}</Text>
-              <Text style={styles.mobileProfileDetailText}>📍 {profileLocation || 'Location not set'}</Text>
+              {userAge && (
+                <Text style={styles.mobileProfileDetailText}>🎂 {userAge} years old</Text>
+              )}
+              <Text style={styles.mobileProfileDetailText}>📧 {profileData?.email || profileContact || 'No email'}</Text>
+              {profileData?.phone && (
+                <Text style={styles.mobileProfileDetailText}>📱 {profileData.phone}</Text>
+              )}
+              <Text style={styles.mobileProfileDetailText}>📍 {profileData?.address?.street || profileLocation || 'Location not set'}</Text>
+              {profileData?.role === 'caregiver' && profileData?.caregiverProfile?.hourlyRate && (
+                <Text style={styles.mobileProfileDetailText}>💰 ₱{profileData.caregiverProfile.hourlyRate}/hr</Text>
+              )}
             </View>
           </View>
         </View>
@@ -78,13 +99,13 @@ const MobileProfileSection = ({ greetingName, profileImage, profileContact, prof
 
 const styles = {
   mobileProfileContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 1,
+    paddingVertical: 5,
     backgroundColor: 'transparent',
   },
   mobileProfileCard: {
     borderRadius: 20,
-    padding: 20,
+    padding: 10,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

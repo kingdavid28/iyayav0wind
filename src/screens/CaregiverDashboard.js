@@ -2,7 +2,6 @@
 
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from "@react-navigation/native"
-import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from "expo-linear-gradient"
 import React, { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native"
@@ -17,8 +16,11 @@ import PrivacyNotificationModal from "../components/Privacy/PrivacyNotificationM
 import { SettingsModal } from "../components/SettingsModal"
 import { RequestInfoModal } from "../components/RequestInfoModal"
 import MessagesTab from "../components/MessagesTab"
+
 import { formatAddress } from "../utils/addressUtils"
+import { calculateAge } from "../utils/dateUtils"
 import { styles } from "./styles/CaregiverDashboard.styles"
+import CaregiverProfileSection from "./CaregiverDashboard/components/CaregiverProfileSection"
 
 // Local quick tiles
 function QuickStat({ icon, value, label, color = '#2563EB', bgColor = '#EFF6FF' }) {
@@ -91,47 +93,46 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
-  // Default profile as fallback - rich mock data for better UX
+
+  // Default empty profile - all data comes from database
   const defaultProfile = {
-    name: "Ana Dela Cruz",
-    rating: 4.9,
-    reviews: 127,
-    hourlyRate: 25,
-    experience: "5+ years",
-    specialties: ["Toddlers", "Meal Prep", "Light Housekeeping"],
-    skills: ["Toddlers", "Meal Prep", "Light Housekeeping"],
-    certifications: ["CPR Certified", "First Aid", "Child Development"],
-    backgroundCheck: "Verified",
-    completedJobs: 234,
-    responseRate: "98%",
-    ageCareRanges: ["0-2 years", "3-5 years"],
-    languages: ["English", "Filipino"],
-    emergencyContacts: [
-      { name: "Maria Santos", relationship: "Sister", phone: "+63 917 123 4567" }
-    ],
+    name: "",
+    rating: 0,
+    reviews: 0,
+    hourlyRate: 0,
+    experience: "",
+    specialties: [],
+    skills: [],
+    certifications: [],
+    backgroundCheck: "Not Started",
+    completedJobs: 0,
+    responseRate: "0%",
+    ageCareRanges: [],
+    languages: [],
+    emergencyContacts: [],
     verification: {
-      profileComplete: true,
-      identityVerified: true,
-      certificationsVerified: true,
-      referencesVerified: true,
-      trustScore: 95,
-      badges: ["Top Rated", "Background Verified", "CPR Certified"]
+      profileComplete: false,
+      identityVerified: false,
+      certificationsVerified: false,
+      referencesVerified: false,
+      trustScore: 0,
+      badges: []
     },
     availability: {
-      flexible: true,
-      days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      flexible: false,
+      days: [],
       weeklySchedule: {
-        Monday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-        Tuesday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-        Wednesday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-        Thursday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
-        Friday: { available: true, timeSlots: [{ start: "08:00", end: "18:00" }] },
+        Monday: { available: false, timeSlots: [] },
+        Tuesday: { available: false, timeSlots: [] },
+        Wednesday: { available: false, timeSlots: [] },
+        Thursday: { available: false, timeSlots: [] },
+        Friday: { available: false, timeSlots: [] },
         Saturday: { available: false, timeSlots: [] },
         Sunday: { available: false, timeSlots: [] }
       }
     },
-    bio: "Experienced and caring childcare provider with over 5 years of experience. I specialize in toddler care and creating engaging activities for children. CPR and First Aid certified.",
-    location: "Cebu City, Philippines"
+    bio: "",
+    location: ""
   }
 
   // Open edit modal with current profile values
@@ -148,97 +149,15 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
   const [profile, setProfile] = useState(defaultProfile)
 
-  // Mock jobs fallback
-  const mockJobs = [
-    {
-      id: 1,
-      title: "Full-time Nanny for 2 Children",
-      family: "The Dela Cruz Family",
-      location: "Cebu City",
-      distance: "3.4 km away",
-      hourlyRate: 28,
-      schedule: "Monday-Friday, 8AM-6PM",
-      requirements: ["CPR certified", "Experience with toddlers", "Non-smoker"],
-      postedDate: "2 days ago",
-      urgent: true,
-      children: 2,
-      ages: "2, 5"
-    },
-    {
-      id: 2,
-      title: "Weekend Babysitter Needed",
-      family: "The Santos Family",
-      location: "Cebu City",
-      distance: "5.6 km away",
-      hourlyRate: 22,
-      schedule: "Weekends, flexible hours",
-      requirements: ["Infant experience", "References required"],
-      postedDate: "1 week ago",
-      urgent: false,
-      children: 1,
-      ages: "8 months"
-    },
-    {
-      id: 3,
-      title: "After School Care Assistant",
-      family: "The Garcia Family",
-      location: "Cebu City",
-      distance: "2.1 km away",
-      hourlyRate: 20,
-      schedule: "Monday-Friday, 3PM-7PM",
-      requirements: ["Homework help", "Driver's license", "First aid certified"],
-      postedDate: "3 days ago",
-      urgent: false,
-      children: 3,
-      ages: "6, 8, 10"
-    }
-  ]
+  // No mock jobs - all jobs come from database
 
-  // Initialize with some sample applications (similar to web design)
-  const initialApplications = [
-    {
-      id: 1,
-      jobId: 2,
-      jobTitle: "Weekend Babysitter Needed",
-      family: "The Santos Family",
-      status: "accepted",
-      appliedDate: "2023-05-10",
-      hourlyRate: 25
-    },
-    {
-      id: 2,
-      jobId: 1,
-      jobTitle: "Full-time Nanny for 2 Children",
-      family: "The Dela Cruz Family",
-      status: "pending",
-      appliedDate: "2023-05-15",
-      hourlyRate: 28
-    }
-  ]
+  // No mock applications - all applications come from database
+  const initialApplications = []
 
-  // State for jobs and bookings with mock defaults
-  const [jobs, setJobs] = useState(mockJobs)
+  // State for jobs and bookings - all data from database
+  const [jobs, setJobs] = useState([])
   const [jobsLoading, setJobsLoading] = useState(false)
-  const [bookings, setBookings] = useState([
-    {
-      id: 1,
-      family: "The Dela Cruz Family",
-      date: "2023-06-01",
-      time: "09:00 - 17:00",
-      status: "confirmed",
-      children: 2,
-      location: "IT Park, Cebu City"
-    },
-    {
-      id: 2,
-      family: "The Santos Family",
-      date: "2023-06-05",
-      time: "18:00 - 22:00",
-      status: "pending",
-      children: 1,
-      location: "Lahug, Cebu City"
-    }
-  ])
+  const [bookings, setBookings] = useState([])
 
   // Debug function to test profile image loading
   const debugProfileImage = () => {
@@ -363,6 +282,8 @@ export default function CaregiverDashboard({ onLogout, route }) {
     }
   }, [route?.params?.refreshProfile]);
 
+
+
   // Initial data load
   useEffect(() => {
     setApplications(initialApplications);
@@ -424,9 +345,9 @@ export default function CaregiverDashboard({ onLogout, route }) {
       
     } catch (error) {
       console.error('❌ Backend jobs fetch failed:', error.message);
-      // Fallback to mock jobs only if backend fails
-      console.log('🔄 Using mock jobs as fallback');
-      setJobs(mockJobs);
+      // No fallback - show empty state when backend fails
+      console.log('🔄 No jobs available - backend unavailable');
+      setJobs([]);
     } finally {
       setJobsLoading(false);
     }
@@ -458,9 +379,9 @@ export default function CaregiverDashboard({ onLogout, route }) {
         
       } catch (error) {
         console.error('❌ Backend applications fetch failed:', error.message);
-        // Fallback to mock applications
-        console.log('🔄 Using mock applications as fallback');
-        setApplications(initialApplications);
+        // No fallback - show empty state when backend fails
+        console.log('🔄 No applications available - backend unavailable');
+        setApplications([]);
       }
     };
 
@@ -488,9 +409,9 @@ export default function CaregiverDashboard({ onLogout, route }) {
         
       } catch (error) {
         console.error('❌ Backend bookings fetch failed:', error.message);
-        // Fallback to mock bookings
-        console.log('🔄 Using mock bookings as fallback');
-        // Keep existing mock bookings
+        // No fallback - show empty state when backend fails
+        console.log('🔄 No bookings available - backend unavailable');
+        setBookings([]);
       }
     };
 
@@ -614,24 +535,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
     }
   }
 
-  const mockApplications = [
-    {
-      id: 1,
-      jobTitle: "Full-time Nanny for 2 Children",
-      family: "The Dela Cruz Family",
-      status: "pending",
-      appliedDate: "2023-05-15",
-      hourlyRate: 28
-    },
-    {
-      id: 2,
-      jobTitle: "Weekend Babysitter",
-      family: "The Santos Family",
-      status: "accepted",
-      appliedDate: "2023-05-10",
-      hourlyRate: 25
-    }
-  ]
+  // No mock applications - all data from database
 
   // Note: bookings now come from state with mock fallback
 
@@ -640,7 +544,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const handleSaveProfile = async () => {
     try {
       console.log(' Saving profile from dashboard...');
-      const isCaregiver = ['caregiver', 'provider'].includes(String(user?.role || '').toLowerCase())
+      const isCaregiver = ['caregiver'].includes(String(user?.role || '').toLowerCase())
       const numericRate = Number(profileHourlyRate)
       const payload = {
         name: profileName,
@@ -923,65 +827,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
     <View style={styles.container}>
       {renderHeader()}
       {renderTopNav()}
-      <View style={styles.header}>
-        <View style={styles.profileHeader}>
-          <View style={styles.profileImageContainer}>
-            <Pressable onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })} accessibilityLabel="View profile photo" accessibilityRole="button">
-              {profile.imageUrl ? (
-                <Image 
-                  key={`profile-image-${imageRefreshKey}`} // Force re-render when key changes
-                  source={{ 
-                    uri: profile.imageUrl,
-                    cache: 'reload' // Force reload from server
-                  }} 
-                  style={[styles.profileImage, { backgroundColor: '#f3f4f6' }]}
-                  onError={(error) => {
-                    console.log('❌ CaregiverDashboard - Image load error:', error.nativeEvent.error);
-                    console.log('🔗 CaregiverDashboard - Failed URL:', profile.imageUrl);
-                    // Clear the broken image URL to show placeholder
-                    setProfile(prev => ({ ...prev, imageUrl: null }));
-                  }}
-                  onLoad={() => console.log('✅ CaregiverDashboard - Image loaded successfully:', profile.imageUrl)}
-                  onLoadStart={() => console.log('🔄 CaregiverDashboard - Image loading started:', profile.imageUrl)}
-                />
-              ) : (
-                <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e1e4e8' }]}>
-                  <Ionicons name="person" size={60} color="#6B7280" />
-                </View>
-              )}
-              <View style={{ position: 'absolute', right: 6, bottom: 6, backgroundColor: '#111827AA', borderRadius: 14, padding: 6 }}>
-                <Ionicons name="create" size={16} color="#fff" />
-              </View>
-            </Pressable>
-            {profile.backgroundCheck === "Verified" && (
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark" size={12} color="#fff" />
-              </View>
-            )}
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile.name}</Text>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.ratingText}>
-                {profile.rating} ({profile.reviews} reviews)
-              </Text>
-            </View>
-            <Text style={styles.profileDetail}>
-              ${profile.hourlyRate}/hr • {profile.experience} experience
-            </Text>
-          </View>
-          <Pressable
-            style={styles.editProfileButton}
-            onPress={() => navigation.navigate('EnhancedCaregiverProfileWizard', { isEdit: true, existingProfile: profile })}
-          >
-            <Ionicons name="create-outline" size={20} color="#4B5563" />
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Top nav replaces old tabs */}
-
+      
       <View style={{ flex: 1 }}>
         {activeTab !== "messages" && (
           <Searchbar
@@ -997,12 +843,40 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
         {activeTab === "dashboard" && (
           <ScrollView style={styles.content}>
-            {/* Quick stats 2x2 grid */}
-            <View style={styles.quickGrid}>
-              <QuickStat icon="star" value={profile.rating} label="Rating" color="#F59E0B" bgColor="#FFFBEB" />
-              <QuickStat icon="checkmark-done" value={profile.completedJobs} label="Jobs Done" color="#10B981" bgColor="#ECFDF5" />
-              <QuickStat icon="cash" value={`$${profile.hourlyRate}`} label="Rate" color="#2563EB" bgColor="#EFF6FF" />
-              <QuickStat icon="chatbubble-ellipses" value={profile.responseRate} label={"Response"} color="#8B5CF6" bgColor="#F5F3FF" />
+            <CaregiverProfileSection 
+              profile={profile}
+              activeTab={activeTab}
+            />
+            {/* Quick stats grid */}
+            <View style={styles.statsGrid}>
+              <QuickStat
+                icon="star"
+                value={profile?.rating?.toFixed(1) || "0.0"}
+                label="Rating"
+                color="#F59E0B"
+                bgColor="#FEF3C7"
+              />
+              <QuickStat
+                icon="briefcase"
+                value={profile?.completedJobs || "0"}
+                label="Jobs Done"
+                color="#10B981"
+                bgColor="#D1FAE5"
+              />
+              <QuickStat
+                icon="chatbubble"
+                value={profile?.responseRate || "0%"}
+                label="Response Rate"
+                color="#3B82F6"
+                bgColor="#DBEAFE"
+              />
+              <QuickStat
+                icon="checkmark-circle"
+                value={profile?.verification?.trustScore || "0"}
+                label="Trust Score"
+                color="#8B5CF6"
+                bgColor="#EDE9FE"
+              />
             </View>
 
             {/* Quick actions 2x2 grid */}

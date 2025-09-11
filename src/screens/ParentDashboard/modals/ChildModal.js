@@ -20,6 +20,8 @@ const ChildModal = ({
   setChildName = () => {},
   childAge = "",
   setChildAge = () => {},
+  childAllergies = "",
+  setChildAllergies = () => {},
   childNotes = "",
   setChildNotes = () => {},
   onSave = () => {},
@@ -69,6 +71,17 @@ const ChildModal = ({
               placeholder="Enter child's age"
               placeholderTextColor="#9CA3AF"
               keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Allergies (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={childAllergies}
+              onChangeText={setChildAllergies}
+              placeholder="Enter any allergies (e.g., Peanuts, Dairy)"
+              placeholderTextColor="#9CA3AF"
             />
           </View>
 

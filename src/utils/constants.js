@@ -52,6 +52,8 @@ export const VALIDATION = {
   BIO_MAX_LENGTH: 500,
   HOURLY_RATE_MIN: 10,
   HOURLY_RATE_MAX: 100,
+  EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  PHONE_REGEX: /^\+?[\d\s\-()]{10,}$/,
 };
 
 // Screen Names (for navigation)

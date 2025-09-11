@@ -1,73 +1,10 @@
+// Sample data removed - all data now comes from database
 export const SAMPLE_DATA = {
-  CAREGIVERS: [
-    {
-      id: "507f1f77bcf86cd799439011",
-      name: "Ana Dela Cruz",
-      avatar:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop",
-      rating: 4.8,
-      reviewCount: 124,
-      hourlyRate: 350,
-      location: "Cebu City",
-      specialties: ["Elderly Care", "Dementia Care", "Post-Surgery Care"],
-      languages: ["English", "Cebuano"],
-      experience: 5,
-      backgroundCheck: true,
-      availability: {
-        monday: { start: "08:00", end: "17:00" },
-        tuesday: { start: "08:00", end: "17:00" },
-        wednesday: { start: "08:00", end: "17:00" },
-        thursday: { start: "08:00", end: "17:00" },
-        friday: { start: "08:00", end: "17:00" },
-        saturday: { start: "09:00", end: "15:00" },
-        sunday: null,
-      },
-    },
-    {
-      id: "507f1f77bcf86cd799439012",
-      name: "John Smith",
-      avatar:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop",
-      rating: 4.5,
-      reviewCount: 98,
-      hourlyRate: 300,
-      location: "Davao City",
-      specialties: ["Pediatric Care", "Postpartum Care"],
-      languages: ["English", "Filipino"],
-      experience: 3,
-      backgroundCheck: true,
-      availability: {
-        monday: { start: "09:00", end: "18:00" },
-        tuesday: { start: "09:00", end: "18:00" },
-        wednesday: { start: "09:00", end: "18:00" },
-        thursday: { start: "09:00", end: "18:00" },
-        friday: { start: "09:00", end: "18:00" },
-        saturday: null,
-        sunday: null,
-      },
-    },
-    {
-      id: "507f1f77bcf86cd799439013",
-      name: "Mary Johnson",
-      avatar:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop",
-      rating: 4.9,
-      reviewCount: 110,
-      hourlyRate: 400,
-      location: "Iloilo City",
-      specialties: ["Elderly Care", "Alzheimer's Care", "Respite Care"],
-      languages: ["English", "Hiligaynon"],
-      experience: 7,
-      backgroundCheck: true,
-      availability: {
-        monday: { start: "07:00", end: "16:00" },
-        tuesday: { start: "07:00", end: "16:00" },
-        wednesday: { start: "07:00", end: "16:00" },
-        thursday: { start: "07:00", end: "16:00" },
-        friday: { start: "07:00", end: "16:00" },
-        saturday: { start: "08:00", end: "12:00" },
-        sunday: null,
-      },
-    },
-  ],
+  CAREGIVERS: [],
+};
+
+// Deprecated - use database APIs instead
+export const DEPRECATED_SAMPLE_DATA = {
+  message: "Sample data has been removed. All data now comes from the database.",
+  migration: "Use caregiversAPI.getProviders() to fetch real caregiver data"
 };

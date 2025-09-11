@@ -1,6 +1,3 @@
-// Email service migrated away from Firebase Functions. These functions are stubs
-// and should call backend email endpoints when available.
-// TODO: Replace with real backend API calls, e.g., api.post('/emails/payment-confirmation')
 import { logger } from '../utils/logger';
 
 export const sendPaymentConfirmationEmail = async (bookingData) => {

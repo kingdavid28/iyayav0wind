@@ -3,6 +3,8 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { authAPI } from "../config/api";
 import { STORAGE_KEYS } from "../config/constants";
+import { firebaseAuthService } from "../services/firebaseAuthService";
+
 
 export const AuthContext = createContext();
 
@@ -15,74 +17,128 @@ export const AuthProvider = ({ children }) => {
   // Check authentication status on app start
   const checkAuthStatus = async () => {
     try {
-      // Don't auto-login if user has explicitly logged out
       if (hasLoggedOut) {
         setUser(null);
         setIsLoading(false);
         return;
       }
       
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      if (token) {
+      // Check Firebase auth state
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (currentUser && currentUser.emailVerified) {
+        const token = await currentUser.getIdToken();
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+        
+        // Get user profile from MongoDB
         try {
-          // Add timeout for mobile network issues
-          const profilePromise = authAPI.getProfile();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Network timeout')), 8000)
-          );
+          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
           
-          const profile = await Promise.race([profilePromise, timeoutPromise]);
-          
-          // Handle different response structures
-          if (profile?.data) {
-            setUser(profile.data);
-          } else if (profile) {
-            setUser(profile);
+          let profile = { role: 'parent' };
+          if (response.ok) {
+            profile = await response.json();
+            console.log('🔍 Profile data received in checkAuthStatus:', profile);
           } else {
-            throw new Error('Invalid profile response');
+            console.log('❌ Profile fetch failed in checkAuthStatus:', response.status);
           }
-        } catch (e) {
-          // Only process non-empty errors
-          if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
-            console.log("Token invalid or network timeout, removing from storage:", e.message);
-            // Auto-logout on 401 errors to force fresh login
-            if (e.message?.includes('401') || e.message?.includes('Profile fetch failed')) {
-              console.log('🔄 Auto-logout due to invalid token');
-              setHasLoggedOut(true);
-            }
-            // Don't set error for network timeouts - just continue without auth
-            if (!e.message?.includes('timeout') && !e.message?.includes('Authentication required') && !e.message?.includes('No auth token found')) {
-              setError(e?.message || "Authentication check failed");
-            }
-          }
-          // Clear invalid token
-          await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-          setUser(null);
-          // If user was deleted, prevent auto-retry
-          if (e?.message === 'User no longer exists') {
-            setHasLoggedOut(true);
-          }
+          
+          setUser({
+            id: currentUser.uid,
+            email: currentUser.email,
+            name: currentUser.displayName || profile.name,
+            emailVerified: currentUser.emailVerified,
+            role: profile.role || 'parent',
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            middleInitial: profile.middleInitial,
+            birthDate: profile.birthDate,
+            phone: profile.phone,
+            profileImage: profile.profileImage,
+            address: profile.address,
+            children: profile.children,
+            caregiverProfile: profile.caregiverProfile
+          });
+        } catch (error) {
+          console.warn('Failed to get profile:', error.message);
+          setUser({
+            id: currentUser.uid,
+            email: currentUser.email,
+            name: currentUser.displayName,
+            emailVerified: currentUser.emailVerified,
+            role: 'parent'
+          });
         }
       } else {
-        // No token found, user is not authenticated
         setUser(null);
       }
     } catch (e) {
-      // Only process non-empty errors
-      if (e && (typeof e !== 'object' || Object.keys(e).length > 0)) {
-        console.log("Auth check error:", e.message);
-        // Only set error for critical issues, not network problems
-        if (!e.message?.includes('timeout') && !e.message?.includes('Network') && !e.message?.includes('No auth token found')) {
-          setError(e?.message || "Failed to check authentication status");
-        }
-      }
+      console.log("Auth check error:", e.message);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    checkAuthStatus();
+    // Set up Firebase auth state listener
+    const unsubscribe = firebaseAuthService.onAuthStateChanged(async (user) => {
+      if (user && user.emailVerified) {
+        const token = await user.getIdToken();
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+        
+        // Get user profile from MongoDB
+        try {
+          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          let profile = { role: 'parent' };
+          if (response.ok) {
+            profile = await response.json();
+            console.log('🔍 Profile data received in auth listener:', profile);
+          } else {
+            console.log('❌ Profile fetch failed in auth listener:', response.status);
+          }
+          
+          setUser({
+            id: user.uid,
+            email: user.email,
+            name: user.displayName || profile.name,
+            emailVerified: user.emailVerified,
+            role: profile.role || 'parent',
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            middleInitial: profile.middleInitial,
+            birthDate: profile.birthDate,
+            phone: profile.phone,
+            profileImage: profile.profileImage,
+            address: profile.address,
+            children: profile.children,
+            caregiverProfile: profile.caregiverProfile
+          });
+        } catch (error) {
+          console.warn('Failed to get profile:', error.message);
+          setUser({
+            id: user.uid,
+            email: user.email,
+            name: user.displayName,
+            emailVerified: user.emailVerified,
+            role: 'parent'
+          });
+        }
+      } else {
+        setUser(null);
+        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email, password) => {
@@ -91,38 +147,20 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setHasLoggedOut(false);
       
-      console.log('🔐 Attempting login with:', { email });
-      const res = await authAPI.login({ email, password });
-      console.log('✅ Login response:', res);
+      console.log('🔐 Attempting Firebase login with:', { email });
+      const res = await firebaseAuthService.login(email, password);
+      console.log('✅ Firebase login successful:', res);
       
       if (res?.token) {
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
-        console.log('Token stored successfully');
-      } else {
-        throw new Error('No token received from server');
+        console.log('💾 Token stored successfully');
       }
       
-      // Always pull latest profile
-      const profile = await authAPI.getProfile();
-      console.log('Profile loaded:', profile);
-      
-      // Handle different response structures
-      if (profile?.data) {
-        setUser(profile.data);
-      } else if (profile) {
-        setUser(profile);
-      } else {
-        throw new Error('Invalid profile response');
-      }
-      return { success: true, user: profile };
+      setUser(res.user);
+      return { success: true, user: res.user };
     } catch (err) {
-      console.log('❌ Login error details:', {
-        message: err?.message,
-        status: err?.response?.status,
-        data: err?.response?.data,
-        code: err?.code
-      });
-      const errorMessage = err?.response?.data?.message || err?.message || "Login failed";
+      console.log('❌ Login error:', err.message);
+      const errorMessage = err?.message || "Login failed";
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -136,30 +174,15 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setHasLoggedOut(false);
       
-      const res = await authAPI.register(userData);
-      console.log('Signup response:', res);
+      console.log('🚀 Starting Firebase signup for:', userData.email);
       
-      if (res?.token) {
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
-        console.log('Token stored successfully');
-      } else {
-        throw new Error('No token received from server');
-      }
+      const res = await firebaseAuthService.signup(userData);
+      console.log('✅ Firebase signup successful:', res);
       
-      const profile = await authAPI.getProfile();
-      console.log('Profile loaded:', profile);
-      
-      // Handle different response structures
-      if (profile?.data) {
-        setUser(profile.data);
-      } else if (profile) {
-        setUser(profile);
-      } else {
-        throw new Error('Invalid profile response');
-      }
-      return { success: true, user: profile };
+      return res;
     } catch (err) {
-      const errorMessage = err?.response?.data?.message || err?.message || "Signup failed";
+      console.error('❌ Signup error:', err.message);
+      const errorMessage = err?.message || "Signup failed";
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -169,33 +192,70 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      console.log('🚪 Starting signOut process...');
+      console.log('🚪 Starting Firebase signOut...');
       setIsLoading(true);
       
-      // Try to call logout API, but don't fail if it doesn't work
-      try {
-        await authAPI.logout();
-        console.log('✅ API logout successful');
-      } catch (apiError) {
-        console.log('⚠️ API logout failed, continuing with local logout:', apiError.message);
-      }
-      
-    } catch (err) {
-      console.log('❌ Logout error:', err);
-    } finally {
-      // Always clear local storage and user state
-      try {
-        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-        console.log('✅ Token removed from storage');
-      } catch (storageError) {
-        console.log('⚠️ Failed to remove token:', storageError);
-      }
+      await firebaseAuthService.signOut();
+      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
       
       setUser(null);
       setError(null);
       setHasLoggedOut(true);
+      console.log('✅ Firebase signOut completed');
+    } catch (err) {
+      console.log('❌ Logout error:', err);
+    } finally {
       setIsLoading(false);
-      console.log('✅ SignOut completed - user cleared');
+    }
+  };
+
+  const verifyEmailToken = async (token) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('🔐 Verifying email token:', token);
+      const result = await authAPI.verifyEmail(token);
+      console.log('✅ Verification API response:', result);
+      
+      if (result.success && result.token) {
+        // Store the new token
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);
+        console.log('💾 Token stored successfully');
+        
+        // Use user data from verification response if available
+        let userData = result.user;
+        
+        // If no user data in response, fetch profile
+        if (!userData) {
+          const profile = await authAPI.getProfile();
+          userData = profile?.data || profile;
+        }
+        
+        console.log('👤 Setting user data:', userData);
+        setUser(userData);
+        return { success: true, user: userData };
+      }
+      
+      throw new Error(result.message || 'Email verification failed');
+    } catch (error) {
+      console.error('❌ Email verification error:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetPassword = async (email) => {
+    try {
+      setError(null);
+      const result = await firebaseAuthService.resetPassword(email);
+      return result;
+    } catch (err) {
+      const errorMessage = err?.message || "Password reset failed";
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -206,7 +266,9 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     signOut,
+    resetPassword,
     checkAuthStatus,
+    verifyEmailToken,
   };
 
   return (

@@ -11,7 +11,7 @@ const { logger } = require('../utils/logger');
 // Get user profile
 exports.getProfile = async (req, res) => {
   try {
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.mongoId || req.user.id || req.user._id;
     
     const user = await User.findById(userId)
       .select('-password -refreshTokens')
@@ -34,6 +34,12 @@ exports.getProfile = async (req, res) => {
       role: user.role,
       avatar: user.avatar,
       verified: user.verified || false,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      middleInitial: user.middleInitial,
+      birthDate: user.birthDate,
+      profileImage: user.profileImage,
+      address: user.address,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
     };
@@ -71,6 +77,37 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+// Get children for parents
+exports.getChildren = async (req, res) => {
+  try {
+    const userId = req.user.mongoId || req.user.id || req.user._id;
+    
+    const user = await User.findById(userId).select('children role');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        children: user.children || []
+      }
+    });
+
+  } catch (error) {
+    logger.error('Get children error:', error);
+    const processedError = errorHandler.process(error);
+    res.status(500).json({
+      success: false,
+      error: processedError.userMessage
+    });
+  }
+};
+
 // Update user profile
 exports.updateProfile = async (req, res) => {
   try {
@@ -83,7 +120,7 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.mongoId || req.user.id || req.user._id;
     const updates = req.body;
 
     // Remove sensitive fields that shouldn't be updated here
@@ -133,7 +170,7 @@ exports.updateProfile = async (req, res) => {
 // Update profile image
 exports.updateProfileImage = async (req, res) => {
   try {
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.mongoId || req.user.id || req.user._id;
     const { imageBase64 } = req.body;
 
     if (!imageBase64) {
@@ -196,7 +233,7 @@ exports.updateChildren = async (req, res) => {
       });
     }
 
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.mongoId || req.user.id || req.user._id;
     const { children } = req.body;
 
     // Verify user is a parent
@@ -259,7 +296,7 @@ exports.updateChildren = async (req, res) => {
 // Get caregiver availability
 exports.getAvailability = async (req, res) => {
   try {
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.mongoId || req.user.id || req.user._id;
     
     const user = await User.findById(userId).select('availability role');
     
@@ -306,7 +343,7 @@ exports.updateAvailability = async (req, res) => {
       });
     }
 
-    const userId = req.user.id || req.user._id;
+    const userId = req.user.mongoId || req.user.id || req.user._id;
     const { availability } = req.body;
 
     // Verify user is a caregiver

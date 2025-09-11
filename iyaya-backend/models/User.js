@@ -58,6 +58,24 @@ const UserSchema = new mongoose.Schema({
       notes: { type: String }
     }
   ],
+  firstName: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'First name cannot exceed 50 characters']
+  },
+  lastName: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'Last name cannot exceed 50 characters']
+  },
+  middleInitial: {
+    type: String,
+    trim: true,
+    maxlength: [1, 'Middle initial must be 1 character']
+  },
+  birthDate: {
+    type: Date
+  },
   phone: {
     type: String,
     validate: {

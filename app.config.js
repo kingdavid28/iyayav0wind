@@ -28,6 +28,26 @@ export default {
     web: {
       favicon: "./assets/favicon.png"
     },
+    scheme: "iyaya",
+    linking: {
+      prefixes: ["iyaya://", "exp://192.168.1.10:8081/--/"],
+      config: {
+        screens: {
+          EmailVerification: {
+            path: "verify-email",
+            parse: {
+              token: (token) => token
+            }
+          },
+          VerificationSuccess: {
+            path: "verify-success",
+            parse: {
+              role: (role) => role
+            }
+          }
+        }
+      }
+    },
     extra: {
       eas: {
         projectId: "583f6598-db53-4667-af75-fdd1f8104fab"

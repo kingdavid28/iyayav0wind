@@ -1,24 +1,23 @@
 import { Platform } from 'react-native';
-import { getCurrentAPIURL } from '../config/api';
-
 /**
  * Network Configuration Helper for Expo Go
  * Helps detect and configure the correct IP address for different network setups
  */
 
+const getCurrentAPIURL = () => 'http://192.168.1.26:3000/api';
+
 export const NetworkConfig = {
   // Common network IP ranges
   COMMON_IPS: [
-    '192.168.1.10',   // Current default
+    '192.168.1.26',   // Current working IP
+    '192.168.1.10',   // Alternative
     '192.168.0.10',   // Common home router
     '10.0.0.10',      // Apple/corporate networks
     '172.16.0.10',    // Corporate VPN
-    '192.168.1.100',  // Extended range
-    '192.168.0.100',  // Extended range
   ],
 
   // Test if an IP is reachable
-  testConnection: async (ip, port = 5001) => {
+  testConnection: async (ip, port = 5000) => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -36,7 +35,7 @@ export const NetworkConfig = {
   },
 
   // Find working backend IP
-  findWorkingIP: async (port = 5001) => {
+  findWorkingIP: async (port = 5000) => {
     console.log('🔍 Scanning for backend server...');
     
     for (const ip of NetworkConfig.COMMON_IPS) {
@@ -71,7 +70,7 @@ export const NetworkConfig = {
         '   • Look for "IPv4 Address" or "inet" (usually 192.168.x.x)',
         '',
         '3. Update the IP in src/config/api.js if needed',
-        '4. Restart the backend server: npm run dev',
+        '4. Restart the backend server: node app.js',
         '5. Restart Expo: npx expo start --clear',
         '',
         `Current backend IP: ${currentIP}`,
@@ -79,9 +78,9 @@ export const NetworkConfig = {
         '',
         '🔧 Troubleshooting:',
         '• Try disabling Windows Firewall temporarily',
-        '• Check if port 5001 is blocked',
+        '• Check if port 5000 is blocked',
         '• Use "npx expo start --tunnel" for network issues',
-        '• Ensure backend server is running on 0.0.0.0:5001'
+        '• Ensure backend server is running on 0.0.0.0:5000'
       ]
     };
   },
@@ -97,8 +96,8 @@ export const NetworkConfig = {
       return {
         success: true,
         ip: workingIP,
-        baseURL: `http://${workingIP}:5001/api`,
-        socketURL: `http://${workingIP}:5001`
+        baseURL: `http://${workingIP}:5000/api`,
+        socketURL: `http://${workingIP}:5000`
       };
     } else {
       console.warn('⚠️ Auto-configuration failed');

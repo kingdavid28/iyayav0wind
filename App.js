@@ -26,16 +26,26 @@ import CaregiversList from "./src/screens/CaregiversList";
 import ChatScreen from "./src/screens/ChatScreen";
 import Children from "./src/screens/Children";
 import ChildrenManagementScreen from "./src/screens/ChildrenManagementScreen";
+
 import EnhancedCaregiverProfileWizard from "./src/screens/EnhancedCaregiverProfileWizard";
 import JobPostingScreen from "./src/screens/JobPostingScreen";
 import JobSearchScreen from "./src/screens/JobSearchScreen";
 import Messages from "./src/screens/Messages";
 import MessagingScreen from "./src/screens/MessagingScreen";
+import OnboardingScreen from "./src/screens/OnboardingScreen";
 import ParentAuth from "./src/screens/ParentAuth";
 import ParentDashboard from "./src/screens/ParentDashboard";
 import PaymentConfirmationScreen from "./src/screens/PaymentConfirmationScreen";
 import ProfileScreen from "./src/screens/profile/ProfileScreen";
+
 import WelcomeScreen from "./src/screens/WelcomeScreen";
+import EmailVerificationScreen from "./src/screens/EmailVerificationScreen";
+import VerificationSuccessScreen from "./src/screens/VerificationSuccessScreen";
+import EmailVerificationPendingScreen from "./src/screens/EmailVerificationPendingScreen";
+import DeepLinkHandler from "./src/components/DeepLinkHandler";
+
+// Utils
+import { hasSeenOnboarding } from "./src/utils/onboarding";
 
 // Development mode setup
 if (__DEV__) {
@@ -59,8 +69,27 @@ const Stack = createNativeStackNavigator();
 const AppNavigator = () => {
   const { user, loading } = useAuth();
   const { theme } = useThemeContext();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [navigationRef, setNavigationRef] = useState(null);
 
-  if (loading) {
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const hasSeenOnboardingBefore = await hasSeenOnboarding();
+        setShowOnboarding(!hasSeenOnboardingBefore);
+      } catch (error) {
+        console.error('Error checking onboarding:', error);
+        setShowOnboarding(false);
+      } finally {
+        setOnboardingChecked(true);
+      }
+    };
+
+    checkOnboarding();
+  }, []);
+
+  if (loading || !onboardingChecked) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
@@ -69,13 +98,19 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer theme={theme}>
+    <NavigationContainer 
+      theme={theme}
+      ref={setNavigationRef}
+    >
+      {navigationRef && <DeepLinkHandler navigation={navigationRef} />}
       <Stack.Navigator
         initialRouteName={
-          user
-            ? user.role === "parent"
-              ? "ParentDashboard"
-              : "CaregiverDashboard"
+          showOnboarding
+            ? "Onboarding"
+            : user && user.emailVerified
+            ? user.role === "caregiver"
+              ? "CaregiverDashboard"
+              : "ParentDashboard"
             : "Welcome"
         }
         screenOptions={{
@@ -91,6 +126,11 @@ const AppNavigator = () => {
           },
         }}
       >
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="Welcome"
           component={WelcomeScreen}
@@ -112,6 +152,7 @@ const AppNavigator = () => {
             headerBackTitle: "Back",
           }}
         />
+
         <Stack.Screen
           name="ParentDashboard"
           component={ParentDashboard}
@@ -226,12 +267,37 @@ const AppNavigator = () => {
             headerBackTitle: "Back",
           }}
         />
+
         <Stack.Screen
           name="EnhancedCaregiverProfileWizard"
           component={EnhancedCaregiverProfileWizard}
           options={{
             title: "Complete Your Profile",
             headerBackTitle: "Back",
+          }}
+        />
+        <Stack.Screen
+          name="EmailVerification"
+          component={EmailVerificationScreen}
+          options={{
+            title: "Verifying Email",
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="VerificationSuccess"
+          component={VerificationSuccessScreen}
+          options={{
+            title: "Verification Complete",
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="EmailVerificationPending"
+          component={EmailVerificationPendingScreen}
+          options={{
+            title: "Verify Your Email",
+            headerShown: false,
           }}
         />
       </Stack.Navigator>

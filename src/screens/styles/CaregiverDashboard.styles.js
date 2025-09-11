@@ -127,6 +127,16 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6B7280",
   },
+  profileAge: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  profileContact: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
   editProfileButton: {
     width: 36,
     height: 36,
@@ -256,6 +266,13 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     paddingHorizontal: 16,
     marginBottom: 16,
+    gap: 12,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    marginBottom: 24,
     gap: 12,
   },
   actionGrid: {

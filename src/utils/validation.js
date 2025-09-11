@@ -16,31 +16,23 @@ export const validators = {
     return null;
   },
 
-  // Password validation
+  // Password validation - Production ready
   password: (password) => {
     if (!password) return 'Password is required';
-    const minLength = __DEV__ ? 8 : 12;
-    if (password.length < minLength) {
-      return `Password must be at least ${minLength} characters`;
+    if (password.length < 12) {
+      return 'Password must be at least 12 characters';
     }
     
-    // Production password strength requirements
-    if (!__DEV__) {
-      const hasUpper = /[A-Z]/.test(password);
-      const hasLower = /[a-z]/.test(password);
-      const hasNumber = /\d/.test(password);
-      const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-      
-      if (!hasUpper) return 'Password must contain at least one uppercase letter';
-      if (!hasLower) return 'Password must contain at least one lowercase letter';
-      if (!hasNumber) return 'Password must contain at least one number';
-      if (!hasSymbol) return 'Password must contain at least one symbol';
-    } else {
-      // Development: basic requirements
-      if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-        return 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
-      }
-    }
+    // Strong password requirements
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    
+    if (!hasUpper) return 'Password must contain at least one uppercase letter';
+    if (!hasLower) return 'Password must contain at least one lowercase letter';
+    if (!hasNumber) return 'Password must contain at least one number';
+    if (!hasSymbol) return 'Password must contain at least one symbol';
     
     return null;
   },
