@@ -541,8 +541,8 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   caregiversContent: {
-    padding: 16,
-    gap: 16,
+    padding: 6,
+    gap: 5,
   },
   // Search and filter bar styles
   combinedSearchFilterBar: {
@@ -611,10 +611,13 @@ export const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   caregiversList: {
-    gap: 5,
+    gap: 1,
   },
   caregiverCard: {
+    backgroundColor: '#ffffff',
     borderRadius: 16,
+    marginBottom: 16,
+    marginHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -625,8 +628,7 @@ export const styles = StyleSheet.create({
     elevation: 3,
   },
   caregiverContent: {
-    padding: 16,
-    gap: 16,
+    padding: 20,
   },
   caregiverHeader: {
     flexDirection: 'row',
@@ -796,7 +798,9 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    padding: 16,
+    padding: 20,
+    marginHorizontal: 4,
+    marginBottom: 16,
   },
   shadowSm: {
     shadowColor: '#000',
@@ -830,16 +834,20 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
   },
   iconButton: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   button: {
     backgroundColor: '#db2777',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButton: {
     backgroundColor: '#db2777',

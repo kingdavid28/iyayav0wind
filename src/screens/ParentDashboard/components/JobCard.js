@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Calendar, MapPin, Clock, DollarSign, Users, Edit2, Trash2, Clock as ClockIcon, Check } from 'lucide-react-native';
+import { StatusBadge } from '../../../shared/ui';
 import { jobsAPI } from '../../../config/api';
 import { useNavigation } from '@react-navigation/native';
 
@@ -53,37 +54,13 @@ const JobCard = ({ job, onPress, onUpdate }) => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  const getStatusInfo = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'open':
-        return { color: '#10B981', bgColor: '#D1FAE5', label: 'Open' }; // green
-      case 'in_progress':
-        return { color: '#3B82F6', bgColor: '#DBEAFE', label: 'In Progress' }; // blue
-      case 'completed':
-        return { color: '#6B7280', bgColor: '#F3F4F6', label: 'Completed' }; // gray
-      case 'cancelled':
-        return { color: '#EF4444', bgColor: '#FEE2E2', label: 'Cancelled' }; // red
-      case 'filled':
-        return { color: '#8B5CF6', bgColor: '#EDE9FE', label: 'Position Filled' }; // purple
-      case 'pending':
-        return { color: '#F59E0B', bgColor: '#FEF3C7', label: 'Pending Approval' }; // yellow
-      default:
-        return { color: '#6B7280', bgColor: '#F3F4F6', label: 'Draft' }; // gray
-    }
-  };
 
-  const statusInfo = getStatusInfo(job.status);
   const showActions = job.status === 'open' || job.status === 'pending';
 
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.statusBadge}>
-          <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
-          <Text style={[styles.statusText, { color: statusInfo.color }]}>
-            {statusInfo.label}
-          </Text>
-        </View>
+        <StatusBadge status={job.status} />
         
         <Text style={styles.postedDate}>
           {(() => {

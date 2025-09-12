@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
 import { TextInput, Button, useTheme } from "react-native-paper";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../core/contexts/AuthContext";
 import { useApp, ACTION_TYPES } from "../contexts/AppContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";

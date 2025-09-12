@@ -5,14 +5,12 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
-  Platform,
-  TextInput as RNTextInput,
   Text,
   TouchableOpacity,
   View,
+  ScrollView,
 } from "react-native";
-import KeyboardAvoidingWrapper from "../../../components/KeyboardAvoidingWrapper";
+import { ModalWrapper, FormInput, Button } from '../../../shared/ui';
 
 const ProfileModal = ({
   visible,
@@ -30,59 +28,43 @@ const ProfileModal = ({
   const [loading, setLoading] = useState(false);
   const [tempImageUri, setTempImageUri] = useState(null);
 
-  const pickImage = async () => {
+  const handleImageSelection = async (type) => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const isCamera = type === 'camera';
+      const { status } = isCamera 
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
       if (status !== "granted") {
         Alert.alert(
           "Permission needed",
-          "Please grant camera roll permissions to upload a profile picture."
+          `Please grant ${isCamera ? 'camera' : 'camera roll'} permissions to ${isCamera ? 'take' : 'upload'} a profile picture.`
         );
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+      const options = {
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
-      });
+      };
+
+      const result = isCamera 
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
 
       if (!result.canceled && result.assets[0]) {
         setTempImageUri(result.assets[0].uri);
       }
     } catch (error) {
-      console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to pick image");
+      console.error(`Error ${type === 'camera' ? 'taking photo' : 'picking image'}:`, error);
+      Alert.alert("Error", `Failed to ${type === 'camera' ? 'take photo' : 'pick image'}`);
     }
   };
 
-  const takePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission needed",
-          "Please grant camera permissions to take a profile picture."
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setTempImageUri(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error("Error taking photo:", error);
-      Alert.alert("Error", "Failed to take photo");
-    }
-  };
+  const pickImage = () => handleImageSelection('gallery');
+  const takePhoto = () => handleImageSelection('camera');
 
   const showImageOptions = () => {
     Alert.alert("Profile Picture", "Choose an option", [
@@ -101,7 +83,6 @@ const ProfileModal = ({
     setLoading(true);
     try {
       await handleSaveProfile(tempImageUri);
-      // Only dismiss if save was successful
       setTempImageUri(null);
       onClose();
     } catch (error) {
@@ -113,41 +94,28 @@ const ProfileModal = ({
   };
 
   const handleCancel = () => {
-    // Reset temporary image when canceling
     setTempImageUri(null);
     onClose();
   };
 
   return (
-    <Modal
+    <ModalWrapper
       visible={visible}
-      animationType="fade"
-      transparent={true}
-      onRequestClose={onClose}
-      statusBarTranslucent={true}
-      presentationStyle="overFullScreen"
-      hardwareAccelerated={true}
+      onClose={onClose}
+      animationType="slide"
+      style={profileModalStyles.modalContentWrapper}
     >
-      <View style={profileModalStyles.fullScreenOverlay}>
-        <View style={profileModalStyles.modalContentWrapper}>
           <View style={profileModalStyles.modalHeader}>
             <Text style={profileModalStyles.modalTitle}>Edit Profile</Text>
             <TouchableOpacity
               style={profileModalStyles.closeButton}
-              onPress={onClose}
+              onPress={handleCancel}
             >
               <X size={24} color="#6B7280" />
             </TouchableOpacity>
           </View>
 
-          <KeyboardAvoidingWrapper
-            style={profileModalStyles.modalBody}
-            keyboardVerticalOffset={Platform.select({
-              ios: 100,
-              android: 50,
-              web: 0,
-            })}
-          >
+          <ScrollView style={profileModalStyles.modalBody}>
             {/* Profile Image Section */}
             <View style={profileModalStyles.imageSection}>
               <Text style={profileModalStyles.imageLabel}>Profile Picture</Text>
@@ -171,106 +139,65 @@ const ProfileModal = ({
               </TouchableOpacity>
             </View>
 
-            <View style={profileModalStyles.inputContainer}>
-              <Text style={profileModalStyles.inputLabel}>Full Name</Text>
-              <RNTextInput
-                value={profileName}
-                onChangeText={setProfileName}
-                style={profileModalStyles.textInput}
-                placeholder="Enter your full name"
-                autoCapitalize="words"
-              />
-            </View>
+            <FormInput
+              label="Full Name"
+              value={profileName}
+              onChangeText={setProfileName}
+              placeholder="Enter your full name"
+              autoCapitalize="words"
+            />
 
-            <View style={profileModalStyles.inputContainer}>
-              <Text style={profileModalStyles.inputLabel}>Contact Number</Text>
-              <RNTextInput
-                value={profileContact}
-                onChangeText={setProfileContact}
-                style={profileModalStyles.textInput}
-                placeholder="Enter your contact number"
-                keyboardType="phone-pad"
-              />
-            </View>
+            <FormInput
+              label="Contact Number"
+              value={profileContact}
+              onChangeText={setProfileContact}
+              placeholder="Enter your contact number"
+              keyboardType="phone-pad"
+            />
 
-            <View style={profileModalStyles.inputContainer}>
-              <Text style={profileModalStyles.inputLabel}>Location</Text>
-              <RNTextInput
-                value={profileLocation}
-                onChangeText={setProfileLocation}
-                style={profileModalStyles.textInput}
-                placeholder="Enter your location"
-              />
-            </View>
+            <FormInput
+  label="Location"
+  value={profileLocation}
+  onChangeText={setProfileLocation}
+  placeholder="Enter your location"
+  
+/>
+          </ScrollView>
 
-            <View style={profileModalStyles.modalActions}>
-              <TouchableOpacity
-                style={profileModalStyles.cancelButton}
-                onPress={handleCancel}
-                disabled={loading}
-              >
-                <Text style={profileModalStyles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  profileModalStyles.submitButton,
-                  loading && profileModalStyles.disabledButton,
-                ]}
-                onPress={handleSave}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={profileModalStyles.submitButtonText}>
-                    Save Changes
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingWrapper>
-        </View>
-      </View>
-    </Modal>
+          <View style={profileModalStyles.modalActions}>
+            <Button
+              title="Cancel"
+              variant="secondary"
+              onPress={handleCancel}
+              disabled={loading}
+              style={{ width: 100 }}
+            />
+            <Button
+              title="Save"
+              variant="primary"
+              onPress={handleSave}
+              loading={loading}
+              style={{ width: 100 }}
+            />
+          </View>
+    </ModalWrapper>
   );
 };
 
 const profileModalStyles = {
   fullScreenOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.8)",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 999999,
-    elevation: 999999,
+    padding: 16,
   },
   modalContentWrapper: {
     backgroundColor: "#ffffff",
-    borderRadius: Platform.select({
-      web: 16,
-      default: 20,
-    }),
-    width: Platform.select({
-      web: "50%",
-      default: "90%",
-    }),
-    height: Platform.select({
-      web: "50%",
-      default: "75%",
-    }),
-    maxWidth: Platform.select({
-      web: 500,
-      default: 400,
-    }),
-    maxHeight: Platform.select({
-      web: "80%",
-      default: "85%",
-    }),
+    borderRadius: 20,
+    width: "100%",
+    maxWidth: 500,
+    maxHeight: "85%",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -280,79 +207,54 @@ const profileModalStyles = {
     shadowRadius: 20,
     elevation: 50,
   },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1f2937",
+  },
   closeButton: {
-    padding: Platform.select({
-      web: 8,
-      default: 12,
-    }),
-    borderRadius: Platform.select({
-      web: 6,
-      default: 8,
-    }),
+    padding: 8,
+    borderRadius: 8,
     backgroundColor: "rgba(107, 114, 128, 0.1)",
+  },
+  modalBody: {
+    padding: 2,
+    maxHeight: 400,
   },
   imageSection: {
     alignItems: "center",
-    marginBottom: Platform.select({
-      web: 20,
-      default: 24,
-    }),
+    marginBottom: 24,
   },
   imageLabel: {
-    fontSize: Platform.select({
-      web: 16,
-      default: 18,
-    }),
+    fontSize: 18,
     fontWeight: "600",
     color: "#374151",
-    marginBottom: Platform.select({
-      web: 12,
-      default: 16,
-    }),
+    marginBottom: 16,
   },
   imageContainer: {
     position: "relative",
-    width: Platform.select({
-      web: 100,
-      default: 120,
-    }),
-    height: Platform.select({
-      web: 100,
-      default: 120,
-    }),
-    borderRadius: Platform.select({
-      web: 50,
-      default: 60,
-    }),
+    width: 100,
+    height: 100,
+    borderRadius: 60,
     overflow: "hidden",
   },
   profileImage: {
-    width: Platform.select({
-      web: 100,
-      default: 120,
-    }),
-    height: Platform.select({
-      web: 100,
-      default: 120,
-    }),
-    borderRadius: Platform.select({
-      web: 50,
-      default: 60,
-    }),
+    width: 100,
+    height: 100,
+    borderRadius: 60,
   },
   defaultImage: {
-    width: Platform.select({
-      web: 100,
-      default: 120,
-    }),
-    height: Platform.select({
-      web: 100,
-      default: 120,
-    }),
-    borderRadius: Platform.select({
-      web: 50,
-      default: 60,
-    }),
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: "rgba(219, 39, 119, 0.1)",
     borderWidth: 2,
     borderColor: "#db2777",
@@ -363,18 +265,9 @@ const profileModalStyles = {
     position: "absolute",
     bottom: 0,
     right: 0,
-    width: Platform.select({
-      web: 32,
-      default: 40,
-    }),
-    height: Platform.select({
-      web: 32,
-      default: 40,
-    }),
-    borderRadius: Platform.select({
-      web: 16,
-      default: 20,
-    }),
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#db2777",
     alignItems: "center",
     justifyContent: "center",
@@ -382,81 +275,39 @@ const profileModalStyles = {
     borderColor: "#fff",
   },
   inputContainer: {
-    marginBottom: Platform.select({
-      web: 16,
-      default: 20,
-    }),
+    marginBottom: 20,
   },
   inputLabel: {
-    fontSize: Platform.select({
-      web: 14,
-      default: 16,
-    }),
+    fontSize: 16,
     fontWeight: "600",
     color: "#374151",
-    marginBottom: Platform.select({
-      web: 6,
-      default: 8,
-    }),
+    marginBottom: 8,
   },
   textInput: {
     borderWidth: 1,
     borderColor: "#d1d5db",
-    borderRadius: Platform.select({
-      web: 8,
-      default: 12,
-    }),
-    paddingHorizontal: Platform.select({
-      web: 12,
-      default: 16,
-    }),
-    paddingVertical: Platform.select({
-      web: 10,
-      default: 14,
-    }),
-    fontSize: Platform.select({
-      web: 14,
-      default: 16,
-    }),
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
     backgroundColor: "#fff",
     color: "#1f2937",
-    minHeight: Platform.select({
-      web: 40,
-      default: 48,
-    }),
+    minHeight: 48,
   },
   modalActions: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: Platform.select({
-      web: 20,
-      default: 2,
-    }),
-    paddingVertical: Platform.select({
-      web: 16,
-      default: 20,
-    }),
+    padding: 20,
+    height: 90,
     borderTopWidth: 1,
     borderTopColor: "#f3f4f6",
-    gap: Platform.select({
-      web: 12,
-      default: 16,
-    }),
+    gap: 16,
   },
   cancelButton: {
-    //flex: 1,
-    paddingVertical: Platform.select({
-      web: 12,
-      default: 16,
-    }),
-    paddingHorizontal: Platform.select({
-      web: 16,
-      default: 20,
-    }),
-    borderRadius: Platform.select({
-      web: 8,
-      default: 12,
-    }),
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#d1d5db",
     backgroundColor: "#fff",
@@ -464,83 +315,28 @@ const profileModalStyles = {
     justifyContent: "center",
   },
   cancelButtonText: {
-    fontSize: Platform.select({
-      web: 14,
-      default: 16,
-    }),
+    fontSize: 16,
     fontWeight: "600",
     color: "#6b7280",
   },
   submitButton: {
-    //flex: 1,
-    paddingVertical: Platform.select({
-      web: 12,
-      default: 16,
-    }),
-    paddingHorizontal: Platform.select({
-      web: 16,
-      default: 20,
-    }),
-    borderRadius: Platform.select({
-      web: 8,
-      default: 12,
-    }),
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     backgroundColor: "#db2777",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: Platform.select({
-      web: 44,
-      default: 48,
-    }),
+    minHeight: 20,
   },
   submitButtonText: {
-    fontSize: Platform.select({
-      web: 14,
-      default: 16,
-    }),
+    fontSize: 16,
     fontWeight: "600",
     color: "#fff",
   },
   disabledButton: {
     backgroundColor: "#9ca3af",
     opacity: 0.7,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Platform.select({
-      web: 20,
-      default: 24,
-    }),
-    paddingVertical: Platform.select({
-      web: 16,
-      default: 20,
-    }),
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  modalTitle: {
-    fontSize: Platform.select({
-      web: 20,
-      default: 24,
-    }),
-    fontWeight: "700",
-    color: "#1f2937",
-  },
-  modalBody: {
-    paddingHorizontal: Platform.select({
-      web: 20,
-      default: 24,
-    }),
-    paddingVertical: Platform.select({
-      web: 16,
-      default: 20,
-    }),
-    maxHeight: Platform.select({
-      web: "60vh",
-      default: 400,
-    }),
   },
 };
 

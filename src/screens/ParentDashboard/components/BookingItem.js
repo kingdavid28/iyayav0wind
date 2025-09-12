@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Calendar, Clock, Baby, MapPin } from 'lucide-react-native';
+import { StatusBadge } from '../../../shared/ui';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import { formatDateFriendly, formatTimeRange } from '../utils/dateUtils';
 import { getCaregiverDisplayName, normalizeStatus } from '../../../utils/caregiverUtils';
@@ -13,22 +14,7 @@ const BookingItem = ({
   onViewBookingDetails, 
   onWriteReview 
 }) => {
-  const getStatusStyles = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return { bg: '#D1FAE5', text: '#065F46' };
-      case 'pending':
-        return { bg: '#FEF3C7', text: '#92400E' };
-      case 'cancelled':
-        return { bg: '#FEE2E2', text: '#B91C1C' };
-      case 'completed':
-        return { bg: '#E0E7FF', text: '#3730A3' };
-      default:
-        return { bg: '#F3F4F6', text: '#4B5563' };
-    }
-  };
 
-  const statusStyles = getStatusStyles(normalizeStatus(item.status));
 
   return (
     <View style={styles.bookingItemCard}>
@@ -42,11 +28,7 @@ const BookingItem = ({
             <Text style={styles.bookingCaregiverName}>
               {getCaregiverDisplayName(item.caregiver)}
             </Text>
-            <View style={[styles.bookingStatusBadge, { backgroundColor: statusStyles.bg }]}>
-              <Text style={[styles.bookingStatusText, { color: statusStyles.text }]}>
-                {normalizeStatus(item.status)}
-              </Text>
-            </View>
+            <StatusBadge status={normalizeStatus(item.status)} />
           </View>
         </View>
         <Text style={styles.bookingCost}>₱{item.totalCost}</Text>

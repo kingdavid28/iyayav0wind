@@ -2,6 +2,8 @@ import { API_CONFIG } from '../config/constants';
 import { errorHandler } from '../utils/errorHandler';
 import { logger } from '../utils/logger';
 
+// Remove CSRF token management as backend doesn't support it
+
 /**
  * Profile Service
  * Handles all profile-related API calls
@@ -53,7 +55,7 @@ class ProfileService {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(profileData),
       });
@@ -78,14 +80,28 @@ class ProfileService {
    */
   async updateProfileImage(imageBase64, token) {
     try {
-      const response = await fetch(`${this.baseURL}/image`, {
+      // Validate image size first
+      const sizeInBytes = (imageBase64.length * 3) / 4;
+      const sizeInMB = sizeInBytes / (1024 * 1024);
+      
+      if (sizeInMB > 2) {
+        throw new Error('Image too large. Please select a smaller image.');
+      }
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch(`${API_CONFIG.BASE_URL}/auth/upload-profile-image`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ imageBase64 }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -97,6 +113,9 @@ class ProfileService {
       return data.data;
 
     } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Network request timed out');
+      }
       logger.error('Update profile image error:', error);
       throw errorHandler.process(error);
     }
@@ -111,7 +130,7 @@ class ProfileService {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ children }),
       });
@@ -168,7 +187,7 @@ class ProfileService {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ availability }),
       });

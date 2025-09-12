@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp, ACTION_TYPES } from '../contexts/AppContext';
 import { authAPI } from '../config/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { useAuthSubmit } from '../hooks/useAuthSubmit';

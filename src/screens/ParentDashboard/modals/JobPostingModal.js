@@ -22,8 +22,8 @@ import {
   AlertCircle,
   Plus
 } from 'lucide-react-native';
-import { jobsAPI } from '../../../config/api';
-import { useAuth } from '../../../contexts/AuthContext';
+import jobService from '../../../services/jobService';
+import { useAuth } from '../../../core/contexts/AuthContext';
 
 import CustomDateTimePicker from '../../../components/DateTimePicker';
 import TimePicker from '../../../components/TimePicker';
@@ -165,7 +165,8 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
       
       console.log('📱 [MOBILE] Job payload:', payload);
 
-      const response = await jobsAPI.create(payload);
+      // Use jobService.createJobPost directly for reliability
+      const response = await jobService.createJobPost(payload);
       console.log('📱 [MOBILE] Job creation response:', response);
 
       setLoading(false);

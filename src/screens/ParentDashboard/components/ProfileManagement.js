@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image,
 import { User, Mail, Phone, MapPin, Edit2, Plus, X, Camera, Calendar, ChevronDown } from 'lucide-react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { authAPI } from '../../../config/api';
 import { API_CONFIG } from '../../../config/constants';
 
@@ -65,7 +65,7 @@ const ProfileManagement = ({ visible, onClose }) => {
       }
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,

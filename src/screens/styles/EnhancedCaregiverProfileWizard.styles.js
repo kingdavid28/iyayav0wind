@@ -97,23 +97,10 @@ export const styles = StyleSheet.create({
     borderColor: '#6366f1',
     backgroundColor: '#f3f4f6',
   },
-  profileImageRound: {
-    width: '100%',
-    height: '100%',
-  },
   profileImageDirect: {
     width: 120,
     height: 120,
     borderRadius: 60,
-  },
-  debugImageContainer: {
-    alignItems: 'center',
-  },
-  debugText: {
-    fontSize: 10,
-    color: '#666',
-    marginBottom: 8,
-    textAlign: 'center',
   },
   profileImagePlaceholder: {
     backgroundColor: '#e5e7eb',
@@ -306,7 +293,6 @@ export const styles = StyleSheet.create({
   navButton: {
     flex: 1,
   },
-  // Address & Location styles
   locationSection: {
     marginBottom: 24,
     alignItems: 'center',
@@ -319,12 +305,6 @@ export const styles = StyleSheet.create({
   searchButton: {
     paddingVertical: 12,
     width: '100%',
-  },
-  orText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginVertical: 8,
   },
   addressRow: {
     flexDirection: 'row',
@@ -344,7 +324,6 @@ export const styles = StyleSheet.create({
     fontFamily: 'monospace',
     marginLeft: 8,
   },
-  // Location Search Dialog styles
   locationDialog: {
     maxHeight: '80%',
     borderRadius: 12,
@@ -380,7 +359,6 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
   },
-  // Legal Documents styles
   documentsGrid: {
     gap: 16,
     marginBottom: 24,
@@ -466,19 +444,11 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
-
-  reviewImagePlaceholder: {
+  reviewPlaceholderImage: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
   },
-  noImageText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  // Enhanced Certifications styles
   certificationsContainer: {
     gap: 12,
   },
@@ -521,13 +491,6 @@ export const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
   },
-  debugContainer: {
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    marginVertical: 10,
-    borderRadius: 5,
-  },
-
   datePickerRow: {
     flexDirection: 'row',
     marginVertical: 10,
@@ -692,7 +655,6 @@ export const styles = StyleSheet.create({
     right: 4,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  // Final checks styles
   finalChecks: {
     marginTop: 24,
     padding: 16,

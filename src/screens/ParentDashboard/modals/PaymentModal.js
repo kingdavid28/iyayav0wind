@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { CheckCircle, Upload, XCircle, AlertCircle, Clock, X } from 'lucide-react-native';
+import { ModalWrapper } from '../../../shared/ui';
 import { bookingsAPI } from '../../../config/api';
 
 const PaymentModal = ({ 
@@ -47,7 +48,7 @@ const PaymentModal = ({
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
@@ -137,14 +138,12 @@ const PaymentModal = ({
   const formattedData = formatPaymentData();
 
   return (
-    <Modal
+    <ModalWrapper
       visible={visible}
-      transparent={true}
+      onClose={onClose}
       animationType="slide"
-      onRequestClose={onClose}
+      style={styles.modalContent}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Payment Confirmation</Text>
@@ -218,9 +217,7 @@ const PaymentModal = ({
               </View>
             )}
           </View>
-        </View>
-      </View>
-    </Modal>
+    </ModalWrapper>
   );
 };
 

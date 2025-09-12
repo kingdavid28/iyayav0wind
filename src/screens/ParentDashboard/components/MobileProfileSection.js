@@ -3,7 +3,7 @@ import { View, Text, Image, Platform } from 'react-native';
 import { User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCurrentSocketURL } from '../../../config/api';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { calculateAge, formatBirthDate } from '../../../utils/dateUtils';
 
 const MobileProfileSection = ({ greetingName, profileImage, profileContact, profileLocation, activeTab, userData }) => {
@@ -33,7 +33,9 @@ const MobileProfileSection = ({ greetingName, profileImage, profileContact, prof
     
     // Use dynamic API URL
     const baseUrl = getCurrentSocketURL();
-    const fullUrl = `${baseUrl}${profileImage}`;
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    const cleanImagePath = profileImage.startsWith('/') ? profileImage : `/${profileImage}`;
+    const fullUrl = `${cleanBaseUrl}${cleanImagePath}`;
     console.log('🖼️ MobileProfileSection - Constructed URL:', fullUrl);
     return { uri: fullUrl };
   };

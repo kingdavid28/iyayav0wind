@@ -66,7 +66,11 @@ exports.uploadProfileImageBase64 = async (req, res, next) => {
       const map = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/jpg': 'jpg' };
       return map[mt] || 'png';
     };
-    const ext = extFromMime(detectedMime);
+    let ext = extFromMime(detectedMime);
+    // Remove leading dot if present
+    if (ext.startsWith('.')) {
+      ext = ext.substring(1);
+    }
 
     // Create uploads dir if not exists
     const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -140,6 +144,11 @@ exports.updateProfile = async (req, res, next) => {
 
     if (Object.keys(update).length === 0) {
       return res.status(400).json({ success: false, error: 'No valid fields to update' });
+    }
+
+    // Check if req.user exists and has id
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
     // JWT lookup

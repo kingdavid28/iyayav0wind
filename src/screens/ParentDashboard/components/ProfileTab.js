@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { User, Edit2, Settings, Shield, Bell, LogOut, Phone, Mail, MapPin, Calendar } from 'lucide-react-native';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { calculateAge } from '../../../utils/dateUtils';
 import { styles } from '../../styles/ParentDashboard.styles';
 
@@ -55,12 +55,7 @@ const ProfileTab = ({
     {
       title: 'Account Settings',
       items: [
-        {
-          icon: Edit2,
-          label: 'Edit Profile',
-          value: 'Update your information',
-          action: () => onProfileEdit?.()
-        },
+
         {
           icon: Bell,
           label: 'Notifications',

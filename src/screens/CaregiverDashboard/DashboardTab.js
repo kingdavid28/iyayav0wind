@@ -4,30 +4,7 @@ import { Button, Card } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { styles } from '../styles/CaregiverDashboard.styles';
 
-function QuickStat({ icon, value, label, color = '#2563EB', bgColor = '#EFF6FF' }) {
-  return (
-    <View style={[styles.quickTile, { backgroundColor: '#fff' }]}>
-      <View style={[styles.quickIconWrap, { backgroundColor: bgColor }]}>
-        <Ionicons name={icon} size={18} color={color} />
-      </View>
-      <Text style={styles.quickValue}>{value ?? '-'}</Text>
-      <Text style={styles.quickLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function QuickAction({ icon, label, onPress, gradientColors }) {
-  return (
-    <Pressable onPress={onPress} style={styles.quickActionTile}>
-      <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickActionGradient}>
-        <View style={styles.quickActionIconWrap}>
-          <Ionicons name={icon} size={20} color="#ffffff" />
-        </View>
-        <Text style={[styles.quickActionLabel, { color: '#ffffff' }]}>{label}</Text>
-      </LinearGradient>
-    </Pressable>
-  );
-}
+import { QuickStat, QuickAction } from '../../shared/ui';
 
 export default function DashboardTab({ 
   profile, 
@@ -46,10 +23,10 @@ export default function DashboardTab({
     <ScrollView style={styles.content}>
       {/* Quick stats */}
       <View style={styles.quickGrid}>
-        <QuickStat icon="star" value={profile.rating} label="Rating" color="#F59E0B" bgColor="#FFFBEB" />
-        <QuickStat icon="checkmark-done" value={profile.completedJobs} label="Jobs Done" color="#10B981" bgColor="#ECFDF5" />
-        <QuickStat icon="cash" value={`$${profile.hourlyRate}`} label="Rate" color="#2563EB" bgColor="#EFF6FF" />
-        <QuickStat icon="chatbubble-ellipses" value={profile.responseRate} label="Response" color="#8B5CF6" bgColor="#F5F3FF" />
+        <QuickStat icon="star" value={profile.rating} label="Rating" color="#F59E0B" bgColor="#FFFBEB" styles={styles} />
+        <QuickStat icon="checkmark-done" value={profile.completedJobs} label="Jobs Done" color="#10B981" bgColor="#ECFDF5" styles={styles} />
+        <QuickStat icon="cash" value={`$${profile.hourlyRate}`} label="Rate" color="#2563EB" bgColor="#EFF6FF" styles={styles} />
+        <QuickStat icon="chatbubble-ellipses" value={profile.responseRate} label="Response" color="#8B5CF6" bgColor="#F5F3FF" styles={styles} />
       </View>
 
       {/* Quick actions */}
@@ -59,24 +36,28 @@ export default function DashboardTab({
           label="Find Jobs"
           gradientColors={["#3B82F6", "#2563EB"]}
           onPress={() => onTabChange('jobs')}
+          styles={styles}
         />
         <QuickAction
           icon="calendar"
           label="Bookings"
           gradientColors={["#22C55E", "#16A34A"]}
           onPress={() => onTabChange('bookings')}
+          styles={styles}
         />
         <QuickAction
           icon="chatbubble-ellipses"
           label="Messages"
           gradientColors={["#A78BFA", "#8B5CF6"]}
           onPress={() => onTabChange('messages')}
+          styles={styles}
         />
         <QuickAction
           icon="document-text"
           label="Applications"
           gradientColors={["#fb7185", "#ef4444"]}
           onPress={() => onTabChange('applications')}
+          styles={styles}
         />
       </View>
 

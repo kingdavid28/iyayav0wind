@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, View, Text, ActivityIndicator, RefreshControl } from 'react-native';
 import { Chip } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { EmptyState } from '../../shared/ui';
 import { styles } from '../styles/CaregiverDashboard.styles';
 
 export default function JobsTab({ 
@@ -67,13 +68,11 @@ export default function JobsTab({
             ))}
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="briefcase" size={48} color="#9CA3AF" />
-            <Text style={styles.emptyStateText}>No jobs available</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Please check back later or adjust your filters
-            </Text>
-          </View>
+          <EmptyState 
+            icon="briefcase" 
+            title="No jobs available"
+            subtitle="Please check back later or adjust your filters"
+          />
         )}
       </View>
     </ScrollView>

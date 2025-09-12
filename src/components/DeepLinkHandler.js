@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Linking } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { navigateToUserDashboard } from '../utils/navigationUtils';
 
 const DeepLinkHandler = ({ navigation }) => {

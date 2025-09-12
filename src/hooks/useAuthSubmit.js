@@ -1,5 +1,5 @@
 import { Alert, Keyboard } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { authAPI } from '../config/api';
 import { useApi } from './useApi';
 import { navigateToUserDashboard } from '../utils/navigationUtils';

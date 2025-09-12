@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { rateLimit } = require('express-rate-limit');
-const { authenticate, authorize } = require('../utils/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const auditService = require('../services/auditService');
 const path = require('path');
 const { 
@@ -257,6 +257,10 @@ router.get('/firebase-profile',
   authController.getFirebaseProfile
 );
 
+router.put('/firebase-profile',
+  authController.updateProfile
+);
+
 router.post('/send-custom-verification',
   authController.sendCustomVerification
 );
@@ -297,6 +301,15 @@ router.post('/upload-profile-image',
   authenticate,
   authController.uploadProfileImageBase64
 );
+
+// CSRF token endpoint (for compatibility)
+router.get('/csrf-token', (req, res) => {
+  res.json({ 
+    success: true, 
+    token: 'no-csrf-needed',
+    csrfToken: 'no-csrf-needed'
+  });
+});
 
 
 // 8. Enhanced health check with system information

@@ -20,7 +20,11 @@ export async function sendEmailVerification(_arg) {
   }
   const res = await fetch(`${BASE}/accounts:sendOobCode?key=${API_KEY}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
     body: JSON.stringify({ requestType: 'VERIFY_EMAIL', idToken })
   })
   const data = await res.json()
@@ -72,7 +76,11 @@ export async function signInWithEmailAndPassword(_auth, email, password) {
   requiredKey()
   const res = await fetch(`${BASE}/accounts:signInWithPassword?key=${API_KEY}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
     body: JSON.stringify({ email, password, returnSecureToken: true })
   })
   const data = await res.json()
@@ -85,7 +93,11 @@ export async function createUserWithEmailAndPassword(_auth, email, password) {
   requiredKey()
   const res = await fetch(`${BASE}/accounts:signUp?key=${API_KEY}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
     body: JSON.stringify({ email, password, returnSecureToken: true })
   })
   const data = await res.json()
@@ -98,7 +110,11 @@ export async function sendPasswordResetEmail(_auth, email) {
   requiredKey()
   const res = await fetch(`${BASE}/accounts:sendOobCode?key=${API_KEY}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
     body: JSON.stringify({ requestType: 'PASSWORD_RESET', email })
   })
   const data = await res.json()
@@ -129,7 +145,11 @@ export async function fetchSignInMethodsForEmail(_auth, email) {
   requiredKey()
   const res = await fetch(`${BASE}/createAuthUri?key=${API_KEY}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
     body: JSON.stringify({ identifier: email, continueUri: 'https://localhost' })
   })
   const data = await res.json()

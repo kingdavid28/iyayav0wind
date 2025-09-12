@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { applicationsAPI, bookingsAPI, caregiversAPI, jobsAPI } from '../config/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { formatAddress } from '../utils/addressUtils';
 
 export const useCaregiverDashboard = () => {

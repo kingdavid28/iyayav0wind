@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScrollView, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { EmptyState } from '../../shared/ui';
 import { styles } from '../styles/CaregiverDashboard.styles';
 
 export default function ApplicationsTab({ 
@@ -21,13 +22,11 @@ export default function ApplicationsTab({
             />
           ))
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text" size={48} color="#9CA3AF" />
-            <Text style={styles.emptyStateText}>No applications yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Apply to jobs to see them here
-            </Text>
-          </View>
+          <EmptyState 
+            icon="document-text" 
+            title="No applications yet"
+            subtitle="Apply to jobs to see them here"
+          />
         )}
       </View>
     </ScrollView>

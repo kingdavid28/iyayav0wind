@@ -6,6 +6,24 @@ try {
   __DEV__ = true; // Default to development mode
 }
 
+// ⚠️ SECURITY: Never hardcode credentials in source code
+// Use environment variables for all sensitive configuration
+export const FIREBASE_CONFIG = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
+};
+
+// Validate required environment variables
+if (!FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.projectId) {
+  console.error('❌ Missing required Firebase environment variables');
+  console.error('Please set EXPO_PUBLIC_FIREBASE_API_KEY and EXPO_PUBLIC_FIREBASE_PROJECT_ID');
+}
+
 export { __DEV__ };
 export const __PROD__ = !__DEV__;
 
@@ -29,11 +47,11 @@ const getBaseHost = () => {
       const platform = rn?.Platform?.OS;
       if (platform === "android") {
         // Android emulator uses host loopback 10.0.2.2
-        return { mode: "android-emulator", url: "http://10.0.2.2:5001" };
+        return { mode: "android-emulator", url: "http://10.0.2.2:5000" };
       }
       if (platform === "ios") {
         // iOS simulator can access localhost - try both localhost and network IP
-        return { mode: "ios-simulator", url: "http://localhost:5001" };
+        return { mode: "ios-simulator", url: "http://localhost:5000" };
       }
     } catch (_) {
       // Platform not available
@@ -42,11 +60,11 @@ const getBaseHost = () => {
     // 3) Web (expo web / react-native-web) – use localhost for trustworthy origin
     if (typeof window !== "undefined" && window.location?.hostname) {
       // Use localhost instead of IP address for trustworthy origin
-      return { mode: "web", url: "http://localhost:5001" };
+      return { mode: "web", url: "http://localhost:5000" };
     }
 
     // 4) Fallback - try localhost first, then network IP
-    return { mode: "fallback", url: "http://localhost:5001" };
+    return { mode: "fallback", url: "http://localhost:5000" };
   } catch (error) {
     console.error("Error determining base host:", error);
     return { mode: "error-fallback", url: "http://localhost:5001" };

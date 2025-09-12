@@ -1,7 +1,8 @@
 import { Slider } from "@miblanchard/react-native-slider";
 import React, { useState } from "react";
-import { Modal, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Button, Switch, Text } from "react-native-paper";
+import { ModalWrapper } from '../../../shared/ui';
 
 // Add type checking utilities
 const isValidArray = (arr) => Array.isArray(arr) && arr !== null;
@@ -108,14 +109,12 @@ const FilterModal = ({
   };
 
   return (
-    <Modal
+    <ModalWrapper
       visible={visible}
-      transparent
+      onClose={onClose}
       animationType="slide"
-      onRequestClose={onClose}
+      style={styles.modalContent}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
           <ScrollView style={styles.filtersContainer}>
             {/* Availability Section */}
             <View style={styles.filterSection}>
@@ -204,9 +203,7 @@ const FilterModal = ({
               Apply Filters
             </Button>
           </View>
-        </View>
-      </View>
-    </Modal>
+    </ModalWrapper>
   );
 };
 

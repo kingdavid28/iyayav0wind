@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Modal,
   ScrollView,
   TouchableOpacity,
   TextInput,
@@ -13,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Image,
 } from 'react-native';
+import { ModalWrapper } from '../../../shared/ui';
 import KeyboardAvoidingWrapper from '../../../components/KeyboardAvoidingWrapper';
 import { 
   X, 
@@ -55,12 +55,12 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
   const [submitError, setSubmitError] = useState('');
 
   const resolveHourlyRate = () => {
-    if (typeof caregiver?.hourlyRate === 'number') return caregiver.hourlyRate;
+    if (typeof caregiver?.hourlyRate === 'number' && caregiver.hourlyRate > 0) return caregiver.hourlyRate;
     if (typeof caregiver?.rate === 'string') {
       const n = parseFloat(caregiver.rate.replace(/[^0-9.]/g, ''));
-      return isNaN(n) ? 0 : n;
+      return isNaN(n) || n <= 0 ? 150 : n;
     }
-    return 0;
+    return 150;
   };
 
   const calculateTotalCost = () => {
@@ -377,17 +377,16 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
   );
 
   return (
-    <Modal
+    <ModalWrapper
       visible={visible}
-      transparent
+      onClose={onClose}
       animationType="slide"
-      onRequestClose={onClose}
+      style={styles.modalContainer}
     >
-      <View style={styles.modalOverlay}>
-        <KeyboardAvoidingView 
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
@@ -403,9 +402,7 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
                 <Text style={styles.stepIndicator}>Step {currentStep} of 4</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color="#6b7280" />
-            </TouchableOpacity>
+
           </View>
 
           {/* Progress Bar */}
@@ -463,15 +460,15 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
           {/* Footer */}
           <View style={styles.modalFooter}>
             <TouchableOpacity
-              onPress={handlePrevStep}
-              disabled={currentStep === 1 || submitting}
+              onPress={currentStep === 1 ? onClose : handlePrevStep}
+              disabled={submitting}
               style={[
                 styles.footerButton, 
                 styles.secondaryButton, 
-                (currentStep === 1 || submitting) && styles.disabledButton
+                submitting && styles.disabledButton
               ]}
             >
-              <Text style={styles.secondaryButtonText}>Previous</Text>
+              <Text style={styles.secondaryButtonText}>{currentStep === 1 ? 'Close' : 'Previous'}</Text>
             </TouchableOpacity>
             
             {currentStep < 4 ? (
@@ -503,9 +500,8 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
               </TouchableOpacity>
             )}
           </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+      </KeyboardAvoidingView>
+    </ModalWrapper>
   );
 }
 
@@ -812,13 +808,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    marginTop: 50,
+    marginTop: 10,
+    width: 300,
+    maxHeight: '100%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     backgroundColor: 'white',
@@ -826,7 +824,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 5,
   },
   caregiverAvatar: {
     width: 40,
@@ -842,7 +840,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 15,
+    padding: 1,
     fontWeight: '600',
     color: '#111827',
   },
@@ -852,7 +851,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   closeButton: {
-    padding: 4,
+    padding: 1,
   },
   
   // BookingModal specific styles
@@ -869,6 +868,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    justifyContent: 'center',
   },
   progressCircle: {
     width: 32,
@@ -902,12 +902,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
   progressLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#6b7280',
-    width: 64,
+    flex: 1,
     textAlign: 'center',
   },
   
@@ -916,7 +916,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   stepContainer: {
     gap: 16,
@@ -939,10 +939,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
     borderRadius: 8,
-    padding: 16,
+    padding: 12,
     fontSize: 16,
     backgroundColor: 'white',
-    minHeight: 48,
+    minHeight: 44,
+    width: '100%',
   },
   multilineInput: {
     minHeight: 50,

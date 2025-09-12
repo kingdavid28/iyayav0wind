@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { View, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../core/contexts/AuthContext';
 import { caregiversAPI, authAPI } from '../../config/api';
 import { jobsAPI, bookingsAPI, childrenAPI } from '../../config/api';
 import { formatAddress } from '../../utils/addressUtils';
@@ -724,6 +724,9 @@ const ParentDashboard = () => {
             profileContact={profileContact}
             profileLocation={profileLocation}
             userData={userData}
+            caregivers={caregivers}
+            onBookCaregiver={handleBookCaregiver}
+            onMessageCaregiver={handleMessageCaregiver}
           />
         );
       case 'search':

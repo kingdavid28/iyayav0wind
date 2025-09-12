@@ -4,7 +4,7 @@ import { useTheme, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { userService } from '../../services/userService';
 import ProfileForm from '../../components/forms/ProfileForm';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../core/contexts/AuthContext';
 
 const ProfileScreen = () => {
   const theme = useTheme();

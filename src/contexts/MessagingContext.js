@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import messageService from '../services/notificationService';
 import { messagingAPI } from '../config/api';
 import { initRealtime, on as onSocket, emit as emitSocket, getSocket } from '../services/realtime';

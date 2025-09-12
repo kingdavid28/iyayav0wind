@@ -3,6 +3,42 @@ import { View, Text, ScrollView, Pressable, Linking, Alert, Platform, StyleSheet
 import { Calendar, Clock, DollarSign, MapPin, Phone, Mail, MessageCircle, Navigation, Star, Baby, AlertCircle, CheckCircle, X } from 'lucide-react-native';
 import PropTypes from 'prop-types';
 
+// Simple i18n helper - replace with proper i18n library in production
+const t = (key) => {
+  const translations = {
+    'booking.details': 'Booking Details',
+    'booking.overview': 'Booking Overview',
+    'booking.date': 'Date',
+    'booking.time': 'Time',
+    'booking.rate': 'Rate',
+    'booking.total': 'Total',
+    'location.contact': 'Location & Contact',
+    'contact.phone': 'Phone',
+    'contact.email': 'Email',
+    'contact.hidden': 'Contact info hidden for privacy',
+    'children.details': 'Children Details',
+    'children.age': 'Age',
+    'children.preferences': 'Preferences',
+    'children.instructions': 'Special Instructions',
+    'children.allergies': 'Allergies',
+    'requirements': 'Requirements',
+    'notes.special': 'Special Notes',
+    'emergency.contact': 'Emergency Contact',
+    'emergency.name': 'Name',
+    'emergency.relation': 'Relation',
+    'emergency.phone': 'Phone',
+    'actions.message': 'Message Family',
+    'actions.directions': 'Get Directions',
+    'actions.complete': 'Mark Complete',
+    'actions.cancel': 'Cancel Booking',
+    'alerts.completed': 'Booking Completed',
+    'alerts.completed.message': 'The booking has been marked as complete',
+    'alerts.cancelled': 'Booking Cancelled',
+    'alerts.cancelled.message': 'The booking has been cancelled'
+  };
+  return translations[key] || key;
+};
+
 /**
  * BookingDetailsModal displays detailed information about a booking, including children, contact, and actions.
  * Accessibility labels and roles are provided for all interactive elements.
@@ -86,7 +122,7 @@ export function BookingDetailsModal({
               <Calendar size={24} color="#3b82f6" />
             </View>
             <View>
-              <Text className="text-xl font-bold text-gray-800">Booking Details</Text>
+              <Text className="text-xl font-bold text-gray-800">{t('booking.details')}</Text>
               <Text className="text-sm text-gray-600">{enhancedBooking.family}</Text>
             </View>
           </View>
@@ -279,7 +315,7 @@ export function BookingDetailsModal({
             className="flex-1 min-w-[120px] px-4 py-3 bg-blue-100 rounded-lg flex flex-row items-center justify-center"
           >
             <MessageCircle size={16} color="#3b82f6" className="mr-2" />
-            <Text className="text-blue-700 font-semibold">Message Family</Text>
+            <Text className="text-blue-700 font-semibold">{t('actions.message')}</Text>
           </Pressable>
           
           <Pressable
@@ -290,7 +326,7 @@ export function BookingDetailsModal({
             className="flex-1 min-w-[120px] px-4 py-3 bg-green-100 rounded-lg flex flex-row items-center justify-center"
           >
             <Navigation size={16} color="#16a34a" className="mr-2" />
-            <Text className="text-green-700 font-semibold">Get Directions</Text>
+            <Text className="text-green-700 font-semibold">{t('actions.directions')}</Text>
           </Pressable>
 
           {enhancedBooking.status === 'confirmed' && (
@@ -302,7 +338,7 @@ export function BookingDetailsModal({
               className="flex-1 min-w-[120px] px-4 py-3 bg-blue-600 rounded-lg flex flex-row items-center justify-center"
             >
               <CheckCircle size={16} color="#ffffff" className="mr-2" />
-              <Text className="text-white font-semibold">Mark Complete</Text>
+              <Text className="text-white font-semibold">{t('actions.complete')}</Text>
             </Pressable>
           )}
 
@@ -314,7 +350,7 @@ export function BookingDetailsModal({
               }}
               className="px-4 py-3 bg-red-100 rounded-lg flex flex-row items-center justify-center"
             >
-              <Text className="text-red-700 font-semibold">Cancel Booking</Text>
+              <Text className="text-red-700 font-semibold">{t('actions.cancel')}</Text>
             </Pressable>
           )}
         </View>

@@ -129,7 +129,7 @@ const corsOptions = {
     'platform'
   ],
   exposedHeaders: ['Authorization', 'X-Refresh-Token', 'X-Request-ID'],
-  credentials: false, // Changed to false for image requests
+  credentials: true, // Enable credentials for authenticated requests
   optionsSuccessStatus: 204,
   maxAge: 86400
 };

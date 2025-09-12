@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Modal,
   ScrollView,
   TouchableOpacity,
   TextInput,
@@ -10,6 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import { ModalWrapper } from '../../../shared/ui';
 import KeyboardAvoidingWrapper from '../../../components/KeyboardAvoidingWrapper';
 import { Button } from "react-native-paper";
 
@@ -35,14 +35,12 @@ const ChildModal = ({
   };
 
   return (
-    <Modal
+    <ModalWrapper
       visible={visible}
-      transparent
+      onClose={onClose}
       animationType="slide"
-      onRequestClose={onClose}
+      style={styles.modalContent}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>
             {editing ? "Edit Child" : "Add Child"}
           </Text>
@@ -118,9 +116,7 @@ const ChildModal = ({
               {editing ? "Save Changes" : "Add Child"}
             </Button>
           </View>
-        </View>
-      </View>
-    </Modal>
+    </ModalWrapper>
   );
 };
 
@@ -135,7 +131,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    maxHeight: "90%",
+    maxHeight: "200%",
+    minHeight: 400,
+    width: '100%',
   },
   modalTitle: {
     fontSize: 20,
@@ -160,19 +158,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111827",
     backgroundColor: "#F9FAFB",
+    width: '100%',
+    maxWidth: '100%',
   },
   textArea: {
-    minHeight: 100,
+    maxHeight: 50,
     textAlignVertical: "top",
   },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 20,
+    marginTop: 24,
+    gap: 12,
   },
   button: {
     flex: 1,
-    marginHorizontal: 8,
   },
   buttonContent: {
     paddingVertical: 8,

@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, CommonActions } from "@react-navigation/native";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../core/contexts/AuthContext";
 import { useApp } from "../contexts/AppContext";
 import { AlignCenter } from 'lucide-react-native';
 

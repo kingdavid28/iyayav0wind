@@ -1,29 +1,20 @@
-// Auto-detect API URL based on network
-const detectAPIURL = async () => {
-  const commonIPs = ['192.168.1.26', '192.168.1.10', '192.168.0.10', '10.0.0.10', '172.16.0.10'];
-  
-  for (const ip of commonIPs) {
-    try {
-      const response = await fetch(`http://${ip}:5000/api/health`, { 
-        method: 'GET',
-        timeout: 2000 
-      });
-      if (response.ok) {
-        console.log(`✅ Found backend at ${ip}:5000`);
-        return `http://${ip}:5000/api`;
-      }
-    } catch (error) {
-      // Continue to next IP
-    }
-  }
-  
-  // Fallback to default
-  return 'http://192.168.1.26:5000/api';
-};
+// ⚠️ DEPRECATED: Use new API client from '../core/api'
+// This file is kept for backward compatibility only
 
-// Use environment variable or fallback
-let API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ? `${process.env.EXPO_PUBLIC_API_URL}/api` : 'http://192.168.1.10:5000/api';
+// Legacy API implementations - kept for backward compatibility
 
+// Environment detection
+const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV === 'development';
+
+// Legacy API_BASE_URL for compatibility
+let API_BASE_URL = isDev 
+  ? 'http://192.168.1.10:5000/api'  // Use network IP for device access
+  : 'https://api.iyaya.com/api';
+
+// Export API_BASE_URL for backward compatibility
+export { API_BASE_URL };
+
+console.log('⚠️ Using legacy API config. Migrate to core/api for better features.');
 console.log('🔗 API URL set to:', API_BASE_URL);
 
 export const getCurrentAPIURL = () => API_BASE_URL;
@@ -89,11 +80,13 @@ export const authAPI = {
       throw new Error('No auth token found');
     }
     
-    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+    const response = await fetch(`${API_BASE_URL}/auth/firebase-profile`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(updateData)
     });
@@ -113,9 +106,11 @@ export const authAPI = {
     
     const response = await fetch(`${API_BASE_URL}/auth/upload-profile-image`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify({ imageBase64, mimeType })
     });
@@ -217,9 +212,11 @@ export const caregiversAPI = {
     
     const response = await fetch(`${API_BASE_URL}/caregivers/profile`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(profileData)
     });
@@ -239,9 +236,11 @@ export const caregiversAPI = {
     
     const response = await fetch(`${API_BASE_URL}/caregivers/profile`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(profileData)
     });
@@ -294,6 +293,27 @@ export const jobsAPI = {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return response.json();
+  },
+
+  async create(jobData) {
+    const token = await import('@react-native-async-storage/async-storage').then(m => m.default.getItem('@auth_token'));
+    if (!token) throw new Error('No auth token found');
+    
+    const response = await fetch(`${API_BASE_URL}/jobs`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(jobData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+    
+    return response.json();
   }
 };
 
@@ -305,9 +325,11 @@ export const bookingsAPI = {
     
     const response = await fetch(`${API_BASE_URL}/bookings`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}` 
+        'Authorization': `Bearer ${token}`,
+        'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify(bookingData)
     });
@@ -445,6 +467,33 @@ export const uploadsAPI = {
     
     if (!response.ok) {
       throw new Error(`Upload failed: ${response.status}`);
+    }
+    
+    return response.json();
+  },
+
+  async uploadDocument({ documentBase64, mimeType, documentType, name }) {
+    const token = await import('@react-native-async-storage/async-storage').then(m => m.default.getItem('@auth_token'));
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/auth/upload-profile-image`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ 
+        imageBase64: documentBase64, 
+        mimeType, 
+        folder: 'documents',
+        name: name || `${documentType}_${Date.now()}`
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Document upload failed: ${response.status}`);
     }
     
     return response.json();

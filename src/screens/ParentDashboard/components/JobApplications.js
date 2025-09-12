@@ -24,7 +24,7 @@ import {
   ChevronRight
 } from 'lucide-react-native';
 import { jobsAPI, applicationsAPI } from '../../../config/api';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../core/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 
 const JobApplications = ({ jobId, onViewApplicant }) => {

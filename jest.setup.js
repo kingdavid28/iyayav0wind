@@ -1,4 +1,4 @@
-import '@testing-library/jest-native/extend-expect';
+// Jest setup file for React Native testing
 import 'react-native-gesture-handler/jestSetup';
 
 // Mock AsyncStorage
@@ -6,30 +6,29 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
-// Skip Firebase mocking for now
-
-// Mock React Native
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
-
-// Mock React Navigation
-jest.mock('@react-navigation/native', () => {
-  const actualNav = jest.requireActual('@react-navigation/native');
-  return {
-    ...actualNav,
-    useNavigation: () => ({
-      navigate: jest.fn(),
-      dispatch: jest.fn(),
-    }),
-    useRoute: () => ({
-      params: {},
-    }),
+// Mock react-native-paper
+jest.mock('react-native-paper', () => {
+  const RealModule = jest.requireActual('react-native-paper');
+  const MockedModule = {
+    ...RealModule,
+    Portal: ({ children }) => children,
   };
+  return MockedModule;
 });
 
 // Mock Expo modules
-jest.mock('expo-font');
-jest.mock('expo-asset');
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
+}));
 
-// Silence warnings
-jest.spyOn(global.console, 'warn').mockImplementation(() => {});
-jest.spyOn(global.console, 'error').mockImplementation(() => {});
+jest.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: jest.fn(),
+  MediaTypeOptions: {
+    Images: 'Images',
+  },
+}));
+
+// Silence the warning: Animated: `useNativeDriver` is not supported
+jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');

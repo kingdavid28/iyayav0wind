@@ -53,6 +53,8 @@ export default {
         projectId: "583f6598-db53-4667-af75-fdd1f8104fab"
       }
     },
-    plugins: []
+    plugins: [
+      "expo-secure-store"
+    ]
   }
 };

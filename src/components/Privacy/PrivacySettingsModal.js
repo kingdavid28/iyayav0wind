@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, Switch } from 'react-native';
 import { X, Shield, Eye, Lock, Info } from 'lucide-react-native';
 import { usePrivacy } from './PrivacyManager';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../core/contexts/AuthContext';
 
 const PrivacySettingsModal = ({ visible, onClose }) => {
   const { privacySettings, updatePrivacySetting, DATA_LEVELS } = usePrivacy();

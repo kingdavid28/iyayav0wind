@@ -9,6 +9,7 @@ import {
 import PropTypes from "prop-types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Card } from '../../../shared/ui';
 
 import { API_CONFIG } from "../../../config/constants";
 import { formatAddress } from "../../../utils/addressUtils";
@@ -139,12 +140,15 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
   const locationText = getLocationString(locationSource);
 
   return (
-    <View
-      style={[styles.card, styles.shadowSm, { marginBottom: spacing.md }]}
-      accessible
-      accessibilityLabel={accessibilityLabel}
-      testID={testID}
+    <Card
+      style={{ marginBottom: spacing.md }}
+      variant="elevated"
     >
+      <View
+        accessible
+        accessibilityLabel={accessibilityLabel}
+        testID={testID}
+      >
       <View
         style={[
           styles.flexRow,
@@ -311,7 +315,8 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+      </View>
+    </Card>
   );
 };
 

@@ -37,7 +37,7 @@ import mime from 'mime';
 const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
 // Firebase removed
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { useMessaging } from '../contexts/MessagingContext';
 
 const MAX_FILE_SIZE_MB = 10;
@@ -202,7 +202,7 @@ export default function EnhancedChatScreen() {
       }
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+        mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.8,
         allowsMultipleSelection: true

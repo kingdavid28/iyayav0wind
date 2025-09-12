@@ -8,7 +8,7 @@ import { userService } from "../services/userService"
 import { logger } from "../utils/logger"
 import { Alert } from "react-native"
 import jobService from '../services/jobService';
-import { useAuth } from "./AuthContext"
+// import { useAuth } from "./AuthContext" // Removed to prevent circular dependency
 
 // Initial State
 const initialState = {
@@ -204,8 +204,10 @@ const AppProvider = ({ children }) => {
   // New: explicit flag to enable/disable dev auto-mock login
   const DEV_AUTOMOCK = (process?.env?.EXPO_PUBLIC_DEV_AUTOMOCK === 'true')
   const devMockApplied = useRef(false)
-  // Bridge: consume JWT-based auth from AuthContext
-  const { user: authUser, loading: authLoading } = useAuth()
+  // Bridge: consume JWT-based auth from AuthContext - removed to prevent circular dependency
+  // const { user: authUser, loading: authLoading } = useAuth()
+  const authUser = null;
+  const authLoading = false;
 
   // Helper function for error handling
   const handleError = (key, error) => {

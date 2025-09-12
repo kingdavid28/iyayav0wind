@@ -38,12 +38,13 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomDateTimePicker from '../components/DateTimePicker';
 import TimePicker from '../components/TimePicker';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { jobsAPI, applicationsAPI, bookingsAPI, caregiversAPI, authAPI, uploadsAPI } from "../config/api";
 import { VALIDATION, CURRENCY, FEATURES } from '../config/constants';
 import { getCurrentSocketURL } from '../config/api';
-import { styles } from './styles/CaregiverProfileWizard.styles';
+import { styles } from './styles/EnhancedCaregiverProfileWizard.styles';
 import { getCurrentDeviceLocation, searchLocation, validateLocation, formatLocationForDisplay } from '../utils/locationUtils';
+import { compressImage, uploadWithRetry, handleUploadError } from '../utils/imageUploadUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -295,7 +296,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
     validateField(field, value);
   };
 
-  // Portfolio image upload
+  // Optimized portfolio image upload
   const handlePortfolioImageUpload = async () => {
     try {
       if (formData.portfolio.images.length >= VALIDATION.PORTFOLIO_MAX_IMAGES) {
@@ -310,22 +311,29 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        base64: true,
+        base64: false, // Don't get base64 initially
       });
 
       if (!result.canceled && result.assets[0]) {
         setUploading(true);
         const asset = result.assets[0];
         
-        // Skip image manipulation on Android due to compatibility issues
-        const mimeType = asset.mimeType || 'image/jpeg';
-        const dataUrl = `data:${mimeType};base64,${asset.base64}`;
+        console.log('Portfolio image upload started');
         
-        const response = await authAPI.uploadProfileImageBase64(dataUrl, mimeType);
+        // Compress image for portfolio
+        const compressedImage = await compressImage(asset.uri, 0.8, 800, 600);
+        
+        const mimeType = 'image/jpeg';
+        const dataUrl = `data:${mimeType};base64,${compressedImage.base64}`;
+        
+        // Upload with retry logic
+        const uploadFunction = () => authAPI.uploadProfileImageBase64(dataUrl, mimeType);
+        const response = await uploadWithRetry(uploadFunction, 3, 2000);
+        
         const imageUrl = response?.data?.url || response?.url;
         
         if (imageUrl) {
@@ -352,7 +360,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Portfolio image upload failed:', error);
-      Alert.alert('Upload Failed', 'Failed to upload image. Please try again.');
+      handleUploadError(error);
     } finally {
       setUploading(false);
     }
@@ -986,6 +994,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         availability: formData.availability,
         emergencyContacts: formData.emergencyContacts,
         profileImage: formData.profileImage,
+        imageUrl: formData.profileImage, // Also send as imageUrl for compatibility
         address: {
           street: formData.address.street,
           city: formData.address.city,
@@ -1047,96 +1056,68 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
   );
 
   // Profile image upload for basic information
-  const handleProfileImageUpload = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photos.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setUploading(true);
-        const asset = result.assets[0];
-        
-        // Skip image manipulation on Android due to compatibility issues
-        const mimeType = asset.mimeType || 'image/jpeg';
-        
-        try {
-          const response = await uploadsAPI.base64Upload({
-            imageBase64: `data:${mimeType};base64,${asset.base64}`,
-            mimeType,
-            folder: 'profiles',
-            name: `profile_${user?.id}_${Date.now()}`
-          });
-          
-          const imageUrl = response?.url;
-          if (imageUrl) {
-            const baseUrl = getCurrentSocketURL();
-            const absoluteUrl = imageUrl.startsWith('/') 
-              ? `${baseUrl}${imageUrl}` 
-              : imageUrl;
-            setProfileImageError(false);
-            updateFormData('profileImage', absoluteUrl);
-            
-            // Update caregiver profile immediately
-            try {
-              await caregiversAPI.updateMyProfile({ profileImage: imageUrl });
-              console.log('✅ Caregiver profile updated with image');
-            } catch (error) {
-              console.log('⚠️ Failed to update caregiver profile:', error.message);
-            }
-            
-            showSnackbar('Profile image updated successfully');
-          } else {
-            throw new Error('No URL returned from upload');
-          }
-        } catch (uploadError) {
-          console.error('Upload API failed, trying auth API:', uploadError);
-          const dataUrl = `data:${mimeType};base64,${asset.base64}`;
-          try {
-            const response = await authAPI.uploadProfileImageBase64(dataUrl, mimeType);
-            const imageUrl = response?.data?.url || response?.url;
-            
-            if (imageUrl) {
-              const baseUrl = getCurrentSocketURL();
-              const absoluteUrl = imageUrl.startsWith('/') 
-                ? `${baseUrl}${imageUrl}` 
-                : imageUrl;
-              setProfileImageError(false);
-              updateFormData('profileImage', absoluteUrl);
-              
-              // Update caregiver profile immediately
-              try {
-                await caregiversAPI.updateMyProfile({ profileImage: imageUrl });
-                console.log('✅ Caregiver profile updated with image');
-              } catch (error) {
-                console.log('⚠️ Failed to update caregiver profile:', error.message);
-              }
-              
-              showSnackbar('Profile image updated successfully');
-            }
-          } catch (error) {
-            console.error('Profile image upload failed:', error);
-            Alert.alert('Upload Failed', 'Failed to upload image. Please try again.');
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Profile image upload failed:', error);
-      Alert.alert('Upload Failed', 'Failed to upload image. Please try again.');
-    } finally {
-      setUploading(false);
+  // Optimized profile image upload with compression and retry logic
+const handleProfileImageUpload = async () => {
+  try {
+    // Request permissions first
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photos.');
+      return;
     }
-  };
+
+    // Launch image picker with optimized settings
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8, // Reduced quality for smaller file size
+      base64: false, // Don't get base64 initially to save memory
+    });
+
+    if (!result.canceled && result.assets && result.assets[0]) {
+      setUploading(true);
+      const asset = result.assets[0];
+      
+      console.log('Profile image upload started');
+      console.log('Asset URI:', asset.uri);
+      console.log('Asset size:', asset.fileSize);
+      
+      // Compress image to reduce size
+      const compressedImage = await compressImage(asset.uri, 0.7, 600, 600);
+      
+      // Create optimized upload payload
+      const mimeType = 'image/jpeg';
+      const dataUrl = `data:${mimeType};base64,${compressedImage.base64}`;
+      
+      console.log('Uploading compressed image to backend...');
+      console.log('Compressed size:', compressedImage.base64.length);
+      
+      // Upload with retry logic
+      const uploadFunction = () => authAPI.uploadProfileImageBase64(dataUrl, mimeType);
+      const response = await uploadWithRetry(uploadFunction, 3, 2000);
+      
+      console.log('Upload response:', response);
+      
+      const imageUrl = response?.data?.url || response?.url || response?.imageUrl;
+      console.log('Received image URL:', imageUrl);
+      
+      if (imageUrl) {
+        // Store the URL as received from backend
+        updateFormData('profileImage', imageUrl);
+        console.log('Profile image URL updated in form:', imageUrl);
+        showSnackbar('Profile image uploaded successfully');
+      } else {
+        throw new Error('No image URL returned from server');
+      }
+    }
+  } catch (error) {
+    console.error('❌ Profile image upload failed:', error);
+    handleUploadError(error);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const renderBasicInformation = () => (
     <View style={styles.stepContainer}>

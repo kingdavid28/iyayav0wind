@@ -6,7 +6,11 @@ class CRUDService {
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
         body: JSON.stringify(data),
       });
       return response.json();
@@ -31,7 +35,11 @@ class CRUDService {
     try {
       const response = await fetch(`${endpoint}/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
         body: JSON.stringify(data),
       });
       return response.json();
@@ -45,6 +53,10 @@ class CRUDService {
     try {
       const response = await fetch(`${endpoint}/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
       return response.json();
     } catch (error) {

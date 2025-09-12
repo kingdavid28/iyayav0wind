@@ -9,7 +9,7 @@ import { Button, Card, Chip, Searchbar } from "react-native-paper"
 import Toast from "../components/Toast"
 import { applicationsAPI, authAPI, bookingsAPI, caregiversAPI, jobsAPI, uploadsAPI } from "../config/api"
 import { getCurrentSocketURL } from '../config/api'
-import { useAuth } from "../contexts/AuthContext"
+import { useAuth } from "../core/contexts/AuthContext"
 import { useMessaging } from "../contexts/MessagingContext"
 import { usePrivacy } from "../components/Privacy/PrivacyManager"
 import PrivacyNotificationModal from "../components/Privacy/PrivacyNotificationModal"
@@ -19,35 +19,11 @@ import MessagesTab from "../components/MessagesTab"
 
 import { formatAddress } from "../utils/addressUtils"
 import { calculateAge } from "../utils/dateUtils"
+import { __DEV__ } from "../config/constants"
 import { styles } from "./styles/CaregiverDashboard.styles"
 import CaregiverProfileSection from "./CaregiverDashboard/components/CaregiverProfileSection"
 
-// Local quick tiles
-function QuickStat({ icon, value, label, color = '#2563EB', bgColor = '#EFF6FF' }) {
-  return (
-    <View style={[styles.quickTile, { backgroundColor: '#fff' }]}>
-      <View style={[styles.quickIconWrap, { backgroundColor: bgColor }]}>
-        <Ionicons name={icon} size={18} color={color} />
-      </View>
-      <Text style={styles.quickValue}>{value ?? '-'}</Text>
-      <Text style={styles.quickLabel}>{label}</Text>
-    </View>
-  )
-}
-
-function QuickAction({ icon, label, color = '#2563EB', bgColor = '#EFF6FF', onPress, gradientColors }) {
-  const colors = gradientColors || ['#60a5fa', '#6366f1']
-  return (
-    <Pressable onPress={onPress} style={styles.quickActionTile} accessibilityRole="button" accessibilityLabel={label}>
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickActionGradient}>
-        <View style={styles.quickActionIconWrap}>
-          <Ionicons name={icon} size={20} color="#ffffff" />
-        </View>
-        <Text style={[styles.quickActionLabel, { color: '#ffffff' }]}>{label}</Text>
-      </LinearGradient>
-    </Pressable>
-  )
-}
+import { QuickStat, QuickAction } from '../shared/ui';
 
 const { width } = Dimensions.get("window")
 
@@ -166,7 +142,12 @@ export default function CaregiverDashboard({ onLogout, route }) {
     console.log('- User ID:', user?.id);
     console.log('- User role:', user?.role);
     console.log('- Current socket URL:', getCurrentSocketURL());
-    console.log('- Profile object:', JSON.stringify(profile, null, 2));
+    console.log('- Full profile object:', JSON.stringify(profile, null, 2));
+    console.log('- User object:', JSON.stringify(user, null, 2));
+    
+    // Force refresh profile
+    console.log('🔄 Forcing profile refresh...');
+    loadProfile();
   };
 
   // Load profile data function
@@ -208,9 +189,28 @@ export default function CaregiverDashboard({ onLogout, route }) {
       console.log('📊 Profile data extracted:', p);
       
       if (p && (p.name || p.hourlyRate || p.experience || caregiverProfile || userProfile)) {
-        // Check for profile image in both profiles
-        const rawImageUrl = caregiverProfile?.profileImage || userProfile?.profileImage || p.profileImage || p.imageUrl || p.avatarUrl || p.image || p.photoUrl || p.userId?.profileImage;
-        console.log('🖼️ CaregiverDashboard - Raw image URL:', rawImageUrl);
+        // Check for profile image in both profiles with extensive debugging
+        const imageFields = {
+          'caregiverProfile?.profileImage': caregiverProfile?.profileImage,
+          'caregiverProfile?.imageUrl': caregiverProfile?.imageUrl,
+          'caregiverProfile?.image': caregiverProfile?.image,
+          'userProfile?.profileImage': userProfile?.profileImage,
+          'userProfile?.imageUrl': userProfile?.imageUrl,
+          'userProfile?.image': userProfile?.image,
+          'p.profileImage': p.profileImage,
+          'p.imageUrl': p.imageUrl,
+          'p.avatarUrl': p.avatarUrl,
+          'p.image': p.image,
+          'p.photoUrl': p.photoUrl,
+          'p.userId?.profileImage': p.userId?.profileImage
+        };
+        
+        console.log('🖼️ CaregiverDashboard - All image fields:', imageFields);
+        
+        const rawImageUrl = caregiverProfile?.profileImage || caregiverProfile?.imageUrl || caregiverProfile?.image || 
+                           userProfile?.profileImage || userProfile?.imageUrl || userProfile?.image ||
+                           p.profileImage || p.imageUrl || p.avatarUrl || p.image || p.photoUrl || p.userId?.profileImage;
+        console.log('🖼️ CaregiverDashboard - Selected raw image URL:', rawImageUrl);
         
         let processedImageUrl = null;
         if (rawImageUrl) {
@@ -255,7 +255,12 @@ export default function CaregiverDashboard({ onLogout, route }) {
           reviews: p.reviewCount || p.reviews || prev.reviews,
           imageUrl: processedImageUrl,
         }));
-        console.log('✅ Profile updated in dashboard with image:', processedImageUrl);
+        console.log('✅ Profile updated in dashboard');
+        console.log('- Final profile object:', {
+          name: p.name || p.userId?.name || prev.name,
+          imageUrl: processedImageUrl,
+          hourlyRate: p.hourlyRate || p.rate || prev.hourlyRate
+        });
       }
     } catch (e) {
       console.error('❌ Error loading profile in dashboard:', e);
@@ -754,6 +759,13 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 <Ionicons name="person-outline" size={22} color="#FFFFFF" />
               </Pressable>
               
+              {/* Debug button - only show in development */}
+              {__DEV__ && (
+                <Pressable style={styles.headerButton} onPress={debugProfileImage}>
+                  <Ionicons name="bug-outline" size={22} color="#FFFFFF" />
+                </Pressable>
+              )}
+              
 
               <Pressable 
                 style={styles.headerButton} 
@@ -847,6 +859,45 @@ export default function CaregiverDashboard({ onLogout, route }) {
               profile={profile}
               activeTab={activeTab}
             />
+            
+            {/* Debug section - only show in development */}
+            {__DEV__ && (
+              <View style={{
+                backgroundColor: '#fff3cd',
+                padding: 12,
+                margin: 16,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#ffeaa7'
+              }}>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 8, color: '#856404' }}>
+                  🐛 Debug Info (Development Only)
+                </Text>
+                <Text style={{ fontSize: 12, color: '#856404', marginBottom: 4 }}>
+                  Profile Image URL: {profile?.imageUrl || 'Not set'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#856404', marginBottom: 4 }}>
+                  User ID: {user?.id || 'Not set'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#856404', marginBottom: 4 }}>
+                  Socket URL: {getCurrentSocketURL()}
+                </Text>
+                <Pressable 
+                  onPress={debugProfileImage}
+                  style={{
+                    backgroundColor: '#ffc107',
+                    padding: 8,
+                    borderRadius: 4,
+                    marginTop: 8,
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ color: '#212529', fontWeight: 'bold', fontSize: 12 }}>
+                    Refresh Profile Data
+                  </Text>
+                </Pressable>
+              </View>
+            )}
             {/* Quick stats grid */}
             <View style={styles.statsGrid}>
               <QuickStat
@@ -855,6 +906,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 label="Rating"
                 color="#F59E0B"
                 bgColor="#FEF3C7"
+                styles={styles}
               />
               <QuickStat
                 icon="briefcase"
@@ -862,6 +914,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 label="Jobs Done"
                 color="#10B981"
                 bgColor="#D1FAE5"
+                styles={styles}
               />
               <QuickStat
                 icon="chatbubble"
@@ -869,6 +922,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 label="Response Rate"
                 color="#3B82F6"
                 bgColor="#DBEAFE"
+                styles={styles}
               />
               <QuickStat
                 icon="checkmark-circle"
@@ -876,6 +930,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 label="Trust Score"
                 color="#8B5CF6"
                 bgColor="#EDE9FE"
+                styles={styles}
               />
             </View>
 
@@ -884,33 +939,33 @@ export default function CaregiverDashboard({ onLogout, route }) {
               <QuickAction
                 icon="search"
                 label="Find Jobs"
-                color="#ffffff"
                 gradientColors={["#3B82F6", "#2563EB"]}
                 onPress={() => {
                   setActiveTab('jobs')
                   fetchJobs() // Refresh jobs when navigating to jobs tab
                 }}
+                styles={styles}
               />
               <QuickAction
                 icon="calendar"
                 label="Bookings"
-                color="#ffffff"
                 gradientColors={["#22C55E", "#16A34A"]}
                 onPress={() => setActiveTab('bookings')}
+                styles={styles}
               />
               <QuickAction
                 icon="chatbubble-ellipses"
                 label="Messages"
-                color="#ffffff"
                 gradientColors={["#A78BFA", "#8B5CF6"]}
                 onPress={() => setActiveTab('messages')}
+                styles={styles}
               />
               <QuickAction
                 icon="document-text"
                 label="Applications"
-                color="#ffffff"
                 gradientColors={["#fb7185", "#ef4444"]}
                 onPress={() => setActiveTab('applications')}
+                styles={styles}
               />
             </View>
 

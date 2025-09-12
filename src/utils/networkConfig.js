@@ -25,6 +25,10 @@ export const NetworkConfig = {
       const response = await fetch(`http://${ip}:${port}/api/health`, {
         method: 'GET',
         signal: controller.signal,
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
       
       clearTimeout(timeoutId);

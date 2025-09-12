@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, View, Text } from 'react-native';
 import { Chip } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { EmptyState } from '../../shared/ui';
 import { styles } from '../styles/CaregiverDashboard.styles';
 
 export default function BookingsTab({ 
@@ -43,13 +44,11 @@ export default function BookingsTab({
             />
           ))
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="calendar" size={48} color="#9CA3AF" />
-            <Text style={styles.emptyStateText}>No bookings yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Your upcoming bookings will appear here
-            </Text>
-          </View>
+          <EmptyState 
+            icon="calendar" 
+            title="No bookings yet"
+            subtitle="Your upcoming bookings will appear here"
+          />
         )}
       </View>
     </ScrollView>

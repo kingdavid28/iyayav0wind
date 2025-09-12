@@ -92,8 +92,8 @@ const SearchTab = ({
           ListHeaderComponent={
             <Text style={styles.sectionTitle}>
               {showSearchResults 
-                ? `Search Results (${displayData.length})` 
-                : `Available iYaya (${displayData.length})`}
+                ? `${displayData.length} results found` 
+                : `${displayData.length} caregivers available`}
             </Text>
           }
           ItemSeparatorComponent={() => <View style={{ height: 5 }} />}

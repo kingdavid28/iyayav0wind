@@ -14,7 +14,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, MessageSquare, User, Search } from 'lucide-react-native';
 import { messagesAPI } from '../config/api';
 import { useMessaging } from '../contexts/MessagingContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../core/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 
 const SAMPLE_CONVERSATIONS = [
