@@ -23,7 +23,7 @@ describe('Shared Components', () => {
   describe('StatusBadge', () => {
     it('renders confirmed status', () => {
       const { getByText } = render(<StatusBadge status="confirmed" />);
-      expect(getByText('confirmed')).toBeTruthy();
+      expect(getByText('Confirmed')).toBeTruthy();
     });
   });
 

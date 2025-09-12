@@ -74,6 +74,7 @@ const authenticate = async (req, res, next) => {
 
     // Try JWT verification first
     try {
+      // Try HS256 first (our JWT tokens)
       const decoded = jwt.verify(token, jwtSecret, {
         algorithms: ['HS256']
       });

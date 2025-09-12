@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from 'react-native-paper'; // Import useTheme
 import { styles } from '../../styles/ParentDashboard.styles';
 import QuickActions from './QuickActions';
-import ChildrenSection from './ChildrenSection';
-import BookingsSection from './BookingsSection';
+
 import MobileProfileSection from './MobileProfileSection';
 import CaregiverCard from './CaregiverCard';
 
@@ -14,7 +13,10 @@ const HomeTab = ({
   quickActions, 
   onAddChild, 
   onEditChild, 
+  onDeleteChild,
   onViewBookings,
+  onViewAllChildren,
+  showAllChildren,
   greetingName,
   profileImage,
   profileContact,
@@ -48,6 +50,61 @@ const HomeTab = ({
         />
         <QuickActions actions={quickActions} />
         
+        {/* Children Section */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Text style={styles.sectionTitle}>My Children ({children.length})</Text>
+            </View>
+          </View>
+          
+          {children.length === 0 ? (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptySectionText}>No children added yet</Text>
+              <Text style={styles.emptyStateSubtext}>Use the "Add Child" quick action above</Text>
+            </View>
+          ) : (
+            <View style={styles.childrenList}>
+              {(showAllChildren ? children : children.slice(0, 3)).map((child, index) => (
+                <View key={child._id || child.id || index} style={styles.childItemCard}>
+                  <View style={styles.childIcon}>
+                    <Text style={{ fontSize: 20, color: '#db2777' }}>👶</Text>
+                  </View>
+                  <View style={styles.childInfo}>
+                    <Text style={styles.childName}>{child.name}</Text>
+                    <Text style={styles.childDetails}>Age: {child.age} years old</Text>
+                    {child.allergies && (
+                      <Text style={styles.childAllergies}>⚠️ {child.allergies}</Text>
+                    )}
+                  </View>
+                  <View style={styles.childActions}>
+                    <TouchableOpacity style={styles.childActionButton} onPress={() => onEditChild(child)}>
+                      <Text style={styles.childActionText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.childActionButton, styles.deleteButton]} 
+                      onPress={() => onDeleteChild(child)}
+                    >
+                      <Text style={[styles.childActionText, styles.deleteText]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+          
+          {children.length > 3 && (
+            <TouchableOpacity 
+              style={{ padding: 12, alignItems: 'center' }}
+              onPress={onViewAllChildren}
+            >
+              <Text style={styles.linkText}>
+                {showAllChildren ? 'Show Less' : `View All ${children.length} Children`}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
         {/* Featured Caregivers Section */}
         {featuredCaregivers.length > 0 && (
           <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
@@ -62,9 +119,6 @@ const HomeTab = ({
             ))}
           </View>
         )}
-        
-        <ChildrenSection children={children} onAddChild={onAddChild} onEditChild={onEditChild} />
-        <BookingsSection bookings={bookings} onViewBookings={onViewBookings} />
       </ScrollView>
     </View>
   );

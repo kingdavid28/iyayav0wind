@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import BookingItem from './BookingItem';
-import { parseDate } from '../utils/dateUtils';
+import { parseDate } from '../../../utils/dateUtils';
 import { formatAddress } from '../../../utils/addressUtils';
 
 const BookingsTab = ({

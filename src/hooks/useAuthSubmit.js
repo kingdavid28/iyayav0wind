@@ -1,9 +1,9 @@
 import { Alert, Keyboard } from 'react-native';
 import { useAuth } from '../core/contexts/AuthContext';
-import { authAPI } from '../config/api';
-import { useApi } from './useApi';
+import { useApi } from '../shared/hooks/useApi';
 import { navigateToUserDashboard } from '../utils/navigationUtils';
 import { STRINGS } from '../constants/strings';
+import { apiService } from '../services';
 
 export const useAuthSubmit = (navigation) => {
   const { login, signup, resetPassword, verifyEmailToken } = useAuth();
@@ -49,7 +49,7 @@ export const useAuthSubmit = (navigation) => {
         
         return result;
       } else if (mode === 'reset') {
-        const result = await resetPassword(email);
+        const result = await apiService.auth.resetPassword(email);
         Alert.alert(STRINGS.RESET_LINK_SENT, STRINGS.RESET_LINK_MESSAGE);
         return result;
       } else {

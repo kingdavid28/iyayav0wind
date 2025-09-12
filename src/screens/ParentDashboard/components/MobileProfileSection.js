@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, Image, Platform } from 'react-native';
-import { User } from 'lucide-react-native';
+import { View, Text, Platform } from 'react-native';
+import ProfileImage from '../../../components/ProfileImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCurrentSocketURL } from '../../../config/api';
 import { useAuth } from '../../../core/contexts/AuthContext';
@@ -17,30 +17,7 @@ const MobileProfileSection = ({ greetingName, profileImage, profileContact, prof
   const displayName = profileData?.firstName && profileData?.lastName 
     ? `${profileData.firstName} ${profileData.middleInitial ? profileData.middleInitial + '. ' : ''}${profileData.lastName}`.trim()
     : fullName;
-  // Handle image URI construction
-  const getImageSource = () => {
-    console.log('🖼️ MobileProfileSection - profileImage:', profileImage);
-    
-    if (!profileImage || profileImage.trim() === '' || profileImage === 'null' || profileImage === 'undefined') {
-      console.log('🖼️ MobileProfileSection - No valid profile image');
-      return null;
-    }
-    
-    if (profileImage.startsWith('http')) {
-      console.log('🖼️ MobileProfileSection - Using full URL:', profileImage);
-      return { uri: profileImage };
-    }
-    
-    // Use dynamic API URL
-    const baseUrl = getCurrentSocketURL();
-    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const cleanImagePath = profileImage.startsWith('/') ? profileImage : `/${profileImage}`;
-    const fullUrl = `${cleanBaseUrl}${cleanImagePath}`;
-    console.log('🖼️ MobileProfileSection - Constructed URL:', fullUrl);
-    return { uri: fullUrl };
-  };
-  
-  const imageSource = getImageSource();
+
 
   // Only render on mobile platforms
   if (Platform.OS === 'web') {
@@ -56,24 +33,12 @@ const MobileProfileSection = ({ greetingName, profileImage, profileContact, prof
         style={styles.mobileProfileCard}
       >
         <View style={styles.mobileProfileContent}>
-          <View style={styles.mobileProfileImageContainer}>
-            {imageSource ? (
-              <Image 
-                source={imageSource}
-                style={styles.mobileProfileImage}
-                onError={(error) => console.log('Image load error:', error)}
-                resizeMode="cover"
-                defaultSource={Platform.OS === 'ios' ? 
-                  require('../../../../assets/icon.png') : 
-                  { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }
-                }
-              />
-            ) : (
-              <View style={styles.mobileDefaultProfileImage}>
-                <User size={40} color="#db2777" />
-              </View>
-            )}
-          </View>
+          <ProfileImage 
+            imageUrl={profileImage}
+            size={80}
+            borderColor="#db2777"
+            style={styles.mobileProfileImageContainer}
+          />
           
           <View style={styles.mobileProfileInfo}>
             <Text style={styles.mobileWelcomeText}>

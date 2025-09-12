@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/44</span>
+                <span class='fraction'>0/48</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/23</span>
+                <span class='fraction'>0/25</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/43</span>
+                <span class='fraction'>0/47</span>
             </div>
         
             
@@ -229,7 +229,17 @@
 <a name='L164'></a><a href='#L164'>164</a>
 <a name='L165'></a><a href='#L165'>165</a>
 <a name='L166'></a><a href='#L166'>166</a>
-<a name='L167'></a><a href='#L167'>167</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -286,8 +296,18 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -399,7 +419,7 @@
 import { View, StyleSheet, Image, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Button, Text, IconButton } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadsAPI } from '../../config/api';
+import { uploadsAPI, authAPI } from '../../config/api';
 &nbsp;
 // Platform-specific FileSystem import
 const FileSystem = <span class="cstat-no" title="statement not covered" >Platform.OS === 'web' ? null : require('expo-file-system');</span>
@@ -418,7 +438,7 @@ const DocumentUpload = <span class="cstat-no" title="statement not covered" ><sp
       }
 &nbsp;
       const result = <span class="cstat-no" title="statement not covered" >await ImagePicker.launchImageLibraryAsync({</span>
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -452,11 +472,21 @@ const DocumentUpload = <span class="cstat-no" title="statement not covered" ><sp
       const name = <span class="cstat-no" title="statement not covered" >`${documentType}_${Date.now()}`;</span>
       const folder = <span class="cstat-no" title="statement not covered" >'verification_documents';</span>
 &nbsp;
-      const res = <span class="cstat-no" title="statement not covered" >await uploadsAPI.base64Upload({ imageBase64, mimeType, folder, name });</span>
-<span class="cstat-no" title="statement not covered" >      if (!res?.success || !res?.url) <span class="cstat-no" title="statement not covered" >throw new Error('Upload failed');</span></span>
+      // Try uploadsAPI first, fallback to authAPI
+      let res;
+<span class="cstat-no" title="statement not covered" >      try {</span>
+<span class="cstat-no" title="statement not covered" >        res = await uploadsAPI.base64Upload({ imageBase64, mimeType, folder, name });</span>
+      } catch (uploadError) {
+<span class="cstat-no" title="statement not covered" >        console.log('Upload API failed, trying auth API:', uploadError.message);</span>
+<span class="cstat-no" title="statement not covered" >        res = await authAPI.uploadProfileImageBase64(imageBase64, mimeType);</span>
+      }
+      
+      const url = <span class="cstat-no" title="statement not covered" >res?.data?.url || res?.url;</span>
+<span class="cstat-no" title="statement not covered" >      if (!res?.success &amp;&amp; !url) <span class="cstat-no" title="statement not covered" >throw new Error('Upload failed');</span></span>
+      
 <span class="cstat-no" title="statement not covered" >      setUploadProgress(100);</span>
-<span class="cstat-no" title="statement not covered" >      setDocumentUri(res.url);</span>
-<span class="cstat-no" title="statement not covered" >      onUploadComplete(res.url, documentType);</span>
+<span class="cstat-no" title="statement not covered" >      setDocumentUri(url);</span>
+<span class="cstat-no" title="statement not covered" >      onUploadComplete(url, documentType);</span>
 <span class="cstat-no" title="statement not covered" >      setIsUploading(false);</span>
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.error('Upload error:', error);</span>
@@ -568,7 +598,7 @@ export default DocumentUpload;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-05T00:50:20.899Z
+                at 2025-09-12T00:29:37.203Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -33,7 +33,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomDateTimePicker from '../components/DateTimePicker';
@@ -483,7 +483,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
 
         // Convert document to base64 for upload
         const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
+          encoding: 'base64',
         });
 
         console.log('📄 Uploading document:', documentType.label);

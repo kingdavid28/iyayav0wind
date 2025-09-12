@@ -30,11 +30,19 @@ import {
 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import mime from 'mime';
+// Simple mime type detection for React Native
+const getMimeType = (uri) => {
+  const ext = uri.split('.').pop()?.toLowerCase();
+  const mimeTypes = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+    pdf: 'application/pdf', doc: 'application/msword', txt: 'text/plain'
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+};
 
 
 // Platform-specific FileSystem import
-const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
+const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system/legacy');
 // Firebase removed
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../core/contexts/AuthContext';
@@ -124,7 +132,7 @@ export default function EnhancedChatScreen() {
         const arr = [];
         for (const a of attachments) {
           try {
-            const base64 = await FileSystem.readAsStringAsync(a.uri, { encoding: FileSystem.EncodingType.Base64 });
+            const base64 = await FileSystem.readAsStringAsync(a.uri, { encoding: 'base64' });
             arr.push({ base64, mimeType: a.type || 'application/octet-stream', name: a.name || 'file' });
           } catch (e) {
             console.warn('Failed to read attachment base64:', e?.message || e);
@@ -212,7 +220,7 @@ export default function EnhancedChatScreen() {
         const selectedImages = result.assets || [result];
         const newAttachments = selectedImages.map(asset => ({
           uri: asset.uri,
-          type: mime.getType(asset.uri) || 'image/jpeg',
+          type: getMimeType(asset.uri) || 'image/jpeg',
           name: asset.uri.split('/').pop() || `image-${Date.now()}.jpg`,
           isImage: true
         }));
@@ -254,7 +262,7 @@ export default function EnhancedChatScreen() {
           
           newAttachments.push({
             uri: doc.uri,
-            type: mime.getType(doc.uri) || 'application/octet-stream',
+            type: getMimeType(doc.uri) || 'application/octet-stream',
             name: doc.name || `file-${Date.now()}`,
             isImage: false,
             size: fileInfo.size
@@ -502,7 +510,7 @@ export default function EnhancedChatScreen() {
           <Image 
             source={{ uri: props.currentMessage.user.avatar }} 
             style={styles.avatar}
-            defaultSource={require('../../assets/avatar-placeholder.png')}
+            defaultSource={require('../../assets/profile-placeholder.png')}
           />
         )}
         

@@ -1,5 +1,4 @@
 // Jest setup file for React Native testing
-import 'react-native-gesture-handler/jestSetup';
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -30,5 +29,5 @@ jest.mock('expo-image-picker', () => ({
   },
 }));
 
-// Silence the warning: Animated: `useNativeDriver` is not supported
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+// Mock console.warn to silence warnings during tests
+global.console.warn = jest.fn();

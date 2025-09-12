@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useContext, useRef } from 'r
 import { useAuth } from '../core/contexts/AuthContext';
 import messageService from '../services/notificationService';
 import { messagingAPI } from '../config/api';
-import { initRealtime, on as onSocket, emit as emitSocket, getSocket } from '../services/realtime';
+import socketService from '../services/socketService';
 import { subscribeToNewMessages, fetchHistory, fetchConversations, sendMessage as chatSendMessage } from '../services/chatClient';
 
 const MessagingContext = createContext();
@@ -30,7 +30,8 @@ export const MessagingProvider = ({ children }) => {
       try {
         // Only attempt socket.io realtime if explicitly enabled
         if (enableRealtime) {
-          await initRealtime(() => user?.getIdToken?.());
+          const token = await user?.getIdToken?.();
+          socketService.connect(token);
         }
       } catch {
         // Ignore realtime init errors
@@ -102,21 +103,23 @@ export const MessagingProvider = ({ children }) => {
       });
 
       // Listen for typing events via socket.io if available
-      const sock = getSocket?.();
-      if (sock) {
-        offTypingStart = onSocket('typing:start', (payload) => {
+      if (socketService.isConnected) {
+        const handleTypingStart = (payload) => {
           if (!mounted) return;
-          // Only react for current conversation
-          if (payload?.userId && payload?.conversationId && payload.conversationId !== activeConversation.id) return;
+          if (payload?.conversationId && payload.conversationId !== activeConversation.id) return;
           setOtherTyping(true);
           if (typingStopTimeout) clearTimeout(typingStopTimeout);
           typingStopTimeout = setTimeout(() => setOtherTyping(false), 3000);
-        });
-        offTypingStop = onSocket('typing:stop', (payload) => {
+        };
+        const handleTypingStop = (payload) => {
           if (!mounted) return;
           if (payload?.conversationId && payload.conversationId !== activeConversation.id) return;
           setOtherTyping(false);
-        });
+        };
+        socketService.onTypingStart(handleTypingStart);
+        socketService.onTypingStop(handleTypingStop);
+        offTypingStart = () => socketService.off('typing:start', handleTypingStart);
+        offTypingStop = () => socketService.off('typing:stop', handleTypingStop);
       }
     };
 
@@ -133,17 +136,11 @@ export const MessagingProvider = ({ children }) => {
   // Expose typing helpers
   const startTyping = () => {
     if (!activeConversation?.id) return;
-    try { emitSocket('typing:start', { conversationId: activeConversation.id }); } catch (error) {
-      // Ignore socket errors
-      console.warn('Typing start failed:', error);
-    }
+    socketService.startTyping(activeConversation.id);
   };
   const stopTyping = () => {
     if (!activeConversation?.id) return;
-    try { emitSocket('typing:stop', { conversationId: activeConversation.id }); } catch (error) {
-      // Ignore socket errors
-      console.warn('Typing stop failed:', error);
-    }
+    socketService.stopTyping(activeConversation.id);
   };
 
   // Start or get existing conversation

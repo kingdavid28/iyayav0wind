@@ -1406,6 +1406,56 @@ emptyStateButtonText: {
   ...typography.button,
   color: colors.textInverse,
 },
+childAge: {
+  fontSize: 14,
+  color: '#6b7280',
+  marginTop: 2,
+},
+childAllergies: {
+  fontSize: 12,
+  color: '#ef4444',
+  marginTop: 2,
+  fontStyle: 'italic',
+},
+linkText: {
+  fontSize: 14,
+  color: '#db2777',
+  fontWeight: '600',
+},
+childDetails: {
+  fontSize: 14,
+  color: '#6b7280',
+},
+childItemCard: {
+  backgroundColor: 'white',
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.1,
+  shadowRadius: 2,
+  elevation: 2,
+},
+childActions: {
+  flexDirection: 'row',
+  gap: 8,
+},
+childActionButton: {
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 6,
+  backgroundColor: '#f3f4f6',
+  borderWidth: 1,
+  borderColor: '#e5e7eb',
+},
+childActionText: {
+  fontSize: 12,
+  fontWeight: '500',
+  color: '#374151',
+},
 
 });
 export default styles;

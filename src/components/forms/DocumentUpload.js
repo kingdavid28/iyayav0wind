@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadsAPI, authAPI } from '../../config/api';
 
 // Platform-specific FileSystem import
-const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
+const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system/legacy');
 
 const DocumentUpload = ({ label, documentType, onUploadComplete, initialUri = '' }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -43,7 +43,7 @@ const DocumentUpload = ({ label, documentType, onUploadComplete, initialUri = ''
       // Read file as base64 (skip on web)
       let imageBase64 = '';
       if (Platform.OS !== 'web' && FileSystem) {
-        imageBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        imageBase64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       } else {
         // For web, we'll need to handle file reading differently
         console.warn('FileSystem not available on web platform');

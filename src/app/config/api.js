@@ -12,7 +12,7 @@ const getCSRFToken = async () => {
     return csrfToken;
   } catch (error) {
     console.warn('CSRF token fetch failed, using fallback');
-    return 'fallback-token';
+    return null;
   }
 };
 
@@ -39,8 +39,9 @@ const detectAPIURL = async () => {
   return 'http://192.168.1.26:5000/api';
 };
 
-// Use environment variable or fallback
-let API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ? `${process.env.EXPO_PUBLIC_API_URL}/api` : 'http://192.168.1.10:5000/api';
+// Use environment configuration
+import ENV from '../../config/environment';
+let API_BASE_URL = ENV.API_URL;
 
 console.log('🔗 API URL set to:', API_BASE_URL);
 

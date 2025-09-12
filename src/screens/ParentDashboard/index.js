@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '../../core/contexts/AuthContext';
 import { caregiversAPI, authAPI } from '../../config/api';
 import { jobsAPI, bookingsAPI, childrenAPI } from '../../config/api';
+import { apiService } from '../../services/index';
 import { formatAddress } from '../../utils/addressUtils';
 import { styles } from '../styles/ParentDashboard.styles';
 // Privacy components
@@ -53,6 +54,7 @@ const ParentDashboard = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showJobPostingModal, setShowJobPostingModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showAllChildren, setShowAllChildren] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [caregivers, setCaregivers] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
@@ -198,12 +200,11 @@ const ParentDashboard = () => {
   const fetchCaregivers = useCallback(async () => {
     try {
       setCaregiversLoading(true);
-      console.log('🔍 Fetching caregivers from backend...');
+      console.log('🔍 Fetching caregivers using integrated service...');
       
-      const response = await caregiversAPI.getCaregivers();
-      const caregiversList = response.data?.caregivers || response.caregivers || [];
+      const caregiversList = await apiService.caregivers.getAll();
       
-      const transformedCaregivers = caregiversList.map(caregiver => ({
+      const transformedCaregivers = (caregiversList.caregivers || caregiversList.data || caregiversList || []).map(caregiver => ({
         ...caregiver,
         id: caregiver.id || caregiver._id,
         name: caregiver.name || 'Unnamed Caregiver',
@@ -218,13 +219,11 @@ const ParentDashboard = () => {
       }));
       
       setCaregivers(transformedCaregivers);
-      console.log(`✅ Loaded ${transformedCaregivers.length} real caregivers from backend`);
+      console.log(`✅ Loaded ${transformedCaregivers.length} caregivers via consolidated service`);
       return transformedCaregivers;
       
     } catch (error) {
-      console.error('❌ Backend caregivers fetch failed:', error.message);
-      // No fallback - show empty state when backend fails
-      console.log('🔄 No caregivers available - backend unavailable');
+      console.error('❌ Consolidated service caregivers fetch failed:', error.message);
       setCaregivers([]);
       return [];
     } finally {
@@ -357,6 +356,35 @@ const ParentDashboard = () => {
     setShowChildModal(true);
   }, []);
 
+  const handleDeleteChild = useCallback(async (child) => {
+    Alert.alert(
+      'Delete Child',
+      `Are you sure you want to delete ${child.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Remove from local state immediately for better UX
+              const childId = child._id || child.id;
+              setChildren(prevChildren => prevChildren.filter(c => (c._id || c.id) !== childId));
+              
+              await childrenAPI.delete(childId);
+              Alert.alert('Success', 'Child deleted successfully!');
+            } catch (error) {
+              console.error('❌ Child delete failed:', error);
+              // Restore the child if delete failed
+              await fetchMyChildren();
+              Alert.alert('Error', 'Failed to delete child. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  }, [fetchMyChildren]);
+
   const handleAddOrSaveChild = useCallback(async () => {
     const trimmedName = (childName || '').trim();
     if (!trimmedName) return;
@@ -370,14 +398,16 @@ const ParentDashboard = () => {
     };
     
     try {
+      console.log('🔍 Attempting to save child:', childData);
+      
       if (editingChildId) {
         // Update existing child
-        await childrenAPI.update(editingChildId, childData);
-        console.log('✅ Child updated successfully');
+        const result = await childrenAPI.update(editingChildId, childData);
+        console.log('✅ Child updated successfully:', result);
       } else {
         // Create new child
-        await childrenAPI.create(childData);
-        console.log('✅ Child created successfully');
+        const result = await childrenAPI.create(childData);
+        console.log('✅ Child created successfully:', result);
       }
       
       // Refresh children list
@@ -390,9 +420,27 @@ const ParentDashboard = () => {
       setChildAge('');
       setChildAllergies('');
       setChildNotes('');
+      
+      Alert.alert('Success', editingChildId ? 'Child updated successfully!' : 'Child added successfully!');
     } catch (error) {
-      console.error('❌ Child save failed:', error.message);
-      Alert.alert('Error', 'Failed to save child. Please try again.');
+      console.error('❌ Child save failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        childData
+      });
+      
+      let errorMessage = 'Failed to save child. Please try again.';
+      
+      if (error.message.includes('Network request failed')) {
+        errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+      } else if (error.message.includes('No auth token found')) {
+        errorMessage = 'Authentication error. Please log out and log back in.';
+      } else if (error.message.includes('401')) {
+        errorMessage = 'Authentication expired. Please log out and log back in.';
+      }
+      
+      Alert.alert('Error', errorMessage);
     }
   }, [childName, childAge, childAllergies, childNotes, editingChildId, fetchMyChildren]);
 
@@ -401,12 +449,30 @@ const ParentDashboard = () => {
     navigation.navigate('CaregiverProfile', { caregiverId: caregiver.id });
   };
 
-  const handleMessageCaregiver = (caregiver) => {
-    navigation.navigate('Messaging', { 
-      recipientId: caregiver.id,
-      recipientName: caregiver.name,
-      recipientAvatar: caregiver.avatar
-    });
+  const handleMessageCaregiver = async (caregiver) => {
+    try {
+      const conversation = await apiService.messaging.startConversation(
+        caregiver.id,
+        caregiver.name,
+        'caregiver',
+        `Hi ${caregiver.name}, I'm interested in your services.`
+      );
+      
+      navigation.navigate('Messaging', { 
+        recipientId: caregiver.id,
+        recipientName: caregiver.name,
+        recipientAvatar: caregiver.avatar,
+        conversationId: conversation.conversation?.id
+      });
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+      // Fallback to direct navigation
+      navigation.navigate('Messaging', { 
+        recipientId: caregiver.id,
+        recipientName: caregiver.name,
+        recipientAvatar: caregiver.avatar
+      });
+    }
   };
 
   const handleBookCaregiver = (caregiver) => {
@@ -447,15 +513,6 @@ const ParentDashboard = () => {
       };
     });
 
-    // Validate all required fields are present
-    const requiredFields = ['caregiverId', 'date', 'startTime', 'endTime', 'address', 'hourlyRate', 'totalCost'];
-    for (const field of requiredFields) {
-      if (!bookingData[field]) {
-        console.error(`Missing required field: ${field}`);
-        throw new Error(`Missing required field: ${field}`);
-      }
-    }
-
     const payload = {
       caregiverId: bookingData.caregiverId,
       date: bookingData.date,
@@ -467,44 +524,23 @@ const ParentDashboard = () => {
       children: selectedChildrenObjects || []
     };
 
-    console.log('📤 Sending booking payload:', JSON.stringify(payload, null, 2));
+    console.log('📤 Creating booking via consolidated service:', JSON.stringify(payload, null, 2));
 
-    const attemptBooking = async (retryCount = 0) => {
-      try {
-        const res = await bookingsAPI.create(payload);
-        console.log('✅ Booking created successfully:', res);
-        setActiveTab('bookings');
-        await handleFetchBookings();
-        setIsBookingModalVisible(false);
-        Alert.alert('Success', 'Booking created successfully!');
-        return res;
-      } catch (err) {
-        console.error('❌ Booking error:', err);
-        
-        if (err.response?.status === 429) {
-          if (retryCount < 2) {
-            const waitTime = (retryCount + 1) * 30;
-            Alert.alert(
-              'Rate Limit Exceeded',
-              `Too many requests. Retrying in ${waitTime} seconds...`
-            );
-            
-            await new Promise(resolve => setTimeout(resolve, waitTime * 1000));
-            return attemptBooking(retryCount + 1);
-          } else {
-            Alert.alert(
-              'Rate Limit Exceeded',
-              'Server is busy. Please try again in a few minutes.'
-            );
-          }
-        } else {
-          Alert.alert('Error', err.message || 'Failed to create booking');
-        }
-        throw err;
-      }
-    };
-
-    return attemptBooking();
+    try {
+      const booking = await apiService.bookings.create(payload);
+      console.log('✅ Booking created successfully:', booking);
+      
+      setActiveTab('bookings');
+      await handleFetchBookings();
+      setIsBookingModalVisible(false);
+      Alert.alert('Success', 'Booking created successfully!');
+      
+      return booking;
+    } catch (error) {
+      console.error('❌ Consolidated booking service error:', error);
+      Alert.alert('Error', error.message || 'Failed to create booking');
+      throw error;
+    }
   };
 
   const handleCancelBooking = async (bookingId) => {
@@ -539,6 +575,29 @@ const ParentDashboard = () => {
     }
   };
 
+  // Search function
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    setSearchLoading(true);
+    
+    setTimeout(() => {
+      if (!query.trim()) {
+        setFilteredCaregivers([]);
+        setSearchResults([]);
+      } else {
+        const searchResults = caregivers.filter(caregiver => 
+          caregiver.name?.toLowerCase().includes(query.toLowerCase()) ||
+          caregiver.location?.toLowerCase().includes(query.toLowerCase()) ||
+          caregiver.bio?.toLowerCase().includes(query.toLowerCase()) ||
+          caregiver.skills?.some(skill => skill.toLowerCase().includes(query.toLowerCase()))
+        );
+        setSearchResults(searchResults);
+        setFilteredCaregivers(applyFilters(searchResults, filters));
+      }
+      setSearchLoading(false);
+    }, 300);
+  }, [caregivers, filters]);
+
   // Filter functions
   const handleApplyFilters = (newFilters) => {
     setFilters(newFilters);
@@ -547,10 +606,6 @@ const ParentDashboard = () => {
     const currentResults = searchQuery ? searchResults : caregivers;
     const filtered = applyFilters(currentResults, newFilters);
     setFilteredCaregivers(filtered);
-    
-    if (searchQuery) {
-      setSearchResults(filtered);
-    }
   };
 
   // Job management functions
@@ -641,6 +696,11 @@ const ParentDashboard = () => {
     }
   };
 
+  // Handle view all children
+  const handleViewAllChildren = () => {
+    setShowAllChildren(!showAllChildren);
+  };
+
   // Profile functions
   const handleSaveProfile = async (imageUri = null) => {
     try {
@@ -657,35 +717,57 @@ const ParentDashboard = () => {
         try {
           // Convert image to base64 using FileSystem (React Native compatible)
           const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: 'base64',
           });
           
           // Upload image first
-          const imageResult = await authAPI.uploadProfileImageBase64(base64Image, 'image/jpeg');
+          const imageResult = await authAPI.uploadProfileImage(base64Image, 'image/jpeg');
           console.log('Image upload result:', imageResult);
           
           // Handle different response structures
           const imageUrl = imageResult?.data?.url || imageResult?.url || imageResult?.data?.profileImageUrl;
           if (imageUrl) {
-            updateData.profileImage = imageUrl;
             setProfileImage(imageUrl);
             console.log('✅ Profile image updated to:', imageUrl);
-          } else {
-            console.log('⚠️ No image URL found in response:', imageResult);
+            
+            // If image upload response contains updated user data, update profile info and skip separate API call
+            if (imageResult?.data?.user) {
+              const userData = imageResult.data.user;
+              
+              // Update local state with image upload response data
+              setProfileName(updateData.name); // Use the form data for name
+              setProfileContact(updateData.contact); // Use the form data for contact
+              setProfileLocation(updateData.location); // Use the form data for location
+              setProfileImage(userData.profileImage || imageUrl);
+              setUserData({ ...userData, ...updateData });
+              
+              setShowProfileModal(false);
+              Alert.alert('Success', 'Profile updated successfully');
+              await loadData();
+              return; // Skip the separate profile update call since image upload already updated the profile
+            }
           }
         } catch (imageError) {
           console.error('Error uploading image:', imageError);
-          Alert.alert('Warning', 'Profile updated but image upload failed');
+          Alert.alert('Warning', 'Image upload failed, but will continue with profile update');
         }
       }
       
+      // Get fresh token before making the request
+      const { tokenManager } = await import('../../utils/tokenManager');
+      const freshToken = await tokenManager.getValidToken(true);
+      
+      if (!freshToken) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+      
+      // Make profile update call only if no image was uploaded or image upload failed
       const result = await authAPI.updateProfile(updateData);
       
       console.log('Profile update result:', result);
       
-      // The API returns the updated data directly, not wrapped in success property
+      // Update local state with API response
       if (result && result.data) {
-        // Update local state with new data
         setProfileName(result.data.name || profileName);
         setProfileContact(result.data.contact || result.data.email || profileContact);
         setProfileLocation(result.data.location || profileLocation);
@@ -695,8 +777,6 @@ const ParentDashboard = () => {
         
         setShowProfileModal(false);
         Alert.alert('Success', 'Profile updated successfully');
-        
-        // Reload profile data to ensure sync
         await loadData();
       } else {
         Alert.alert('Error', 'Failed to update profile');
@@ -718,7 +798,10 @@ const ParentDashboard = () => {
             quickActions={quickActions}
             onAddChild={openAddChild}
             onEditChild={openEditChild}
+            onDeleteChild={handleDeleteChild}
             onViewBookings={() => setActiveTab('bookings')}
+            onViewAllChildren={handleViewAllChildren}
+            showAllChildren={showAllChildren}
             greetingName={greetingName}
             profileImage={profileImage}
             profileContact={profileContact}
@@ -742,7 +825,7 @@ const ParentDashboard = () => {
             onBookCaregiver={handleBookCaregiver}
             onMessageCaregiver={handleMessageCaregiver}
             onViewCaregiver={handleViewCaregiver}
-            onSearch={setSearchQuery}
+            onSearch={handleSearch}
             onOpenFilter={() => setShowFilterModal(true)}
           />
         );

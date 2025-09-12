@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>0/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>0/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>0/11</span>
             </div>
         
             
@@ -78,13 +78,38 @@
 <a name='L13'></a><a href='#L13'>13</a>
 <a name='L14'></a><a href='#L14'>14</a>
 <a name='L15'></a><a href='#L15'>15</a>
-<a name='L16'></a><a href='#L16'>16</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -92,30 +117,44 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Enhanced logger for mobile debugging
 export const logger = <span class="cstat-no" title="statement not covered" >{</span>
+  debug: <span class="fstat-no" title="function not covered" >(m</span>essage, ...args) =&gt; {
+<span class="cstat-no" title="statement not covered" >    if (__DEV__) {</span>
+<span class="cstat-no" title="statement not covered" >      console.log(`[DEBUG] ${message}`, ...args);</span>
+    }
+  },
   info: <span class="fstat-no" title="function not covered" >(m</span>essage, ...args) =&gt; {
 <span class="cstat-no" title="statement not covered" >    console.log(`[INFO] ${message}`, ...args);</span>
   },
   error: <span class="fstat-no" title="function not covered" >(m</span>essage, ...args) =&gt; {
-<span class="cstat-no" title="statement not covered" >    console.error(`[ERROR] ${message}`, ...args);</span>
-    // Also show alert in development
-<span class="cstat-no" title="statement not covered" >    if (__DEV__) {</span>
-<span class="cstat-no" title="statement not covered" >      console.warn('ERROR OCCURRED:', message);</span>
+    // Filter out empty error objects to reduce noise
+    const filteredArgs = <span class="cstat-no" title="statement not covered" >args.filter(<span class="fstat-no" title="function not covered" >ar</span>g =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >      if (typeof arg === 'object' &amp;&amp; arg !== null) {</span>
+<span class="cstat-no" title="statement not covered" >        return Object.keys(arg).length &gt; 0;</span>
+      }
+<span class="cstat-no" title="statement not covered" >      return arg !== undefined &amp;&amp; arg !== null;</span>
+    });
+    
+    // Only log if there are actual error details
+<span class="cstat-no" title="statement not covered" >    if (filteredArgs.length &gt; 0) {</span>
+<span class="cstat-no" title="statement not covered" >      console.error(message, ...filteredArgs);</span>
     }
   },
   warn: <span class="fstat-no" title="function not covered" >(m</span>essage, ...args) =&gt; {
-<span class="cstat-no" title="statement not covered" >    console.warn(`[WARN] ${message}`, ...args);</span>
+<span class="cstat-no" title="statement not covered" >    console.warn(`🟡 WARN: ${message}`, ...args);</span>
   }
-};</pre></td></tr></table></pre>
+};
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-05T00:50:20.899Z
+                at 2025-09-12T00:29:37.203Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Image,
   StatusBar,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,7 +18,7 @@ const { width, height } = Dimensions.get('window');
 const onboardingData = [
   {
     id: '1',
-    title: 'Welcome to Iyaya',
+    title: 'Welcome to iYaya',
     subtitle: 'Connect families with trusted caregivers',
     description: 'The platform that brings together parents seeking quality childcare and experienced caregivers.',
     showLogo: true,
@@ -153,7 +153,13 @@ const OnboardingScreen = ({ navigation }) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
       {/* Skip Button */}
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+      <TouchableOpacity
+        style={[
+          styles.skipButton,
+          { backgroundColor: onboardingData[currentIndex].color }
+        ]}
+        onPress={handleSkip}
+      >
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
 
@@ -214,11 +220,17 @@ const styles = StyleSheet.create({
     zIndex: 1,
     paddingHorizontal: 16,
     paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   skipText: {
     fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
+    color: 'white',
+    fontWeight: '600',
   },
   slide: {
     width,

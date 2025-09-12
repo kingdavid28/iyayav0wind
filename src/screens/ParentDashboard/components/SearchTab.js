@@ -3,6 +3,8 @@ import { View, Text, FlatList, ActivityIndicator, RefreshControl, TextInput, Tou
 import { SlidersHorizontal, Search } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import CaregiverCard from './CaregiverCard';
+import { userService } from '../../../services/userService';
+import { apiService } from '../../../services/apiService';
 
 
 const SearchTab = ({

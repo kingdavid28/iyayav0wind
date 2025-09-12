@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
       const currentUser = firebaseAuthService.getCurrentUser();
       if (currentUser && currentUser.emailVerified) {
         const token = await currentUser.getIdToken();
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+        await AsyncStorage.setItem('@auth_token', token);
         
         // Get user profile from MongoDB
         try {
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = firebaseAuthService.onAuthStateChanged(async (user) => {
       if (user && user.emailVerified) {
         const token = await user.getIdToken();
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+        await AsyncStorage.setItem('@auth_token', token);
         
         // Get user profile from MongoDB
         try {
@@ -133,7 +133,7 @@ export const AuthProvider = ({ children }) => {
         }
       } else {
         setUser(null);
-        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        await AsyncStorage.removeItem('@auth_token');
       }
       setIsLoading(false);
     });
@@ -152,7 +152,7 @@ export const AuthProvider = ({ children }) => {
       console.log('✅ Firebase login successful:', res);
       
       if (res?.token) {
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
+        await AsyncStorage.setItem('@auth_token', res.token);
         console.log('💾 Token stored successfully');
       }
       
@@ -196,7 +196,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
       
       await firebaseAuthService.signOut();
-      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      await AsyncStorage.removeItem('@auth_token');
       
       setUser(null);
       setError(null);
@@ -220,7 +220,7 @@ export const AuthProvider = ({ children }) => {
       
       if (result.success && result.token) {
         // Store the new token
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);
+        await AsyncStorage.setItem('@auth_token', result.token);
         console.log('💾 Token stored successfully');
         
         // Use user data from verification response if available

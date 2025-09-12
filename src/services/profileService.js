@@ -1,18 +1,18 @@
 import { API_CONFIG } from '../config/constants';
 import { errorHandler } from '../utils/errorHandler';
 import { logger } from '../utils/logger';
-
-// Remove CSRF token management as backend doesn't support it
+import { tokenManager } from '../utils/tokenManager';
 
 /**
  * Profile Service
  * Handles all profile-related API calls
  */
 class ProfileService {
+
   constructor() {
     if (!API_CONFIG || !API_CONFIG.BASE_URL) {
       console.error('API_CONFIG.BASE_URL is undefined. Check your environment configuration.');
-      this.baseURL = 'http://localhost:5000/api/profile'; // Fallback URL
+      this.baseURL = 'http://192.168.1.10:5000/api/profile'; // Updated fallback URL
     } else {
       this.baseURL = `${API_CONFIG.BASE_URL}/profile`;
     }
@@ -47,23 +47,48 @@ class ProfileService {
   }
 
   /**
+   * Get fresh token from Firebase
+   */
+  async getFreshToken() {
+    return await tokenManager.getValidToken(true); // Force refresh
+  }
+
+  /**
    * Update user profile
    */
   async updateProfile(profileData, token) {
     try {
-      const response = await fetch(`${this.baseURL}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(profileData),
-      });
+      // Try with provided token first
+      let authToken = token;
+      
+      const makeRequest = async (authToken) => {
+        return await fetch(`${this.baseURL}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(profileData),
+        });
+      };
+
+      let response = await makeRequest(authToken);
+      
+      // If 401, try to refresh token and retry
+      if (response.status === 401) {
+        logger.info('Token expired, attempting to refresh...');
+        const freshToken = await this.getFreshToken();
+        
+        if (freshToken) {
+          authToken = freshToken;
+          response = await makeRequest(authToken);
+        }
+      }
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update profile');
+        throw new Error(data.error || `Profile update failed: ${response.status}`);
       }
 
       logger.info('Profile updated successfully');
@@ -183,14 +208,32 @@ class ProfileService {
    */
   async updateAvailability(availability, token) {
     try {
-      const response = await fetch(`${this.baseURL}/availability`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ availability }),
-      });
+      // Try with provided token first
+      let authToken = token;
+      
+      const makeRequest = async (authToken) => {
+        return await fetch(`${this.baseURL}/availability`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ availability }),
+        });
+      };
+
+      let response = await makeRequest(authToken);
+      
+      // If 401, try to refresh token and retry
+      if (response.status === 401) {
+        logger.info('Token expired, attempting to refresh...');
+        const freshToken = await this.getFreshToken();
+        
+        if (freshToken) {
+          authToken = freshToken;
+          response = await makeRequest(authToken);
+        }
+      }
 
       const data = await response.json();
 

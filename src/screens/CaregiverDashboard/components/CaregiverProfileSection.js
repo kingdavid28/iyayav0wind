@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, Image, Platform } from 'react-native';
-import { User } from 'lucide-react-native';
+import { View, Text, Platform } from 'react-native';
+import ProfileImage from '../../../components/ProfileImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCurrentSocketURL } from '../../../config/api';
 import { useAuth } from '../../../core/contexts/AuthContext';
@@ -14,43 +14,7 @@ const CaregiverProfileSection = ({ profile, activeTab }) => {
   const caregiverName = profile?.name || user?.name;
   const displayName = caregiverName;
 
-  // Handle image URI construction with better debugging
-  const getImageSource = () => {
-    const profileImage = profile?.imageUrl || profile?.profileImage || profile?.image || profile?.photoUrl;
-    
-    console.log('🖼️ CaregiverProfileSection - Profile image debug:');
-    console.log('- Raw profile object:', profile);
-    console.log('- Profile imageUrl:', profile?.imageUrl);
-    console.log('- Profile profileImage:', profile?.profileImage);
-    console.log('- Selected image:', profileImage);
-    
-    if (!profileImage || profileImage.trim() === '' || profileImage === 'null' || profileImage === 'undefined') {
-      console.log('❌ No valid image URL found');
-      return null;
-    }
-    
-    let finalUrl;
-    if (profileImage.startsWith('http')) {
-      finalUrl = profileImage;
-    } else {
-      // Use dynamic API URL
-      const baseUrl = getCurrentSocketURL();
-      if (profileImage.startsWith('/')) {
-        finalUrl = `${baseUrl}${profileImage}`;
-      } else {
-        finalUrl = `${baseUrl}/uploads/${profileImage}`;
-      }
-    }
-    
-    // Add cache busting parameter
-    const timestamp = Date.now();
-    finalUrl = finalUrl.includes('?') ? `${finalUrl}&t=${timestamp}` : `${finalUrl}?t=${timestamp}`;
-    
-    console.log('✅ Final image URL:', finalUrl);
-    return { uri: finalUrl };
-  };
-  
-  const imageSource = getImageSource();
+
 
   // Only render on mobile platforms and Dashboard tab
   if (Platform.OS === 'web' || activeTab !== 'dashboard') {
@@ -66,33 +30,11 @@ const CaregiverProfileSection = ({ profile, activeTab }) => {
         style={styles.profileCard}
       >
         <View style={styles.profileContent}>
-          <View style={styles.profileImageContainer}>
-            {imageSource ? (
-              <Image 
-                source={imageSource}
-                style={styles.profileImage}
-                onError={(error) => {
-                  console.log('❌ Image load error:', error.nativeEvent?.error || error);
-                  console.log('❌ Failed URL:', imageSource.uri);
-                }}
-                onLoad={() => {
-                  console.log('✅ Image loaded successfully:', imageSource.uri);
-                }}
-                onLoadStart={() => {
-                  console.log('🔄 Image loading started:', imageSource.uri);
-                }}
-                resizeMode="cover"
-                defaultSource={Platform.OS === 'ios' ? 
-                  require('../../../../assets/icon.png') : 
-                  undefined
-                }
-              />
-            ) : (
-              <View style={styles.defaultProfileImage}>
-                <User size={40} color="#3b82f6" />
-              </View>
-            )}
-          </View>
+          <ProfileImage 
+            imageUrl={profile?.imageUrl || profile?.profileImage || profile?.image || profile?.photoUrl}
+            size={80}
+            style={styles.profileImageContainer}
+          />
           
           <View style={styles.profileInfo}>
             <Text style={styles.welcomeText}>

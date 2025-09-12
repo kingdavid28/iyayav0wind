@@ -1,5 +1,5 @@
 import { apiService } from "./apiService"
-import { api, authAPI, nanniesAPI } from "../config/api"
+import { api, authAPI, caregiversAPI } from "../config/api"
 import { logger } from "../utils/logger"
 import { validator } from "../utils/validation"
 import { API_CONFIG, VALIDATION } from "../config/constants"
@@ -164,16 +164,18 @@ class UserService {
       })
 
       logger.info(`Updating profile for user: ${userId}`)
-      const updated = await api.put(`/users/${userId}`, updates)
+      
+      // Use authAPI.updateProfile instead of direct API call
+      const updated = await authAPI.updateProfile(updates)
       
       // Update cache
       try {
-        await apiService.setCachedData(`profile:${userId}`, updated.data)
+        await apiService.setCachedData(`profile:${userId}`, updated)
       } catch (cacheError) {
         logger.warn('Failed to update profile cache', cacheError)
       }
       
-      return updated.data
+      return updated
     } catch (error) {
       logger.error("Failed to update user profile:", error)
       throw error
@@ -321,14 +323,14 @@ class UserService {
   async searchNannies(filters = {}, page = 1, limit = 10) {
     try {
       // Create cache key based on filters
-      const cacheKey = `nannies:${JSON.stringify(filters)}:${page}:${limit}`
+      const cacheKey = `caregivers:${JSON.stringify(filters)}:${page}:${limit}`
       const cached = await apiService.getCachedData(cacheKey)
       
       if (cached) {
         return cached
       }
 
-      logger.info('Searching nannies with filters:', filters)
+      logger.info('Searching caregivers with filters:', filters)
       
       // Build query string from filters
       const queryParams = new URLSearchParams({
@@ -337,14 +339,14 @@ class UserService {
         ...filters
       })
 
-      const result = await apiService.get(`/nannies?${queryParams}`)
+      const result = await apiService.get(`/caregivers?${queryParams}`)
       
       // Cache the result
       await apiService.setCachedData(cacheKey, result)
       
       return result
     } catch (error) {
-      logger.error("Failed to search nannies:", error)
+      logger.error("Failed to search caregivers:", error)
       throw error
     }
   }

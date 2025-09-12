@@ -32,7 +32,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/140</span>
+                <span class='fraction'>0/145</span>
             </div>
         
             
@@ -1465,7 +1465,10 @@
 <a name='L1400'></a><a href='#L1400'>1400</a>
 <a name='L1401'></a><a href='#L1401'>1401</a>
 <a name='L1402'></a><a href='#L1402'>1402</a>
-<a name='L1403'></a><a href='#L1403'>1403</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L1403'></a><a href='#L1403'>1403</a>
+<a name='L1404'></a><a href='#L1404'>1404</a>
+<a name='L1405'></a><a href='#L1405'>1405</a>
+<a name='L1406'></a><a href='#L1406'>1406</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1501,6 +1504,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1843,7 +1847,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1876,10 +1879,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2268,6 +2268,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2871,7 +2877,6 @@
 import {
   View,
   Text,
-  Modal,
   ScrollView,
   TouchableOpacity,
   TextInput,
@@ -2882,6 +2887,7 @@ import {
   KeyboardAvoidingView,
   Image,
 } from 'react-native';
+import { ModalWrapper } from '../../../shared/ui';
 import KeyboardAvoidingWrapper from '../../../components/KeyboardAvoidingWrapper';
 import { 
   X, 
@@ -2902,6 +2908,7 @@ import {
 } from 'lucide-react-native';
 import CustomDateTimePicker from '../../../components/DateTimePicker';
 import TimePicker from '../../../components/TimePicker';
+import { formatAddress } from '../../../utils/addressUtils';
 &nbsp;
 const BookingModal = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >({</span> caregiver, childrenList = <span class="branch-0 cbranch-no" title="branch not covered" >[],</span> onConfirm, onClose, visible }) =&gt; {</span>
   const [currentStep, setCurrentStep] = <span class="cstat-no" title="statement not covered" >useState(1);</span>
@@ -2923,12 +2930,12 @@ const BookingModal = <span class="cstat-no" title="statement not covered" ><span
   const [submitError, setSubmitError] = <span class="cstat-no" title="statement not covered" >useState('');</span>
 &nbsp;
   const resolveHourlyRate = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    if (typeof caregiver?.hourlyRate === 'number') <span class="cstat-no" title="statement not covered" >return caregiver.hourlyRate;</span></span>
+<span class="cstat-no" title="statement not covered" >    if (typeof caregiver?.hourlyRate === 'number' &amp;&amp; caregiver.hourlyRate &gt; 0) <span class="cstat-no" title="statement not covered" >return caregiver.hourlyRate;</span></span>
 <span class="cstat-no" title="statement not covered" >    if (typeof caregiver?.rate === 'string') {</span>
       const n = <span class="cstat-no" title="statement not covered" >parseFloat(caregiver.rate.replace(/[^0-9.]/g, ''));</span>
-<span class="cstat-no" title="statement not covered" >      return isNaN(n) ? 0 : n;</span>
+<span class="cstat-no" title="statement not covered" >      return isNaN(n) || n &lt;= 0 ? 150 : n;</span>
     }
-<span class="cstat-no" title="statement not covered" >    return 0;</span>
+<span class="cstat-no" title="statement not covered" >    return 150;</span>
   };
 &nbsp;
   const calculateTotalCost = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
@@ -3245,17 +3252,16 @@ const BookingModal = <span class="cstat-no" title="statement not covered" ><span
   );
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
-    &lt;Modal
+    &lt;ModalWrapper
       visible={visible}
-      transparent
+      onClose={onClose}
       animationType="slide"
-      onRequestClose={onClose}
+      style={styles.modalContainer}
     &gt;
-      &lt;View style={styles.modalOverlay}&gt;
-        &lt;KeyboardAvoidingView 
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        &gt;
+      &lt;KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      &gt;
           {/* Header */}
           &lt;View style={styles.modalHeader}&gt;
             &lt;View style={styles.headerLeft}&gt;
@@ -3271,9 +3277,7 @@ const BookingModal = <span class="cstat-no" title="statement not covered" ><span
                 &lt;Text style={styles.stepIndicator}&gt;Step {currentStep} of 4&lt;/Text&gt;
               &lt;/View&gt;
             &lt;/View&gt;
-            &lt;TouchableOpacity onPress={onClose} style={styles.closeButton}&gt;
-              &lt;X size={24} color="#6b7280" /&gt;
-            &lt;/TouchableOpacity&gt;
+&nbsp;
           &lt;/View&gt;
 &nbsp;
           {/* Progress Bar */}
@@ -3331,15 +3335,15 @@ const BookingModal = <span class="cstat-no" title="statement not covered" ><span
           {/* Footer */}
           &lt;View style={styles.modalFooter}&gt;
             &lt;TouchableOpacity
-              onPress={handlePrevStep}
-              disabled={currentStep === 1 || submitting}
+              onPress={currentStep === 1 ? onClose : handlePrevStep}
+              disabled={submitting}
               style={[
                 styles.footerButton, 
                 styles.secondaryButton, 
-                (currentStep === 1 || submitting) &amp;&amp; styles.disabledButton
+                submitting &amp;&amp; styles.disabledButton
               ]}
             &gt;
-              &lt;Text style={styles.secondaryButtonText}&gt;Previous&lt;/Text&gt;
+              &lt;Text style={styles.secondaryButtonText}&gt;{currentStep === 1 ? 'Close' : 'Previous'}&lt;/Text&gt;
             &lt;/TouchableOpacity&gt;
             
             {currentStep &lt; 4 ? (
@@ -3371,9 +3375,8 @@ const BookingModal = <span class="cstat-no" title="statement not covered" ><span
               &lt;/TouchableOpacity&gt;
             )}
           &lt;/View&gt;
-        &lt;/KeyboardAvoidingView&gt;
-      &lt;/View&gt;
-    &lt;/Modal&gt;
+      &lt;/KeyboardAvoidingView&gt;
+    &lt;/ModalWrapper&gt;
   );
 }
 &nbsp;
@@ -3523,8 +3526,8 @@ const BookingDetailsModal = <span class="cstat-no" title="statement not covered"
                 &lt;View style={styles.contactItem}&gt;
                   &lt;MapPin size={20} color="#6b7280" /&gt;
                   &lt;View&gt;
-                    &lt;Text style={styles.contactTitle}&gt;{enhancedBooking.location}&lt;/Text&gt;
-                    &lt;Text style={styles.contactDetail}&gt;{enhancedBooking.address}&lt;/Text&gt;
+                    &lt;Text style={styles.contactTitle}&gt;{formatAddress(enhancedBooking.location)}&lt;/Text&gt;
+                    &lt;Text style={styles.contactDetail}&gt;{formatAddress(enhancedBooking.address)}&lt;/Text&gt;
                   &lt;/View&gt;
                 &lt;/View&gt;
                 &lt;View style={styles.contactItem}&gt;
@@ -3680,13 +3683,15 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    marginTop: 50,
+    marginTop: 10,
+    width: 300,
+    maxHeight: '100%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     backgroundColor: 'white',
@@ -3694,7 +3699,7 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 5,
   },
   caregiverAvatar: {
     width: 40,
@@ -3710,7 +3715,8 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
     borderRadius: 20,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 15,
+    padding: 1,
     fontWeight: '600',
     color: '#111827',
   },
@@ -3720,7 +3726,7 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
     marginTop: 2,
   },
   closeButton: {
-    padding: 4,
+    padding: 1,
   },
   
   // BookingModal specific styles
@@ -3737,6 +3743,7 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    justifyContent: 'center',
   },
   progressCircle: {
     width: 32,
@@ -3770,12 +3777,12 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
   progressLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#6b7280',
-    width: 64,
+    flex: 1,
     textAlign: 'center',
   },
   
@@ -3784,7 +3791,7 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   stepContainer: {
     gap: 16,
@@ -3807,10 +3814,11 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
     borderWidth: 1,
     borderColor: '#d1d5db',
     borderRadius: 8,
-    padding: 16,
+    padding: 12,
     fontSize: 16,
     backgroundColor: 'white',
-    minHeight: 48,
+    minHeight: 44,
+    width: '100%',
   },
   multilineInput: {
     minHeight: 50,
@@ -4269,14 +4277,15 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
 });
 &nbsp;
 export default BookingModal;
-export { BookingDetailsModal };</pre></td></tr></table></pre>
+export { BookingDetailsModal };
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-05T00:50:20.899Z
+                at 2025-09-12T00:29:37.203Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

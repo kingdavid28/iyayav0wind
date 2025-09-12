@@ -3,8 +3,10 @@ import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useTheme, ActivityIndicator } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { userService } from '../../services/userService';
+import { authAPI } from '../../services';
 import ProfileForm from '../../components/forms/ProfileForm';
 import { useAuth } from '../../core/contexts/AuthContext';
+import { tokenManager } from '../../utils/tokenManager';
 
 const ProfileScreen = () => {
   const theme = useTheme();
@@ -57,9 +59,25 @@ const ProfileScreen = () => {
   const handleSubmit = async (formData) => {
     try {
       setLoading(true);
+      console.log('Updating profile with data:', formData);
+      
+      // Get fresh Firebase token
+      const token = await tokenManager.getValidToken(true);
+      if (token) {
+        console.log('✅ Fresh token obtained');
+      } else {
+        console.error('❌ Failed to get valid token');
+        throw new Error('Authentication required. Please log in again.');
+      }
       
       // Prepare the profile data for update
       const profileData = {
+        name: `${formData.firstName} ${formData.middleInitial ? formData.middleInitial + '. ' : ''}${formData.lastName}`.trim(),
+        contact: formData.phone,
+        location: formData.location ? 
+          (typeof formData.location === 'string' ? formData.location : 
+           `${formData.location.city || ''}, ${formData.location.state || ''}, ${formData.location.country || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ',')) 
+          : '',
         ...formData,
         updatedAt: new Date().toISOString()
       };
@@ -69,7 +87,9 @@ const ProfileScreen = () => {
         profileData.verificationStatus = 'pending';
       }
       
-      await userService.updateProfile(user.uid, profileData);
+      // Use authAPI.updateProfile which handles token refresh automatically
+      const result = await authAPI.updateProfile(profileData);
+      console.log('✅ Profile update result:', result);
       
       Alert.alert(
         'Success',
@@ -79,7 +99,7 @@ const ProfileScreen = () => {
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
-      console.error('Update failed:', error);
+      console.error('❌ Profile update failed:', error);
       Alert.alert(
         'Error',
         error.message || 'Failed to update profile. Please try again.'

@@ -1451,7 +1451,39 @@
 <a name='L1386'></a><a href='#L1386'>1386</a>
 <a name='L1387'></a><a href='#L1387'>1387</a>
 <a name='L1388'></a><a href='#L1388'>1388</a>
-<a name='L1389'></a><a href='#L1389'>1389</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L1389'></a><a href='#L1389'>1389</a>
+<a name='L1390'></a><a href='#L1390'>1390</a>
+<a name='L1391'></a><a href='#L1391'>1391</a>
+<a name='L1392'></a><a href='#L1392'>1392</a>
+<a name='L1393'></a><a href='#L1393'>1393</a>
+<a name='L1394'></a><a href='#L1394'>1394</a>
+<a name='L1395'></a><a href='#L1395'>1395</a>
+<a name='L1396'></a><a href='#L1396'>1396</a>
+<a name='L1397'></a><a href='#L1397'>1397</a>
+<a name='L1398'></a><a href='#L1398'>1398</a>
+<a name='L1399'></a><a href='#L1399'>1399</a>
+<a name='L1400'></a><a href='#L1400'>1400</a>
+<a name='L1401'></a><a href='#L1401'>1401</a>
+<a name='L1402'></a><a href='#L1402'>1402</a>
+<a name='L1403'></a><a href='#L1403'>1403</a>
+<a name='L1404'></a><a href='#L1404'>1404</a>
+<a name='L1405'></a><a href='#L1405'>1405</a>
+<a name='L1406'></a><a href='#L1406'>1406</a>
+<a name='L1407'></a><a href='#L1407'>1407</a>
+<a name='L1408'></a><a href='#L1408'>1408</a>
+<a name='L1409'></a><a href='#L1409'>1409</a>
+<a name='L1410'></a><a href='#L1410'>1410</a>
+<a name='L1411'></a><a href='#L1411'>1411</a>
+<a name='L1412'></a><a href='#L1412'>1412</a>
+<a name='L1413'></a><a href='#L1413'>1413</a>
+<a name='L1414'></a><a href='#L1414'>1414</a>
+<a name='L1415'></a><a href='#L1415'>1415</a>
+<a name='L1416'></a><a href='#L1416'>1416</a>
+<a name='L1417'></a><a href='#L1417'>1417</a>
+<a name='L1418'></a><a href='#L1418'>1418</a>
+<a name='L1419'></a><a href='#L1419'>1419</a>
+<a name='L1420'></a><a href='#L1420'>1420</a>
+<a name='L1421'></a><a href='#L1421'>1421</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1501,6 +1533,38 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -3015,10 +3079,11 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
   },
   headerActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 4,
-    justifyContent: 'center',
-    paddingEnd: 10,
+    flexShrink: 0,
+    maxWidth: 160,
+    justifyContent: 'flex-end',
     marginTop: Platform.select({
       web: 5,
       default: 2,
@@ -3027,16 +3092,31 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
   headerButton: {
     padding: Platform.select({
       web: 8,
-      default: 2,
+      default: 6,
     }),
     marginLeft: Platform.select({
       web: 20,
-      default: 8,
+      default: 4,
     }),
+    marginBottom: 4,
     minWidth: Platform.select({
       web: 5,
       default: 36,
     }),
+    width: Platform.select({
+      web: 'auto',
+      default: 36,
+    }),
+    height: Platform.select({
+      web: 'auto',
+      default: 36,
+    }),
+    borderRadius: Platform.select({
+      web: 0,
+      default: 18,
+    }),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Fixed tab container styles
   tabContainer: {
@@ -3366,8 +3446,8 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     fontWeight: '600',
   },
   caregiversContent: {
-    padding: 16,
-    gap: 16,
+    padding: 6,
+    gap: 5,
   },
   // Search and filter bar styles
   combinedSearchFilterBar: {
@@ -3436,10 +3516,13 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     fontStyle: 'italic',
   },
   caregiversList: {
-    gap: 5,
+    gap: 1,
   },
   caregiverCard: {
+    backgroundColor: '#ffffff',
     borderRadius: 16,
+    marginBottom: 16,
+    marginHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -3450,8 +3533,7 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     elevation: 3,
   },
   caregiverContent: {
-    padding: 16,
-    gap: 16,
+    padding: 20,
   },
   caregiverHeader: {
     flexDirection: 'row',
@@ -3621,7 +3703,9 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    padding: 16,
+    padding: 20,
+    marginHorizontal: 4,
+    marginBottom: 16,
   },
   shadowSm: {
     shadowColor: '#000',
@@ -3655,16 +3739,20 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     borderWidth: 1,
   },
   iconButton: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   button: {
     backgroundColor: '#db2777',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButton: {
     backgroundColor: '#db2777',
@@ -4193,6 +4281,10 @@ jobActionButton: {
   borderColor: colors.border,
   backgroundColor: colors.surface,
 },
+completeButton: {
+  borderColor: colors.success,
+  backgroundColor: colors.success + '10',
+},
 deleteButton: {
   borderColor: colors.error,
   backgroundColor: colors.error + '10',
@@ -4201,6 +4293,9 @@ jobActionText: {
   ...typography.body2,
   color: colors.text,
   fontWeight: '500',
+},
+completeText: {
+  color: colors.success,
 },
 deleteText: {
   color: colors.error,
@@ -4227,14 +4322,15 @@ export default styles;
 //   colors,
 //   spacing,
 //   typography,
-// };</pre></td></tr></table></pre>
+// };
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-05T00:50:20.899Z
+                at 2025-09-12T00:29:37.203Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadsAPI } from '../../config/api';
 
 // Platform-specific FileSystem import
-const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system');
+const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system/legacy');
 
 const ReviewForm = ({ onSubmit, initialRating = 0, onCancel }) => {
   const theme = useTheme();
@@ -69,7 +69,7 @@ const ReviewForm = ({ onSubmit, initialRating = 0, onCancel }) => {
         }
         
         const uploadPromises = images.map(async (uri, index) => {
-          const imageBase64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+          const imageBase64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
           const mimeType = uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
           const name = `review_${Date.now()}_${index}`;
           const folder = 'review_images';

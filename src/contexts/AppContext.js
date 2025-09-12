@@ -30,7 +30,7 @@ const initialState = {
 
   // Data State
   jobs: [],
-  nannies: [],
+  caregivers: [],
   applications: [],
   messages: [],
   bookings: [],
@@ -38,7 +38,7 @@ const initialState = {
   // Loading States
   loading: {
     jobs: false,
-    nannies: false,
+    caregivers: false,
     applications: false,
     messages: false,
     profile: false,
@@ -153,7 +153,7 @@ const appReducer = (state, action) => {
       return { ...state, jobs: action.payload }
 
     case ACTION_TYPES.SET_NANNIES:
-      return { ...state, nannies: action.payload }
+      return { ...state, caregivers: action.payload }
 
     case ACTION_TYPES.SET_APPLICATIONS:
       return { ...state, applications: action.payload }

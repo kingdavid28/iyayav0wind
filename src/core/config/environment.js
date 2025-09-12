@@ -4,11 +4,11 @@ const isDev = __DEV__;
 export const Config = {
   // API Configuration
   API_BASE_URL: isDev 
-    ? 'http://192.168.1.10:3000/api'
+    ? 'http://10.162.42.117:5000/api'
     : 'https://api.iyaya.com/api',
   
   SOCKET_URL: isDev
-    ? 'http://192.168.1.10:3000'
+    ? 'http://10.162.42.117:5000'
     : 'https://api.iyaya.com',
 
   // App Configuration

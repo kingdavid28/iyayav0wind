@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { applicationsAPI, bookingsAPI, caregiversAPI, jobsAPI } from '../config/api';
+import { apiService } from '../services';
 import { useAuth } from '../core/contexts/AuthContext';
 import { formatAddress } from '../utils/addressUtils';
 
@@ -27,7 +27,7 @@ export const useCaregiverDashboard = () => {
     if (!user?.id) return;
     
     try {
-      const caregiverResponse = await caregiversAPI.getMyProfile();
+      const caregiverResponse = await apiService.caregivers.getProfile();
       const caregiverProfile = caregiverResponse?.caregiver || caregiverResponse?.data?.caregiver || caregiverResponse || {};
       
       if (caregiverProfile && (caregiverProfile.name || caregiverProfile.hourlyRate)) {
@@ -52,7 +52,7 @@ export const useCaregiverDashboard = () => {
     
     setJobsLoading(true);
     try {
-      const res = await jobsAPI.getAvailableJobs();
+      const res = await apiService.jobs.getAvailable();
       const jobsList = res?.data?.jobs || res?.jobs || [];
       
       const transformedJobs = jobsList.map(job => ({
@@ -85,7 +85,7 @@ export const useCaregiverDashboard = () => {
     if (!user?.id || user?.role !== 'caregiver') return;
     
     try {
-      const res = await applicationsAPI.getMyApplications();
+      const res = await apiService.applications.getMy();
       const list = res?.data?.applications || res?.applications || [];
       
       const normalized = list.map(a => ({
@@ -110,7 +110,7 @@ export const useCaregiverDashboard = () => {
     if (!user?.id || user?.role !== 'caregiver') return;
     
     try {
-      const res = await bookingsAPI.getMy();
+      const res = await apiService.bookings.getMy();
       const list = Array.isArray(res?.bookings) ? res.bookings : [];
       
       const normalized = list.map((b, idx) => ({

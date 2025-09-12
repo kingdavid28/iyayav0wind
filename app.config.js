@@ -4,7 +4,7 @@ export default {
     slug: "iyaya-caregiver-app",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/adaptive-icon.png",
     userInterfaceStyle: "light",
     splash: {
       image: "./assets/splash.png",
@@ -54,7 +54,8 @@ export default {
       }
     },
     plugins: [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ]
   }
 };

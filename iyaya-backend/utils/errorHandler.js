@@ -90,10 +90,18 @@ const catchAsync = (fn) => {
 
 // Add process method for compatibility with frontend error handler
 const process = (error) => {
+  if (!error) {
+    return {
+      userMessage: 'An unknown error occurred',
+      code: 'UNKNOWN_ERROR',
+      statusCode: 500
+    };
+  }
+  
   return {
-    userMessage: error.message || 'An error occurred',
-    code: error.code || 'UNKNOWN_ERROR',
-    statusCode: error.statusCode || 500
+    userMessage: error.message || error.userMessage || 'An error occurred',
+    code: error.code || error.name || 'UNKNOWN_ERROR',
+    statusCode: error.statusCode || error.status || 500
   };
 };
 

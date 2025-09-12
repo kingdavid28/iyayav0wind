@@ -160,9 +160,9 @@ exports.updateProfile = async (req, res) => {
   } catch (error) {
     logger.error('Update profile error:', error);
     const processedError = errorHandler.process(error);
-    res.status(500).json({
+    res.status(processedError.statusCode || 500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError.userMessage || 'Failed to update profile'
     });
   }
 };

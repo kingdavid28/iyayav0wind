@@ -116,6 +116,15 @@ const FilterModal = ({
       style={styles.modalContent}
     >
           <ScrollView style={styles.filtersContainer}>
+            {/* Instructions */}
+            <View style={styles.instructionsContainer}>
+              <Text style={styles.instructionsTitle}>How to use filters:</Text>
+              <Text style={styles.instructionsText}>• Toggle "Available Now" for immediate booking</Text>
+              <Text style={styles.instructionsText}>• Set your budget with rate range slider</Text>
+              <Text style={styles.instructionsText}>• Choose minimum experience needed</Text>
+              <Text style={styles.instructionsText}>• Set minimum rating requirement</Text>
+            </View>
+
             {/* Availability Section */}
             <View style={styles.filterSection}>
               <Text style={styles.sectionTitle}>Availability</Text>
@@ -239,6 +248,26 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     marginHorizontal: 5,
+  },
+  instructionsContainer: {
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#8B5CF6',
+  },
+  instructionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+    lineHeight: 20,
   },
 });
 

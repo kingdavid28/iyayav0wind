@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/144</span>
+                <span class='fraction'>0/154</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/61</span>
+                <span class='fraction'>0/63</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/20</span>
+                <span class='fraction'>0/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/140</span>
+                <span class='fraction'>0/150</span>
             </div>
         
             
@@ -365,8 +365,34 @@
 <a name='L300'></a><a href='#L300'>300</a>
 <a name='L301'></a><a href='#L301'>301</a>
 <a name='L302'></a><a href='#L302'>302</a>
-<a name='L303'></a><a href='#L303'>303</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -670,6 +696,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { privacyAPI } from '../../config/api';
+&nbsp;
+// Fallback if privacyAPI is not available
+const safePrivacyAPI = <span class="cstat-no" title="statement not covered" >privacyAPI || {</span>
+  getPrivacySettings: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ data: null }),</span>
+  getPendingRequests: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ data: [] }),</span>
+  getPrivacyNotifications: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ data: [] }),</span>
+  updatePrivacySettings: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ success: true }),</span>
+  requestInformation: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ success: true }),</span>
+  respondToRequest: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ success: true }),</span>
+  grantPermission: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ success: true }),</span>
+  revokePermission: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ success: true }),</span>
+  markNotificationAsRead: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >Promise.resolve({ success: true })</span>
+};
 import { isAuthenticated } from '../../utils/authUtils';
 import { useProfileData } from './ProfileDataManager';
 &nbsp;
@@ -711,7 +750,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
 <span class="cstat-no" title="statement not covered" >        return;</span>
       }
       
-      const response = <span class="cstat-no" title="statement not covered" >await privacyAPI.getPrivacySettings();</span>
+      const response = <span class="cstat-no" title="statement not covered" >await safePrivacyAPI.getPrivacySettings();</span>
 <span class="cstat-no" title="statement not covered" >      if (response?.data) {</span>
 <span class="cstat-no" title="statement not covered" >        setPrivacySettings(response.data);</span>
       }
@@ -732,7 +771,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
       const updatedSettings = <span class="cstat-no" title="statement not covered" >{ ...privacySettings, [setting]: value };</span>
 <span class="cstat-no" title="statement not covered" >      setPrivacySettings(updatedSettings);</span>
       
-<span class="cstat-no" title="statement not covered" >      await privacyAPI.updatePrivacySettings(updatedSettings);</span>
+<span class="cstat-no" title="statement not covered" >      await safePrivacyAPI.updatePrivacySettings(updatedSettings);</span>
 <span class="cstat-no" title="statement not covered" >      return true;</span>
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.error('Error updating privacy setting:', error);</span>
@@ -750,7 +789,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
         requestedAt: new Date().toISOString(),
       };
 &nbsp;
-      const response = <span class="cstat-no" title="statement not covered" >await privacyAPI.requestInformation(requestData);</span>
+      const response = <span class="cstat-no" title="statement not covered" >await safePrivacyAPI.requestInformation(requestData);</span>
       
 <span class="cstat-no" title="statement not covered" >      if (response?.success) {</span>
 <span class="cstat-no" title="statement not covered" >        Alert.alert('Request Sent', 'Your information request has been sent and is pending approval.');</span>
@@ -766,7 +805,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
 &nbsp;
   const respondToRequest = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >as</span>ync (requestId, approved, sharedFields = <span class="branch-0 cbranch-no" title="branch not covered" >[],</span> expiresIn = <span class="branch-0 cbranch-no" title="branch not covered" >null)</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
-      const response = <span class="cstat-no" title="statement not covered" >await privacyAPI.respondToRequest({</span>
+      const response = <span class="cstat-no" title="statement not covered" >await safePrivacyAPI.respondToRequest({</span>
         requestId,
         approved,
         sharedFields,
@@ -778,7 +817,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
         // Grant specific permissions to the requester
         const request = <span class="cstat-no" title="statement not covered" >pendingRequests.find(<span class="fstat-no" title="function not covered" >re</span>q =&gt; <span class="cstat-no" title="statement not covered" >req.id === requestId)</span>;</span>
 <span class="cstat-no" title="statement not covered" >        if (request) {</span>
-<span class="cstat-no" title="statement not covered" >          await privacyAPI.grantPermission(</span>
+<span class="cstat-no" title="statement not covered" >          await safePrivacyAPI.grantPermission(</span>
             request.targetUserId,
             request.requesterId,
             sharedFields,
@@ -843,7 +882,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
 &nbsp;
   const grantUserPermission = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >as</span>ync (targetUserId, viewerUserId, fields, expiresIn = <span class="branch-0 cbranch-no" title="branch not covered" >null)</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
-      const response = <span class="cstat-no" title="statement not covered" >await privacyAPI.grantPermission(targetUserId, viewerUserId, fields, expiresIn);</span>
+      const response = <span class="cstat-no" title="statement not covered" >await safePrivacyAPI.grantPermission(targetUserId, viewerUserId, fields, expiresIn);</span>
 <span class="cstat-no" title="statement not covered" >      if (response?.success) {</span>
 <span class="cstat-no" title="statement not covered" >        Alert.alert('Permission Granted', 'Data access has been granted successfully.');</span>
 <span class="cstat-no" title="statement not covered" >        return true;</span>
@@ -858,7 +897,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
 &nbsp;
   const revokeUserPermission = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >as</span>ync (targetUserId, viewerUserId, fields = <span class="branch-0 cbranch-no" title="branch not covered" >null)</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
-      const response = <span class="cstat-no" title="statement not covered" >await privacyAPI.revokePermission(targetUserId, viewerUserId, fields);</span>
+      const response = <span class="cstat-no" title="statement not covered" >await safePrivacyAPI.revokePermission(targetUserId, viewerUserId, fields);</span>
 <span class="cstat-no" title="statement not covered" >      if (response?.success) {</span>
 <span class="cstat-no" title="statement not covered" >        Alert.alert('Permission Revoked', 'Data access has been revoked successfully.');</span>
 <span class="cstat-no" title="statement not covered" >        return true;</span>
@@ -881,7 +920,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
 <span class="cstat-no" title="statement not covered" >        return;</span>
       }
       
-      const response = <span class="cstat-no" title="statement not covered" >await privacyAPI.getPendingRequests();</span>
+      const response = <span class="cstat-no" title="statement not covered" >await safePrivacyAPI.getPendingRequests();</span>
 <span class="cstat-no" title="statement not covered" >      if (response?.data) {</span>
 <span class="cstat-no" title="statement not covered" >        setPendingRequests(response.data);</span>
       }
@@ -907,7 +946,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
 <span class="cstat-no" title="statement not covered" >        return;</span>
       }
       
-      const response = <span class="cstat-no" title="statement not covered" >await privacyAPI.getPrivacyNotifications();</span>
+      const response = <span class="cstat-no" title="statement not covered" >await safePrivacyAPI.getPrivacyNotifications();</span>
 <span class="cstat-no" title="statement not covered" >      if (response?.data) {</span>
 <span class="cstat-no" title="statement not covered" >        setNotifications(response.data);</span>
       }
@@ -925,7 +964,7 @@ export const PrivacyProvider = <span class="cstat-no" title="statement not cover
 &nbsp;
   const markNotificationAsRead = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >as</span>ync (notificationId) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
-<span class="cstat-no" title="statement not covered" >      await privacyAPI.markNotificationAsRead(notificationId);</span>
+<span class="cstat-no" title="statement not covered" >      await safePrivacyAPI.markNotificationAsRead(notificationId);</span>
 <span class="cstat-no" title="statement not covered" >      setNotifications(<span class="fstat-no" title="function not covered" >pr</span>ev =&gt; </span>
 <span class="cstat-no" title="statement not covered" >        prev.map(<span class="fstat-no" title="function not covered" >no</span>tif =&gt; </span>
 <span class="cstat-no" title="statement not covered" >          notif.id === notificationId </span>
@@ -976,7 +1015,7 @@ export default PrivacyProvider;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-05T00:50:20.899Z
+                at 2025-09-12T00:29:37.203Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

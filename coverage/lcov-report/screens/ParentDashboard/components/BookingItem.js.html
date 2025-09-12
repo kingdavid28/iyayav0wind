@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/14</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
-                <span class="quiet">Branches</span>
-                <span class='fraction'>0/17</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
-                <span class="quiet">Functions</span>
                 <span class='fraction'>0/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/12</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/5</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/14</span>
+                <span class='fraction'>0/6</span>
             </div>
         
             
@@ -167,23 +167,9 @@
 <a name='L102'></a><a href='#L102'>102</a>
 <a name='L103'></a><a href='#L103'>103</a>
 <a name='L104'></a><a href='#L104'>104</a>
-<a name='L105'></a><a href='#L105'>105</a>
-<a name='L106'></a><a href='#L106'>106</a>
-<a name='L107'></a><a href='#L107'>107</a>
-<a name='L108'></a><a href='#L108'>108</a>
-<a name='L109'></a><a href='#L109'>109</a>
-<a name='L110'></a><a href='#L110'>110</a>
-<a name='L111'></a><a href='#L111'>111</a>
-<a name='L112'></a><a href='#L112'>112</a>
-<a name='L113'></a><a href='#L113'>113</a>
-<a name='L114'></a><a href='#L114'>114</a>
-<a name='L115'></a><a href='#L115'>115</a>
-<a name='L116'></a><a href='#L116'>116</a>
-<a name='L117'></a><a href='#L117'>117</a>
-<a name='L118'></a><a href='#L118'>118</a>
-<a name='L119'></a><a href='#L119'>119</a>
-<a name='L120'></a><a href='#L120'>120</a>
-<a name='L121'></a><a href='#L121'>121</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L105'></a><a href='#L105'>105</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -197,28 +183,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -294,6 +261,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -306,9 +274,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Calendar, Clock, Baby, MapPin } from 'lucide-react-native';
+import { StatusBadge } from '../../../shared/ui';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
-import { formatDateFriendly, formatTimeRange } from '../utils/bookingUtils';
+import { formatDateFriendly, formatTimeRange } from '../utils/dateUtils';
 import { getCaregiverDisplayName, normalizeStatus } from '../../../utils/caregiverUtils';
+import { formatAddress } from '../../../utils/addressUtils';
 &nbsp;
 const BookingItem = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >({ </span></span>
   item, 
@@ -317,22 +287,7 @@ const BookingItem = <span class="cstat-no" title="statement not covered" ><span 
   onViewBookingDetails, 
   onWriteReview 
 }) =&gt; {
-  const getStatusStyles = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(s</span>tatus) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    switch (status) {</span>
-      case 'confirmed':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#D1FAE5', text: '#065F46' };</span>
-      case 'pending':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#FEF3C7', text: '#92400E' };</span>
-      case 'cancelled':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#FEE2E2', text: '#B91C1C' };</span>
-      case 'completed':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#E0E7FF', text: '#3730A3' };</span>
-      default:
-<span class="cstat-no" title="statement not covered" >        return { bg: '#F3F4F6', text: '#4B5563' };</span>
-    }
-  };
 &nbsp;
-  const statusStyles = <span class="cstat-no" title="statement not covered" >getStatusStyles(normalizeStatus(item.status));</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;View style={styles.bookingItemCard}&gt;
@@ -346,11 +301,7 @@ const BookingItem = <span class="cstat-no" title="statement not covered" ><span 
             &lt;Text style={styles.bookingCaregiverName}&gt;
               {getCaregiverDisplayName(item.caregiver)}
             &lt;/Text&gt;
-            &lt;View style={[styles.bookingStatusBadge, { backgroundColor: statusStyles.bg }]}&gt;
-              &lt;Text style={[styles.bookingStatusText, { color: statusStyles.text }]}&gt;
-                {normalizeStatus(item.status)}
-              &lt;/Text&gt;
-            &lt;/View&gt;
+            &lt;StatusBadge status={normalizeStatus(item.status)} /&gt;
           &lt;/View&gt;
         &lt;/View&gt;
         &lt;Text style={styles.bookingCost}&gt;₱{item.totalCost}&lt;/Text&gt;
@@ -379,7 +330,7 @@ const BookingItem = <span class="cstat-no" title="statement not covered" ><span 
           &lt;View style={styles.bookingDetailRow}&gt;
             &lt;MapPin size={16} color={colors.textSecondary} /&gt;
             &lt;Text style={styles.bookingDetailText} numberOfLines={1}&gt;
-              {item.address}
+              {formatAddress(item.address)}
             &lt;/Text&gt;
           &lt;/View&gt;
         )}
@@ -423,14 +374,15 @@ const BookingItem = <span class="cstat-no" title="statement not covered" ><span 
   );
 };
 &nbsp;
-export default BookingItem;</pre></td></tr></table></pre>
+export default BookingItem;
+&nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-05T00:50:20.899Z
+                at 2025-09-12T00:29:37.203Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

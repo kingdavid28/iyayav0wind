@@ -1,0 +1,727 @@
+// Enhanced Consolidated Services - Best practices from all services combined
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../config/constants';
+import { logger } from '../utils/logger';
+import { errorHandler } from '../shared/utils/errorHandler';
+import { tokenManager } from '../utils/tokenManager';
+
+// Environment detection
+const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV === 'development';
+const API_BASE_URL = isDev 
+  ? 'http://192.168.1.10:5000/api'
+  : 'https://api.iyaya.com/api';
+
+// Network monitoring (from apiService.js)
+let isConnected = true;
+try {
+  const NetInfo = require('@react-native-netinfo/netinfo').default;
+  NetInfo?.addEventListener((state) => {
+    isConnected = state.isConnected;
+  });
+} catch (error) {
+  // NetInfo not available
+}
+
+class EnhancedAPIService {
+  constructor() {
+    this.baseURL = API_BASE_URL;
+    this.cache = new Map();
+    this.requestQueue = [];
+    this.isRefreshing = false;
+  }
+
+  // Enhanced request method with all best practices
+  async request(endpoint, options = {}) {
+    const { 
+      method = 'GET', 
+      body, 
+      headers = {}, 
+      useAuth = true,
+      retries = 2,
+      cache = false,
+      cacheKey = null,
+      timeout = 10000,
+      validateToken = true
+    } = options;
+
+    // Network check (from apiService.js)
+    if (!isConnected) {
+      throw new Error('No internet connection available');
+    }
+
+    // Check cache first (from apiService.js + integratedService.js)
+    if (cache && cacheKey && this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < 300000) { // 5 minutes
+        return cached.data;
+      }
+    }
+
+    const url = `${this.baseURL}${endpoint}`;
+    let attempt = 0;
+
+    while (attempt <= retries) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        const config = {
+          method,
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...headers
+          }
+        };
+
+        // Enhanced auth handling (from multiple services)
+        if (useAuth) {
+          const token = await this.getValidToken(validateToken);
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+
+        // Add body for non-GET requests
+        if (body && method !== 'GET') {
+          config.body = JSON.stringify(body);
+        }
+
+        const response = await fetch(url, config);
+        clearTimeout(timeoutId);
+        
+        // Handle different response types
+        let data;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          data = await response.text();
+        }
+
+        if (!response.ok) {
+          // Enhanced error handling for 401 (from apiService.js)
+          if (response.status === 401 && useAuth) {
+            return this.handleUnauthorized(endpoint, options);
+          }
+          throw new Error(data.error || data.message || `HTTP ${response.status}`);
+        }
+
+        // Cache successful responses
+        if (cache && cacheKey) {
+          this.cache.set(cacheKey, { data, timestamp: Date.now() });
+        }
+
+        logger.info(`API Success: ${method} ${endpoint}`);
+        return data;
+
+      } catch (error) {
+        attempt++;
+        
+        // Handle timeout errors specifically
+        if (error.name === 'AbortError') {
+          logger.error(`Request timeout after ${timeout}ms: ${method} ${endpoint}`);
+        } else {
+          logger.error(`API Error (attempt ${attempt}): ${method} ${endpoint}`, error);
+        }
+
+        if (attempt > retries) {
+          throw errorHandler.process(error);
+        }
+
+        // Exponential backoff with jitter (from apiService.js)
+        const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 100, 5000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  // Enhanced token management using TokenManager
+  async getValidToken(validate = true) {
+    return await tokenManager.getValidToken(false);
+  }
+
+  // Handle 401 unauthorized with token refresh (from apiService.js)
+  async handleUnauthorized(endpoint, options) {
+    if (this.isRefreshing) {
+      return this.addToQueue(endpoint, options);
+    }
+
+    this.isRefreshing = true;
+    
+    try {
+      // Clear invalid token
+      await this.clearAuthData();
+      throw new Error('Authentication required. Please log in again.');
+    } finally {
+      this.isRefreshing = false;
+    }
+  }
+
+  // Queue management for concurrent requests (from apiService.js)
+  addToQueue(endpoint, options) {
+    return new Promise((resolve, reject) => {
+      this.requestQueue.push({ resolve, reject, endpoint, options });
+    });
+  }
+
+  // Clear auth data (from authService.js)
+  async clearAuthData() {
+    try {
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.AUTH_TOKEN,
+        STORAGE_KEYS.USER_EMAIL,
+        '@shim_id_token'
+      ]);
+    } catch (error) {
+      logger.error('Error clearing auth data:', error);
+    }
+  }
+
+  // Enhanced Auth operations (consolidated from authService.js + firebaseAuthService.js)
+  auth = {
+    login: async (credentials) => {
+      const result = await this.request('/auth/login', {
+        method: 'POST',
+        body: credentials,
+        useAuth: false,
+        timeout: 15000
+      });
+      
+      // Store token if successful
+      if (result.token) {
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, credentials.email);
+      }
+      
+      return result;
+    },
+
+    register: async (userData) => {
+      const result = await this.request('/auth/register', {
+        method: 'POST',
+        body: userData,
+        useAuth: false,
+        timeout: 15000
+      });
+      
+      // Store token if successful and no verification required
+      if (result.token && !result.requiresVerification) {
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, userData.email);
+      }
+      
+      return result;
+    },
+
+    getProfile: () => this.request('/auth/firebase-profile', {
+      cache: true,
+      cacheKey: 'user-profile',
+      timeout: 8000
+    }),
+
+    updateProfile: (data) => {
+      this.clearCache('profile');
+      return this.request('/profile', {
+        method: 'PUT',
+        body: data
+      });
+    },
+
+    uploadProfileImage: (imageBase64, mimeType) => {
+      // Validate image size (from profileService.js)
+      const sizeInBytes = (imageBase64.length * 3) / 4;
+      const sizeInMB = sizeInBytes / (1024 * 1024);
+      
+      if (sizeInMB > 2) {
+        throw new Error('Image too large. Please select a smaller image.');
+      }
+      
+      this.clearCache('profile');
+      return this.request('/auth/upload-profile-image', {
+        method: 'POST',
+        body: { imageBase64, mimeType },
+        timeout: 30000 // Longer timeout for uploads
+      });
+    },
+
+    resetPassword: (email) => this.request('/auth/reset-password', {
+      method: 'POST',
+      body: { email },
+      useAuth: false
+    }),
+
+    logout: async () => {
+      await this.clearAuthData();
+      this.clearCache();
+    }
+  };
+
+  // Enhanced Caregiver operations (from caregiversAPI + userService.js)
+  caregivers = {
+    getProfile: () => this.request('/caregivers/profile', {
+      cache: true,
+      cacheKey: 'caregiver-profile'
+    }),
+
+    updateProfile: (data) => {
+      this.clearCache('caregiver');
+      return this.request('/caregivers/profile', {
+        method: 'PUT',
+        body: data
+      });
+    },
+
+    createProfile: (data) => this.request('/caregivers/profile', {
+      method: 'POST',
+      body: data
+    }),
+
+    getAll: (filters = {}) => {
+      const cacheKey = `caregivers:${JSON.stringify(filters)}`;
+      const queryParams = new URLSearchParams(filters).toString();
+      const endpoint = queryParams ? `/caregivers?${queryParams}` : '/caregivers';
+      
+      return this.request(endpoint, {
+        cache: true,
+        cacheKey
+      });
+    },
+
+    search: (filters = {}, page = 1, limit = 10) => {
+      const searchParams = { ...filters, page, limit };
+      const cacheKey = `caregivers-search:${JSON.stringify(searchParams)}`;
+      const queryParams = new URLSearchParams(searchParams).toString();
+      
+      return this.request(`/caregivers?${queryParams}`, {
+        cache: true,
+        cacheKey
+      });
+    }
+  };
+
+  // Enhanced Jobs operations (from jobService.js + jobsAPI)
+  jobs = {
+    getAvailable: (filters = {}) => {
+      const cacheKey = `jobs:${JSON.stringify(filters)}`;
+      const queryParams = new URLSearchParams(filters).toString();
+      const endpoint = queryParams ? `/jobs?${queryParams}` : '/jobs';
+      
+      return this.request(endpoint, {
+        cache: true,
+        cacheKey
+      });
+    },
+
+    getMy: (page = 1, limit = 10) => {
+      return this.request(`/jobs/my?page=${page}&limit=${limit}`);
+    },
+    getMyJobs: (page = 1, limit = 10) => {
+      return this.request(`/jobs/my?page=${page}&limit=${limit}`);
+    }, // Backward compatibility
+
+    getById: (jobId) => this.request(`/jobs/${jobId}`, {
+      cache: true,
+      cacheKey: `job:${jobId}`
+    }),
+
+    create: (jobData) => {
+      this.clearCache('jobs');
+      return this.request('/jobs', {
+        method: 'POST',
+        body: jobData
+      });
+    },
+
+    update: (jobId, jobData) => {
+      this.clearCache('jobs');
+      this.cache.delete(`job:${jobId}`);
+      return this.request(`/jobs/${jobId}`, {
+        method: 'PUT',
+        body: jobData
+      });
+    },
+
+    delete: (jobId) => {
+      this.clearCache('jobs');
+      this.cache.delete(`job:${jobId}`);
+      return this.request(`/jobs/${jobId}`, {
+        method: 'DELETE'
+      });
+    },
+
+    search: (query, filters = {}) => {
+      const searchParams = { search: query, ...filters };
+      const queryString = new URLSearchParams(searchParams).toString();
+      return this.request(`/jobs?${queryString}`);
+    },
+
+    getApplications: (jobId, page = 1, limit = 10) => {
+      return this.request(`/jobs/${jobId}/applications?page=${page}&limit=${limit}`);
+    }
+  };
+
+  // Enhanced Applications operations
+  applications = {
+    getMy: () => this.request('/applications/my'),
+
+    apply: (applicationData) => {
+      this.clearCache('applications');
+      return this.request('/applications', {
+        method: 'POST',
+        body: applicationData
+      });
+    },
+
+    getById: (applicationId) => this.request(`/applications/${applicationId}`),
+
+    updateStatus: (applicationId, status) => {
+      this.clearCache('applications');
+      return this.request(`/applications/${applicationId}/status`, {
+        method: 'PATCH',
+        body: { status }
+      });
+    }
+  };
+
+  // Enhanced Bookings operations (from bookingService.js)
+  bookings = {
+    getMy: (filters = {}) => {
+      const queryParams = new URLSearchParams(filters).toString();
+      const endpoint = queryParams ? `/bookings/my?${queryParams}` : '/bookings/my';
+      return this.request(endpoint);
+    },
+
+    getById: (bookingId) => this.request(`/bookings/${bookingId}`),
+
+    create: (bookingData) => {
+      this.clearCache('bookings');
+      return this.request('/bookings', {
+        method: 'POST',
+        body: bookingData
+      });
+    },
+
+    updateStatus: (bookingId, status, feedback = null) => {
+      this.clearCache('bookings');
+      return this.request(`/bookings/${bookingId}/status`, {
+        method: 'PATCH',
+        body: { status, feedback }
+      });
+    },
+
+    cancel: (bookingId, reason) => {
+      this.clearCache('bookings');
+      return this.request(`/bookings/${bookingId}`, {
+        method: 'DELETE',
+        body: { reason }
+      });
+    },
+
+    uploadPaymentProof: (bookingId, imageBase64, mimeType) => {
+      return this.request(`/bookings/${bookingId}/payment-proof`, {
+        method: 'POST',
+        body: { imageBase64, mimeType },
+        timeout: 30000
+      });
+    },
+
+    getStats: () => this.request('/bookings/stats', {
+      cache: true,
+      cacheKey: 'booking-stats'
+    }),
+
+    getAvailableSlots: (caregiverId, date) => {
+      return this.request(`/bookings/available-slots/${caregiverId}?date=${date}`);
+    },
+
+    checkConflicts: (bookingData) => {
+      return this.request('/bookings/check-conflicts', {
+        method: 'POST',
+        body: bookingData
+      });
+    }
+  };
+
+  // Enhanced Children operations (from childrenAPI + userService.js)
+  children = {
+    getMy: () => this.request('/children'),
+    getMyChildren: () => this.request('/children'), // Backward compatibility
+
+    create: (childData) => {
+      // Create a deep copy to avoid mutating the original
+      const processedData = JSON.parse(JSON.stringify(childData));
+      
+      try {
+        // Validate and process child data
+        this.validateChildData(processedData);
+      } catch (error) {
+        console.error('Child validation error:', error);
+        // Ensure allergies is always an array even if validation fails
+        processedData.allergies = [];
+      }
+      
+      this.clearCache('children');
+      return this.request('/children', {
+        method: 'POST',
+        body: processedData
+      });
+    },
+
+    update: (childId, childData) => {
+      // Create a deep copy to avoid mutating the original
+      const processedData = JSON.parse(JSON.stringify(childData));
+      
+      try {
+        // Validate and process child data
+        this.validateChildData(processedData);
+      } catch (error) {
+        console.error('Child validation error:', error);
+        // Ensure allergies is always an array even if validation fails
+        processedData.allergies = [];
+      }
+      
+      this.clearCache('children');
+      return this.request(`/children/${childId}`, {
+        method: 'PUT',
+        body: processedData
+      });
+    },
+
+    delete: (childId) => {
+      this.clearCache('children');
+      return this.request(`/children/${childId}`, {
+        method: 'DELETE'
+      });
+    }
+  };
+
+  // Child data validation (from userService.js)
+  validateChildData(childData) {
+    if (!childData.name || typeof childData.name !== 'string') {
+      throw new Error('Child name is required');
+    }
+    
+    if (typeof childData.age !== 'number' || childData.age < 0 || childData.age > 18) {
+      throw new Error('Child must have a valid age between 0 and 18');
+    }
+    
+    // Handle allergies - ALWAYS ensure it's an array
+    try {
+      if (childData.allergies === undefined || childData.allergies === null) {
+        childData.allergies = [];
+      } else if (typeof childData.allergies === 'string') {
+        // Convert comma-separated string to array, or empty array if empty string
+        childData.allergies = childData.allergies.trim() ? 
+          childData.allergies.split(',').map(a => a.trim()).filter(a => a) : [];
+      } else if (!Array.isArray(childData.allergies)) {
+        // If not string or array, convert to empty array
+        childData.allergies = [];
+      }
+      
+      // Ensure all items in allergies array are strings
+      childData.allergies = childData.allergies.map(item => String(item).trim()).filter(item => item);
+    } catch (error) {
+      // If any error occurs during conversion, just set to empty array
+      childData.allergies = [];
+    }
+  }
+
+  // Enhanced Messaging operations - Real data only
+  messaging = {
+    getConversations: async () => {
+      const result = await this.request('/messages/conversations', {
+        cache: true,
+        cacheKey: 'conversations'
+      });
+      return result?.data?.conversations || result?.conversations || [];
+    },
+
+    getMessages: async (conversationId, params = {}) => {
+      const queryParams = new URLSearchParams(params).toString();
+      const endpoint = queryParams 
+        ? `/messages/conversations/${conversationId}/messages?${queryParams}`
+        : `/messages/conversations/${conversationId}/messages`;
+      
+      const result = await this.request(endpoint);
+      return result?.data?.messages || result?.messages || [];
+    },
+
+    sendMessage: async (messageData) => {
+      this.clearCache('conversations');
+      const result = await this.request('/messages/send', {
+        method: 'POST',
+        body: messageData
+      });
+      return result?.data?.message || result?.message || result;
+    },
+
+    startConversation: async (recipientId, recipientName, recipientRole, initialMessage) => {
+      this.clearCache('conversations');
+      const result = await this.request('/messages/conversations', {
+        method: 'POST',
+        body: { recipientId, recipientName, recipientRole, initialMessage }
+      });
+      return result?.data || result;
+    },
+
+    markAsRead: async (conversationId) => {
+      await this.request(`/messages/conversations/${conversationId}/read`, {
+        method: 'PUT'
+      });
+      return true;
+    }
+  };
+
+  // Enhanced Settings operations (from settingsService.js)
+  settings = {
+    getProfile: () => this.request('/auth/profile'),
+    
+    updateProfile: (data) => this.request('/auth/profile', {
+      method: 'PUT',
+      body: data
+    }),
+    
+    getPrivacySettings: () => this.request('/privacy/settings'),
+    
+    updatePrivacySettings: (data) => this.request('/privacy/settings', {
+      method: 'PUT',
+      body: data
+    }),
+    
+    getNotificationSettings: () => this.request('/notifications/settings'),
+    
+    updateNotificationSettings: (data) => this.request('/notifications/settings', {
+      method: 'PUT',
+      body: data
+    }),
+    
+    exportUserData: () => this.request('/data/export', { method: 'POST' }),
+    
+    deleteUserData: () => this.request('/data/all', { method: 'DELETE' })
+  };
+
+  // Rating operations (from ratingService.js)
+  ratings = {
+    rateCaregiver: (caregiverId, bookingId, rating, review = '') => {
+      return this.request('/ratings/caregiver', {
+        method: 'POST',
+        body: { caregiverId, bookingId, rating, review: review.trim() }
+      });
+    },
+
+    rateParent: (parentId, bookingId, rating, review = '') => {
+      return this.request('/ratings/parent', {
+        method: 'POST',
+        body: { parentId, bookingId, rating, review: review.trim() }
+      });
+    },
+
+    getCaregiverRatings: (caregiverId, page = 1, limit = 10) => {
+      return this.request(`/ratings/caregiver/${caregiverId}?page=${page}&limit=${limit}`);
+    },
+
+    getRatingSummary: (userId, userType = 'caregiver') => {
+      return this.request(`/ratings/summary/${userId}?userType=${userType}`);
+    }
+  };
+
+  // Notification operations (stub for Expo Go compatibility)
+  notifications = {
+    requestPermissions: async () => {
+      logger.info('Notification permissions granted (stub)');
+      return true;
+    },
+    
+    schedule: async (title, body, data = {}) => {
+      logger.info('Notification scheduled (stub):', { title, body, data });
+    },
+    
+    init: async () => {
+      logger.info('Notifications initialized (stub)');
+      return 'expo-go-stub-token';
+    }
+  };
+
+  // Enhanced cache management (from apiService.js + integratedService.js)
+  clearCache(pattern = null) {
+    if (pattern) {
+      for (const key of this.cache.keys()) {
+        if (key.includes(pattern)) {
+          this.cache.delete(key);
+        }
+      }
+    } else {
+      this.cache.clear();
+    }
+  }
+
+  // Get cached data with TTL check
+  getCachedData(key, ttl = 300000) {
+    if (this.cache.has(key)) {
+      const cached = this.cache.get(key);
+      if (Date.now() - cached.timestamp < ttl) {
+        return cached.data;
+      }
+      this.cache.delete(key);
+    }
+    return null;
+  }
+
+  // Set cached data
+  setCachedData(key, data, ttl = 300000) {
+    this.cache.set(key, { data, timestamp: Date.now(), ttl });
+  }
+
+  // Health check
+  async healthCheck() {
+    try {
+      await this.request('/health', { useAuth: false, timeout: 5000 });
+      return { status: 'healthy', timestamp: new Date().toISOString() };
+    } catch (error) {
+      return { status: 'unhealthy', error: error.message, timestamp: new Date().toISOString() };
+    }
+  }
+}
+
+// Create singleton instance
+export const apiService = new EnhancedAPIService();
+
+// Export individual services for backward compatibility
+export const authAPI = apiService.auth;
+export const caregiversAPI = apiService.caregivers;
+export const jobsAPI = apiService.jobs;
+export const applicationsAPI = apiService.applications;
+export const bookingsAPI = apiService.bookings;
+export const childrenAPI = apiService.children;
+export const messagingService = apiService.messaging;
+export const settingsService = apiService.settings;
+export const ratingsService = apiService.ratings;
+export const notificationService = apiService.notifications;
+
+// Legacy compatibility exports
+export const uploadsAPI = {
+  base64Upload: apiService.auth.uploadProfileImage,
+  uploadDocument: apiService.auth.uploadProfileImage
+};
+
+// Privacy API (stub implementation)
+export const privacyAPI = {
+  getPrivacySettings: () => ({ data: null }),
+  getPendingRequests: () => ({ data: [] }),
+  getPrivacyNotifications: () => ({ data: [] }),
+  updatePrivacySettings: () => ({ success: true }),
+  requestInformation: () => ({ success: true }),
+  respondToRequest: () => ({ success: true }),
+  grantPermission: () => ({ success: true }),
+  revokePermission: () => ({ success: true }),
+  markNotificationAsRead: () => ({ success: true })
+};
+
+// Export utilities
+export const getCurrentAPIURL = () => API_BASE_URL;
+export const getCurrentSocketURL = () => API_BASE_URL.replace('/api', '');
+
+// Export main service
+export default apiService;

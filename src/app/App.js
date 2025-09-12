@@ -7,11 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 // Core imports
 import AppProvider from '../core/providers/AppProvider';
-
-// Legacy imports (to be migrated)
-// import { AuthProvider } from '../core/contexts/AuthContext';
-// import { ThemeProvider } from '../core/contexts/ThemeContext';
-// import MessagingProvider from '../contexts/MessagingContext';
+import AppIntegration from './AppIntegration';
 import PrivacyProvider from '../components/Privacy/PrivacyManager';
 import ProfileDataProvider from '../components/Privacy/ProfileDataManager';
 import { ErrorBoundary, LoadingSpinner } from '../shared';
@@ -67,8 +63,10 @@ export default function App() {
     <ErrorBoundary>
       <SafeAreaProvider>
         <AppProvider>
-          <AppNavigator />
-          <StatusBar style="auto" />
+          <AppIntegration>
+            <AppNavigator />
+            <StatusBar style="auto" />
+          </AppIntegration>
         </AppProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

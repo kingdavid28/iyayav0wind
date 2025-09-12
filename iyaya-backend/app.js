@@ -206,6 +206,7 @@ const mountRoutes = () => {
   // Protected Routes
   // Caregivers: public search/details + authenticated profile endpoints are enforced inside the router
   apiRouter.use('/caregivers', require('./routes/caregiverRoutes'));
+
   apiRouter.use('/profile', require('./routes/profileRoutes'));
   apiRouter.use('/contracts', authenticate, require('./routes/contractRoutes'));
   apiRouter.use('/bookings', authenticate, require('./routes/bookingRoutes'));

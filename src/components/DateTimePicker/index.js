@@ -145,30 +145,47 @@ const CustomDateTimePicker = ({
         </Text>
       )}
       
-      <TouchableOpacity
-        style={[
-          styles.dateButton,
-          error && styles.dateButtonError,
-          disabled && styles.dateButtonDisabled
-        ]}
-        onPress={() => !disabled && setShowPicker(true)}
-        disabled={disabled}
-      >
-        <Text style={[
-          styles.dateButtonText,
-          !value && styles.placeholderText,
-          disabled && styles.disabledText,
-          textStyle
-        ]}>
-          {formatDate(value)}
-        </Text>
-        
-        <Ionicons 
-          name={getIcon()} 
-          size={20} 
-          color={disabled ? '#ccc' : error ? '#ff4444' : '#666'} 
+      {Platform.OS === 'web' ? (
+        <input 
+          type={mode === 'time' ? 'time' : mode === 'datetime' ? 'datetime-local' : 'date'}
+          value={value ? (mode === 'time' ? value.toTimeString().slice(0,5) : value.toISOString().slice(0, mode === 'datetime' ? 16 : 10)) : ''}
+          onChange={(e) => onDateChange(new Date(e.target.value))}
+          disabled={disabled}
+          style={{
+            width: '100%',
+            padding: 12,
+            borderRadius: 8,
+            border: `1px solid ${error ? '#ff4444' : '#e5e7eb'}`,
+            fontSize: 16,
+            backgroundColor: disabled ? '#f3f4f6' : '#ffffff'
+          }}
         />
-      </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[
+            styles.dateButton,
+            error && styles.dateButtonError,
+            disabled && styles.dateButtonDisabled
+          ]}
+          onPress={() => !disabled && setShowPicker(true)}
+          disabled={disabled}
+        >
+          <Text style={[
+            styles.dateButtonText,
+            !value && styles.placeholderText,
+            disabled && styles.disabledText,
+            textStyle
+          ]}>
+            {formatDate(value)}
+          </Text>
+          
+          <Ionicons 
+            name={getIcon()} 
+            size={20} 
+            color={disabled ? '#ccc' : error ? '#ff4444' : '#666'} 
+          />
+        </TouchableOpacity>
+      )}
       
       {error && (
         <Text style={styles.errorText}>{error}</Text>
@@ -176,7 +193,7 @@ const CustomDateTimePicker = ({
 
       {Platform.OS === 'ios' ? (
         renderIOSModal()
-      ) : (
+      ) : Platform.OS !== 'web' && (
         showPicker && (
           <DateTimePicker
             value={tempDate}

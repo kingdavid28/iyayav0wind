@@ -22,6 +22,7 @@ import { calculateAge } from "../utils/dateUtils"
 import { __DEV__ } from "../config/constants"
 import { styles } from "./styles/CaregiverDashboard.styles"
 import CaregiverProfileSection from "./CaregiverDashboard/components/CaregiverProfileSection"
+import { useCaregiverDashboard } from '../hooks/useCaregiverDashboard'
 
 import { QuickStat, QuickAction } from '../shared/ui';
 
@@ -41,7 +42,14 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const gridCardWidth = Math.floor((containerWidth - gridGap * (columns - 1)) / columns)
   // On Android single-column, let cards auto-size by content for better look
   const gridCardHeight = isAndroid ? undefined : 280
-  const [activeTab, setActiveTab] = useState("dashboard")
+  const {
+    activeTab, setActiveTab,
+    profile, setProfile,
+    jobs, applications, bookings,
+    jobsLoading,
+    loadProfile, fetchJobs, fetchApplications, fetchBookings
+  } = useCaregiverDashboard();
+  
   const [searchQuery, setSearchQuery] = useState("")
   const [editProfileModalVisible, setEditProfileModalVisible] = useState(false)
   const [profileName, setProfileName] = useState("Ana Dela Cruz")
@@ -51,7 +59,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const [showBookingDetails, setShowBookingDetails] = useState(false)
   const [selectedJob, setSelectedJob] = useState(null)
   const [showJobApplication, setShowJobApplication] = useState(false)
-  const [applications, setApplications] = useState([])
   const [showJobDetails, setShowJobDetails] = useState(false)
   const [selectedApplication, setSelectedApplication] = useState(null)
   const [showApplicationDetails, setShowApplicationDetails] = useState(false)
@@ -123,17 +130,14 @@ export default function CaregiverDashboard({ onLogout, route }) {
     setEditProfileModalVisible(true)
   }
 
-  const [profile, setProfile] = useState(defaultProfile)
+  // Profile now managed by useCaregiverDashboard hook
 
   // No mock jobs - all jobs come from database
 
   // No mock applications - all applications come from database
   const initialApplications = []
 
-  // State for jobs and bookings - all data from database
-  const [jobs, setJobs] = useState([])
-  const [jobsLoading, setJobsLoading] = useState(false)
-  const [bookings, setBookings] = useState([])
+  // Jobs and bookings now managed by useCaregiverDashboard hook
 
   // Debug function to test profile image loading
   const debugProfileImage = () => {
@@ -150,123 +154,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
     loadProfile();
   };
 
-  // Load profile data function
-  const loadProfile = async () => {
-    try {
-      // Check if user is authenticated before making API calls
-      if (!user?.id) {
-        console.log('[INFO] No user ID, skipping profile load');
-        return;
-      }
-      
-      const isCaregiver = (user?.role === 'caregiver');
-      
-      // Get both caregiver and user profiles to check for image
-      let caregiverProfile = null;
-      let userProfile = null;
-      
-      if (isCaregiver) {
-        try {
-          const caregiverResponse = await caregiversAPI.getMyProfile();
-          caregiverProfile = caregiverResponse?.caregiver || caregiverResponse?.data?.caregiver || caregiverResponse || {};
-        } catch (error) {
-          console.log('No caregiver profile found:', error.message);
-        }
-      }
-      
-      try {
-        const userResponse = await authAPI.getProfile();
-        userProfile = userResponse?.data || userResponse || {};
-      } catch (error) {
-        console.log('Failed to get user profile:', error.message);
-      }
-      
-      console.log('📋 Caregiver profile:', caregiverProfile);
-      console.log('👤 User profile:', userProfile);
-      
-      // Merge profiles, prioritizing caregiver profile data
-      const p = { ...userProfile, ...caregiverProfile };
-      console.log('📊 Profile data extracted:', p);
-      
-      if (p && (p.name || p.hourlyRate || p.experience || caregiverProfile || userProfile)) {
-        // Check for profile image in both profiles with extensive debugging
-        const imageFields = {
-          'caregiverProfile?.profileImage': caregiverProfile?.profileImage,
-          'caregiverProfile?.imageUrl': caregiverProfile?.imageUrl,
-          'caregiverProfile?.image': caregiverProfile?.image,
-          'userProfile?.profileImage': userProfile?.profileImage,
-          'userProfile?.imageUrl': userProfile?.imageUrl,
-          'userProfile?.image': userProfile?.image,
-          'p.profileImage': p.profileImage,
-          'p.imageUrl': p.imageUrl,
-          'p.avatarUrl': p.avatarUrl,
-          'p.image': p.image,
-          'p.photoUrl': p.photoUrl,
-          'p.userId?.profileImage': p.userId?.profileImage
-        };
-        
-        console.log('🖼️ CaregiverDashboard - All image fields:', imageFields);
-        
-        const rawImageUrl = caregiverProfile?.profileImage || caregiverProfile?.imageUrl || caregiverProfile?.image || 
-                           userProfile?.profileImage || userProfile?.imageUrl || userProfile?.image ||
-                           p.profileImage || p.imageUrl || p.avatarUrl || p.image || p.photoUrl || p.userId?.profileImage;
-        console.log('🖼️ CaregiverDashboard - Selected raw image URL:', rawImageUrl);
-        
-        let processedImageUrl = null;
-        if (rawImageUrl) {
-          const baseUrl = getCurrentSocketURL();
-          
-          if (rawImageUrl.startsWith('http')) {
-            // Already absolute URL
-            processedImageUrl = rawImageUrl;
-          } else if (rawImageUrl.startsWith('/')) {
-            // Relative URL - convert to absolute
-            processedImageUrl = `${baseUrl}${rawImageUrl}`;
-          } else {
-            // Filename only - add uploads path
-            processedImageUrl = `${baseUrl}/uploads/${rawImageUrl}`;
-          }
-          
-          // Add cache-busting timestamp for fresh load
-          const timestamp = Date.now();
-          processedImageUrl = processedImageUrl.includes('?') 
-            ? `${processedImageUrl}&t=${timestamp}` 
-            : `${processedImageUrl}?t=${timestamp}`;
-            
-          console.log('✅ CaregiverDashboard - Final image URL:', processedImageUrl);
-        }
-        
-        // Force refresh if image URL changed
-        if (processedImageUrl !== profile.imageUrl) {
-          console.log('🔄 Profile image URL changed, forcing refresh');
-          setImageRefreshKey(prev => prev + 1);
-        }
-        
-        setProfile((prev) => ({
-          ...prev,
-          name: p.name || p.userId?.name || prev.name,
-          hourlyRate: p.hourlyRate || p.rate || prev.hourlyRate,
-          experience: typeof p.experience?.years === 'number' ? `${p.experience.years}+ years` : 
-                     (typeof p.experience === 'number' ? `${p.experience}+ years` : 
-                     (p.experience || prev.experience)),
-          skills: p.skills || prev.skills || prev.specialties,
-          bio: p.bio || prev.bio,
-          rating: p.rating || prev.rating,
-          reviews: p.reviewCount || p.reviews || prev.reviews,
-          imageUrl: processedImageUrl,
-        }));
-        console.log('✅ Profile updated in dashboard');
-        console.log('- Final profile object:', {
-          name: p.name || p.userId?.name || prev.name,
-          imageUrl: processedImageUrl,
-          hourlyRate: p.hourlyRate || p.rate || prev.hourlyRate
-        });
-      }
-    } catch (e) {
-      console.error('❌ Error loading profile in dashboard:', e);
-      // keep default profile
-    }
-  }
+  // Profile loading now handled by useCaregiverDashboard hook
 
   useFocusEffect(
     useCallback(() => {
@@ -294,162 +182,12 @@ export default function CaregiverDashboard({ onLogout, route }) {
     setApplications(initialApplications);
   }, []);
 
-  // Fetch jobs from backend
-  const fetchJobs = async () => {
-    const isCaregiver = (user?.role === 'caregiver');
-    if (!isCaregiver) return;
-    
-    if (!user?.id) {
-      console.log('[INFO] No user authentication, skipping jobs fetch');
-      return;
-    }
-    
-    setJobsLoading(true);
-    try {
-      console.log('🔍 Fetching available jobs for caregiver...');
-      const res = await jobsAPI.getAvailableJobs();
-      const jobsList = res?.data?.jobs || res?.jobs || [];
-      
-      console.log(`📋 Backend jobs response:`, res);
-      console.log(`📋 Jobs count: ${jobsList.length}`);
-      
-      // Transform backend jobs to match frontend format
-      const transformedJobs = jobsList.map((job) => {
-        const getPostedDate = (createdAt) => {
-          if (!createdAt) return 'Recently posted';
-          const now = new Date();
-          const posted = new Date(createdAt);
-          const diffTime = Math.abs(now - posted);
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
-          if (diffDays === 1) return '1 day ago';
-          if (diffDays < 7) return `${diffDays} days ago`;
-          if (diffDays < 14) return '1 week ago';
-          return `${Math.floor(diffDays / 7)} weeks ago`;
-        };
-        
-        return {
-          id: job._id || job.id,
-          title: job.title || 'Childcare Position',
-          family: job.clientName || job.employerName || job.parentId?.name || 'Family',
-          location: job.location || 'Cebu City',
-          distance: '2-5 km away',
-          hourlyRate: job.hourlyRate || job.rate || 300,
-          schedule: job.startTime && job.endTime ? `${job.startTime} - ${job.endTime}` : 'Flexible hours',
-          requirements: Array.isArray(job.requirements) ? job.requirements : ['Experience with children'],
-          postedDate: getPostedDate(job.createdAt),
-          urgent: job.urgent || false,
-          children: job.numberOfChildren || job.childrenCount || 1,
-          ages: job.childrenAges || job.ages || 'Various ages',
-          description: job.description || ''
-        };
-      });
-      
-      setJobs(transformedJobs);
-      console.log(`✅ Loaded ${transformedJobs.length} real jobs from backend`);
-      
-    } catch (error) {
-      console.error('❌ Backend jobs fetch failed:', error.message);
-      // No fallback - show empty state when backend fails
-      console.log('🔄 No jobs available - backend unavailable');
-      setJobs([]);
-    } finally {
-      setJobsLoading(false);
-    }
-  };
+  // Job fetching now handled by useCaregiverDashboard hook
 
-  // Fetch applications and bookings when component mounts or user role changes
-  useEffect(() => {
-    // Fetch applications (caregiver-only)
-    const fetchApplications = async () => {
-      const isCaregiver = (user?.role === 'caregiver');
-      if (!isCaregiver || !user?.id) return;
-      
-      try {
-        const res = await applicationsAPI.getMyApplications();
-        const list = res?.data?.applications || res?.applications || [];
-        
-        const normalized = list.map((a) => ({
-          id: a._id || a.id || Date.now(),
-          jobId: a.jobId?._id || a.jobId || a.job?._id || a.job?.id,
-          jobTitle: a.jobId?.title || a.job?.title || "Job Application",
-          family: a.jobId?.parentId?.name || a.job?.employerName || "Family",
-          status: a.status || "pending",
-          appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
-          hourlyRate: a.proposedRate || a.jobId?.rate || a.expectedRate || undefined,
-        }));
-        
-        setApplications(normalized);
-        console.log(`✅ Loaded ${normalized.length} real applications from backend`);
-        
-      } catch (error) {
-        console.error('❌ Backend applications fetch failed:', error.message);
-        // No fallback - show empty state when backend fails
-        console.log('🔄 No applications available - backend unavailable');
-        setApplications([]);
-      }
-    };
+  // Data fetching now handled by useCaregiverDashboard hook
 
-    // Fetch bookings (caregiver-only)
-    const fetchBookings = async () => {
-      const isCaregiver = (user?.role === 'caregiver');
-      if (!isCaregiver || !user?.id) return;
-      
-      try {
-        const res = await bookingsAPI.getMy();
-        const list = Array.isArray(res?.bookings) ? res.bookings : Array.isArray(res) ? res : [];
-        
-        const normalized = list.map((b, idx) => ({
-          id: b._id || b.id || idx + 1,
-          family: b.family || b.customerName || "Family",
-          date: b.date || b.startDate || new Date().toISOString(),
-          time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ""),
-          status: b.status || "pending",
-          children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
-          location: formatAddress(b.location || b.address),
-        }));
-        
-        setBookings(normalized);
-        console.log(`✅ Loaded ${normalized.length} real bookings from backend`);
-        
-      } catch (error) {
-        console.error('❌ Backend bookings fetch failed:', error.message);
-        // No fallback - show empty state when backend fails
-        console.log('🔄 No bookings available - backend unavailable');
-        setBookings([]);
-      }
-    };
-
-    // Execute all fetches
-    fetchJobs();
-    fetchApplications();
-    fetchBookings();
-  }, [user?.role, user?.id]);
-
-  // Refresh applications after successful submission
-  const refreshApplications = async () => {
-    const isCaregiver = (user?.role === 'caregiver');
-    if (!isCaregiver || !user?.id) return;
-    
-    try {
-      const res = await applicationsAPI.getMyApplications();
-      const list = res?.data?.applications || res?.applications || [];
-      if (list.length) {
-        const normalized = list.map((a) => ({
-          id: a._id || a.id || Date.now(),
-          jobId: a.jobId?._id || a.jobId || a.job?._id || a.job?.id,
-          jobTitle: a.jobId?.title || a.job?.title || "Job Application",
-          family: a.jobId?.parentId?.name || a.job?.employerName || "Family",
-          status: a.status || "pending",
-          appliedDate: a.createdAt || a.appliedDate || new Date().toISOString(),
-          hourlyRate: a.proposedRate || a.jobId?.rate || a.expectedRate || undefined,
-        }));
-        setApplications(normalized);
-      }
-    } catch (e) {
-      console.error('Error refreshing applications:', e);
-    }
-  };
+  // Application refresh now handled by useCaregiverDashboard hook
+  const refreshApplications = fetchApplications;
 
   // Open application modal for a selected job
   const handleJobApplication = (job) => {

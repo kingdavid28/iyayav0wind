@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { errorHandler } from '../utils/errorHandler';
 import { analytics } from '../utils/analytics';
+import { autoFixAuthOnStartup } from '../utils/authFix';
+import { initializeNetworkConfig } from '../utils/networkConfig';
 
 export class GlobalErrorHandler extends React.Component {
   constructor(props) {
@@ -17,6 +19,16 @@ export class GlobalErrorHandler extends React.Component {
     // Log error to analytics and error reporting
     analytics.trackError(error, { errorInfo });
     errorHandler.reportError(error, { errorInfo });
+    
+    // Auto-fix auth issues if error is auth-related
+    if (error.message?.includes('auth') || error.message?.includes('token')) {
+      autoFixAuthOnStartup();
+    }
+  }
+
+  componentDidMount() {
+    // Initialize network configuration
+    initializeNetworkConfig();
   }
 
   handleRetry = () => {

@@ -4,6 +4,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { CheckCircle, Upload, XCircle, AlertCircle, Clock, X } from 'lucide-react-native';
 import { ModalWrapper } from '../../../shared/ui';
 import { bookingsAPI } from '../../../config/api';
+import RatingSystem from '../../../components/RatingSystem';
+import ratingService from '../../../services/ratingService';
 
 const PaymentModal = ({ 
   visible, 
@@ -20,6 +22,8 @@ const PaymentModal = ({
   const [bookingStatus, setBookingStatus] = useState('pending');
   const [imageBase64, setImageBase64] = useState(null);
   const [mimeType, setMimeType] = useState('image/jpeg');
+  const [showRating, setShowRating] = useState(false);
+  const [canRate, setCanRate] = useState(false);
 
   // Safe formatting for payment data
   const formatPaymentData = () => {
@@ -86,6 +90,10 @@ const PaymentModal = ({
       const res = await bookingsAPI.uploadPaymentProof(bookingId, imageBase64, mimeType);
       setUploadStatus('pending_verification');
       setBookingStatus('pending_verification');
+      
+      // Check if user can rate after payment
+      const ratingEligible = await ratingService.canRate(bookingId);
+      setCanRate(ratingEligible);
       
       Alert.alert('Payment Submitted', 'We received your payment proof. We will verify it shortly.');
       if (onPaymentSuccess) onPaymentSuccess();
@@ -214,7 +222,24 @@ const PaymentModal = ({
                 <Text style={styles.statusInfoText}>
                   Payment submitted for verification. You'll be notified when verified.
                 </Text>
+                {canRate && (
+                  <TouchableOpacity 
+                    style={styles.rateButton}
+                    onPress={() => setShowRating(true)}
+                  >
+                    <Text style={styles.rateButtonText}>Rate Caregiver</Text>
+                  </TouchableOpacity>
+                )}
               </View>
+            )}
+            
+            {showRating && (
+              <RatingSystem
+                onSubmit={async (rating) => {
+                  await ratingService.rateCaregiver(caregiverName, bookingId, rating.rating, rating.review);
+                  setShowRating(false);
+                }}
+              />
             )}
           </View>
     </ModalWrapper>
@@ -330,6 +355,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4B5563',
     textAlign: 'center',
+  },
+  rateButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    marginTop: 12,
+    alignSelf: 'center',
+  },
+  rateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

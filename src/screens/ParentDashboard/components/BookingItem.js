@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Calendar, Clock, Baby, MapPin } from 'lucide-react-native';
 import { StatusBadge } from '../../../shared/ui';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
-import { formatDateFriendly, formatTimeRange } from '../utils/dateUtils';
+import { formatDateFriendly, formatTimeRange } from '../../../utils/dateUtils';
 import { getCaregiverDisplayName, normalizeStatus } from '../../../utils/caregiverUtils';
 import { formatAddress } from '../../../utils/addressUtils';
 

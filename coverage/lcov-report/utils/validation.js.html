@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/138</span>
+                <span class='fraction'>0/148</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/108</span>
+                <span class='fraction'>0/114</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/116</span>
+                <span class='fraction'>0/122</span>
             </div>
         
             
@@ -372,7 +372,18 @@
 <a name='L307'></a><a href='#L307'>307</a>
 <a name='L308'></a><a href='#L308'>308</a>
 <a name='L309'></a><a href='#L309'>309</a>
-<a name='L310'></a><a href='#L310'>310</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -395,6 +406,15 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -686,6 +706,7 @@
 /**
  * Comprehensive validation utility functions
  * Consolidated from validation.js and validator.js
+ * Single source of truth for all validation logic
  */
 &nbsp;
 export const validators = <span class="cstat-no" title="statement not covered" >{</span>
@@ -698,15 +719,24 @@ export const validators = <span class="cstat-no" title="statement not covered" >
 <span class="cstat-no" title="statement not covered" >    return null;</span>
   },
 &nbsp;
-  // Password validation
+  // Password validation - Production ready
   password: <span class="fstat-no" title="function not covered" >(p</span>assword) =&gt; {
 <span class="cstat-no" title="statement not covered" >    if (!password) <span class="cstat-no" title="statement not covered" >return 'Password is required';</span></span>
-<span class="cstat-no" title="statement not covered" >    if (password.length &lt; VALIDATION.PASSWORD_MIN_LENGTH) {</span>
-<span class="cstat-no" title="statement not covered" >      return `Password must be at least ${VALIDATION.PASSWORD_MIN_LENGTH} characters`;</span>
+<span class="cstat-no" title="statement not covered" >    if (password.length &lt; 12) {</span>
+<span class="cstat-no" title="statement not covered" >      return 'Password must be at least 12 characters';</span>
     }
-<span class="cstat-no" title="statement not covered" >    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {</span>
-<span class="cstat-no" title="statement not covered" >      return 'Password must contain at least one uppercase letter, one lowercase letter, and one number';</span>
-    }
+    
+    // Strong password requirements
+    const hasUpper = <span class="cstat-no" title="statement not covered" >/[A-Z]/.test(password);</span>
+    const hasLower = <span class="cstat-no" title="statement not covered" >/[a-z]/.test(password);</span>
+    const hasNumber = <span class="cstat-no" title="statement not covered" >/\d/.test(password);</span>
+    const hasSymbol = <span class="cstat-no" title="statement not covered" >/[!@#$%^&amp;*(),.?":{}|&lt;&gt;]/.test(password);</span>
+    
+<span class="cstat-no" title="statement not covered" >    if (!hasUpper) <span class="cstat-no" title="statement not covered" >return 'Password must contain at least one uppercase letter';</span></span>
+<span class="cstat-no" title="statement not covered" >    if (!hasLower) <span class="cstat-no" title="statement not covered" >return 'Password must contain at least one lowercase letter';</span></span>
+<span class="cstat-no" title="statement not covered" >    if (!hasNumber) <span class="cstat-no" title="statement not covered" >return 'Password must contain at least one number';</span></span>
+<span class="cstat-no" title="statement not covered" >    if (!hasSymbol) <span class="cstat-no" title="statement not covered" >return 'Password must contain at least one symbol';</span></span>
+    
 <span class="cstat-no" title="statement not covered" >    return null;</span>
   },
 &nbsp;
@@ -997,7 +1027,7 @@ export const validator = <span class="cstat-no" title="statement not covered" >n
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-05T00:50:20.899Z
+                at 2025-09-12T00:29:37.203Z
             </div>
         <script src="../prettify.js"></script>
         <script>
