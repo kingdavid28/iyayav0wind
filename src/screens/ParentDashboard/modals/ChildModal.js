@@ -10,7 +10,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { ModalWrapper } from '../../../shared/ui';
-import KeyboardAvoidingWrapper from '../../../components/KeyboardAvoidingWrapper';
+import KeyboardAvoidingWrapper from '../../../shared/ui/layout/KeyboardAvoidingWrapper';
 import { Button } from "react-native-paper";
 
 const ChildModal = ({

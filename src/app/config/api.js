@@ -87,9 +87,10 @@ export const authAPI = {
   },
 
   async getProfile() {
-    const token = await import('@react-native-async-storage/async-storage').then(m => m.default.getItem('@auth_token'));
+    const { tokenManager } = await import('../utils/tokenManager');
+    const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('No auth token found');
+      throw new Error('No authentication token available');
     }
     
     const response = await fetch(`${API_BASE_URL}/auth/firebase-profile`, {
@@ -223,9 +224,10 @@ export const caregiversAPI = {
   },
 
   async getMyProfile() {
-    const token = await import('@react-native-async-storage/async-storage').then(m => m.default.getItem('@auth_token'));
+    const { tokenManager } = await import('../utils/tokenManager');
+    const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('No auth token found');
+      throw new Error('No authentication token available');
     }
     
     const response = await fetch(`${API_BASE_URL}/caregivers/profile`, {
@@ -243,9 +245,10 @@ export const caregiversAPI = {
   },
 
   async updateMyProfile(profileData) {
-    const token = await import('@react-native-async-storage/async-storage').then(m => m.default.getItem('@auth_token'));
+    const { tokenManager } = await import('../utils/tokenManager');
+    const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('No auth token found');
+      throw new Error('No authentication token available');
     }
     
     const csrf = await getCSRFToken();

@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/174</span>
+                <span class='fraction'>0/178</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/189</span>
+                <span class='fraction'>0/191</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/41</span>
+                <span class='fraction'>0/42</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/164</span>
+                <span class='fraction'>0/168</span>
             </div>
         
             
@@ -1204,7 +1204,15 @@
 <a name='L1139'></a><a href='#L1139'>1139</a>
 <a name='L1140'></a><a href='#L1140'>1140</a>
 <a name='L1141'></a><a href='#L1141'>1141</a>
-<a name='L1142'></a><a href='#L1142'>1142</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L1142'></a><a href='#L1142'>1142</a>
+<a name='L1143'></a><a href='#L1143'>1143</a>
+<a name='L1144'></a><a href='#L1144'>1144</a>
+<a name='L1145'></a><a href='#L1145'>1145</a>
+<a name='L1146'></a><a href='#L1146'>1146</a>
+<a name='L1147'></a><a href='#L1147'>1147</a>
+<a name='L1148'></a><a href='#L1148'>1148</a>
+<a name='L1149'></a><a href='#L1149'>1149</a>
+<a name='L1150'></a><a href='#L1150'>1150</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1236,6 +1244,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2377,11 +2393,19 @@ import {
 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import mime from 'mime';
+// Simple mime type detection for React Native
+const getMimeType = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(u</span>ri) =&gt; {</span>
+  const ext = <span class="cstat-no" title="statement not covered" >uri.split('.').pop()?.toLowerCase();</span>
+  const mimeTypes = <span class="cstat-no" title="statement not covered" >{</span>
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+    pdf: 'application/pdf', doc: 'application/msword', txt: 'text/plain'
+  };
+<span class="cstat-no" title="statement not covered" >  return mimeTypes[ext] || 'application/octet-stream';</span>
+};
 &nbsp;
 &nbsp;
 // Platform-specific FileSystem import
-const FileSystem = <span class="cstat-no" title="statement not covered" >Platform.OS === 'web' ? null : require('expo-file-system');</span>
+const FileSystem = <span class="cstat-no" title="statement not covered" >Platform.OS === 'web' ? null : require('expo-file-system/legacy');</span>
 // Firebase removed
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../core/contexts/AuthContext';
@@ -2471,7 +2495,7 @@ export default function <span class="fstat-no" title="function not covered" >Enh
         const arr = <span class="cstat-no" title="statement not covered" >[];</span>
 <span class="cstat-no" title="statement not covered" >        for (const a of attachments) {</span>
 <span class="cstat-no" title="statement not covered" >          try {</span>
-            const base64 = <span class="cstat-no" title="statement not covered" >await FileSystem.readAsStringAsync(a.uri, { encoding: FileSystem.EncodingType.Base64 });</span>
+            const base64 = <span class="cstat-no" title="statement not covered" >await FileSystem.readAsStringAsync(a.uri, { encoding: 'base64' });</span>
 <span class="cstat-no" title="statement not covered" >            arr.push({ base64, mimeType: a.type || 'application/octet-stream', name: a.name || 'file' });</span>
           } catch (e) {
 <span class="cstat-no" title="statement not covered" >            console.warn('Failed to read attachment base64:', e?.message || e);</span>
@@ -2559,7 +2583,7 @@ export default function <span class="fstat-no" title="function not covered" >Enh
         const selectedImages = <span class="cstat-no" title="statement not covered" >result.assets || [result];</span>
         const newAttachments = <span class="cstat-no" title="statement not covered" >selectedImages.map(<span class="fstat-no" title="function not covered" >as</span>set =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
           uri: asset.uri,
-          type: mime.getType(asset.uri) || 'image/jpeg',
+          type: getMimeType(asset.uri) || 'image/jpeg',
           name: asset.uri.split('/').pop() || `image-${Date.now()}.jpg`,
           isImage: true
         }));
@@ -2601,7 +2625,7 @@ export default function <span class="fstat-no" title="function not covered" >Enh
           
 <span class="cstat-no" title="statement not covered" >          newAttachments.push({</span>
             uri: doc.uri,
-            type: mime.getType(doc.uri) || 'application/octet-stream',
+            type: getMimeType(doc.uri) || 'application/octet-stream',
             name: doc.name || `file-${Date.now()}`,
             isImage: false,
             size: fileInfo.size
@@ -2849,7 +2873,7 @@ export default function <span class="fstat-no" title="function not covered" >Enh
           &lt;Image 
             source={{ uri: props.currentMessage.user.avatar }} 
             style={styles.avatar}
-            defaultSource={require('../../assets/avatar-placeholder.png')}
+            defaultSource={require('../../assets/profile-placeholder.png')}
           /&gt;
         )}
         
@@ -3493,7 +3517,7 @@ const styles = <span class="cstat-no" title="statement not covered" >StyleSheet.
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T00:29:37.203Z
+                at 2025-09-12T16:00:36.461Z
             </div>
         <script src="../prettify.js"></script>
         <script>

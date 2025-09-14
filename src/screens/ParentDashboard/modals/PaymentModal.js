@@ -4,8 +4,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { CheckCircle, Upload, XCircle, AlertCircle, Clock, X } from 'lucide-react-native';
 import { ModalWrapper } from '../../../shared/ui';
 import { bookingsAPI } from '../../../config/api';
-import RatingSystem from '../../../components/RatingSystem';
+import RatingSystem from '../../../components/ui/feedback/RatingSystem';
 import ratingService from '../../../services/ratingService';
+import { getPaymentActions, calculateDeposit, calculateRemainingPayment } from '../../../utils/paymentUtils';
+import { BOOKING_STATUSES } from '../../../constants/bookingStatuses';
 
 const PaymentModal = ({ 
   visible, 
@@ -14,6 +16,7 @@ const PaymentModal = ({
   amount, 
   caregiverName, 
   bookingDate,
+  paymentType = 'deposit',
   onPaymentSuccess 
 }) => {
   const [image, setImage] = useState(null);
@@ -27,19 +30,27 @@ const PaymentModal = ({
 
   // Safe formatting for payment data
   const formatPaymentData = () => {
+    if (!amount || !caregiverName || !bookingDate) {
+      return null;
+    }
+    
     try {
+      const paymentAmount = paymentType === 'deposit' 
+        ? calculateDeposit(amount)
+        : paymentType === 'final_payment'
+          ? calculateRemainingPayment(amount)
+          : amount;
+          
       return {
-        amount: (amount || 0).toFixed(2),
-        caregiverName: caregiverName || 'Unknown Caregiver',
-        bookingDate: bookingDate || 'Unknown Date'
+        amount: paymentAmount.toFixed(2),
+        totalAmount: amount.toFixed(2),
+        caregiverName: caregiverName,
+        bookingDate: bookingDate,
+        paymentType: paymentType
       };
     } catch (error) {
       console.error('Error formatting payment data:', error);
-      return {
-        amount: '0.00',
-        caregiverName: 'Error loading information',
-        bookingDate: 'Unknown Date'
-      };
+      return null;
     }
   };
 
@@ -87,22 +98,41 @@ const PaymentModal = ({
     setUploadStatus('uploading');
 
     try {
+      // Upload payment proof with base64 image and mime type
       const res = await bookingsAPI.uploadPaymentProof(bookingId, imageBase64, mimeType);
+      
       setUploadStatus('pending_verification');
       setBookingStatus('pending_verification');
       
-      // Check if user can rate after payment
-      const ratingEligible = await ratingService.canRate(bookingId);
-      setCanRate(ratingEligible);
+      // Check if user can rate after payment (if rating service exists)
+      try {
+        if (ratingService && ratingService.canRate) {
+          const ratingEligible = await ratingService.canRate(bookingId);
+          setCanRate(ratingEligible);
+        }
+      } catch (ratingError) {
+        console.log('Rating service not available:', ratingError.message);
+      }
       
-      Alert.alert('Payment Submitted', 'We received your payment proof. We will verify it shortly.');
-      if (onPaymentSuccess) onPaymentSuccess();
+      Alert.alert(
+        'Payment Submitted', 
+        `Your ${paymentType === 'deposit' ? 'deposit' : 'final payment'} proof has been submitted. We will verify it shortly.`
+      );
+      
+      if (onPaymentSuccess) {
+        onPaymentSuccess();
+      }
       
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Error uploading payment proof:', error);
       setUploadStatus('error');
       setBookingStatus('error');
-      Alert.alert('Error', 'Failed to upload payment. Please try again.');
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Failed to upload payment proof. Please try again.';
+      
+      Alert.alert('Upload Failed', errorMessage);
     } finally {
       setUploading(false);
     }
@@ -145,6 +175,11 @@ const PaymentModal = ({
   // Get formatted payment data
   const formattedData = formatPaymentData();
 
+  // Don't render modal if required data is missing
+  if (!formattedData) {
+    return null;
+  }
+
   return (
     <ModalWrapper
       visible={visible}
@@ -164,9 +199,18 @@ const PaymentModal = ({
           <View style={styles.modalBody}>
             <View style={styles.paymentDetails}>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Amount:</Text>
+                <Text style={styles.detailLabel}>
+                  {formattedData.paymentType === 'deposit' ? 'Deposit Amount:' : 
+                   formattedData.paymentType === 'final_payment' ? 'Final Payment:' : 'Amount:'}
+                </Text>
                 <Text style={styles.detailValue}>₱{formattedData.amount}</Text>
               </View>
+              {formattedData.paymentType !== 'full' && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Total Booking Cost:</Text>
+                  <Text style={styles.detailValue}>₱{formattedData.totalAmount}</Text>
+                </View>
+              )}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Caregiver:</Text>
                 <Text style={styles.detailValue}>{formattedData.caregiverName}</Text>

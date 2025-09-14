@@ -1,4 +1,4 @@
-const ErrorResponse = require('../utils/rrorResponse');
+const ErrorResponse = require('../utils/errorResponse');
 const logger = require('../utils/logger');
 const { isCelebrateError } = require('celebrate');
 const { NODE_ENV } = require('../config');

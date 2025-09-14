@@ -15,7 +15,7 @@ import {
   Keyboard,
   Linking,
 } from 'react-native';
-import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
+import KeyboardAvoidingWrapper from '../shared/ui/layout/KeyboardAvoidingWrapper';
 import { TextInput, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +25,7 @@ import { useAuth } from '../core/contexts/AuthContext';
 import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { useAuthSubmit } from '../hooks/useAuthSubmit';
-import CustomDateTimePicker from '../components/DateTimePicker';
+import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../config/constants';
 import { navigateToUserDashboard } from '../utils/navigationUtils';
@@ -153,8 +153,6 @@ const CaregiverAuth = ({ navigation }) => {
       setMode('login');
     }
   };
-
-
 
   const keyboardOffset = Platform.select({ ios: 80, android: 0 });
 
@@ -358,27 +356,33 @@ const CaregiverAuth = ({ navigation }) => {
               {/* Footer links */}
               {mode !== 'reset' ? (
                 <>
-                  <TouchableOpacity onPress={() => setMode('reset')} accessibilityLabel="Switch to reset password">
+                  <TouchableOpacity 
+                    onPress={() => setMode('reset')} 
+                    accessibilityLabel="Reset password"
+                  >
                     <Text style={styles.smallLink}>Forgot password?</Text>
                   </TouchableOpacity>
                   
-
                   <View style={styles.authFooter}>
-                <Text style={styles.authFooterText}>
-                  {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
-                </Text>
-                <TouchableOpacity 
-                  onPress={toggleAuthMode}
-                  accessibilityLabel={mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
-                >
-                  <Text style={[styles.authFooterLink, { color: '#2563eb' }]}>
-                    {mode === 'signup' ? 'Sign In' : 'Sign Up'}
-                  </Text>
-                </TouchableOpacity>
+                    <Text style={styles.authFooterText}>
+                      {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
+                    </Text>
+                    <Button
+                      mode="outlined"
+                      onPress={toggleAuthMode}
+                      style={[styles.toggleButton, mode === 'login' ? styles.signUpButton : styles.signInButton]}
+                      labelStyle={mode === 'login' ? styles.signUpButtonLabel : styles.signInButtonLabel}
+                      accessibilityLabel={mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
+                    >
+                      {mode === 'signup' ? 'Sign In' : 'Sign Up'}
+                    </Button>
                   </View>
                 </>
               ) : (
-                <TouchableOpacity onPress={() => setMode('login')} accessibilityLabel="Back to sign in">
+                <TouchableOpacity 
+                  onPress={() => setMode('login')} 
+                  accessibilityLabel="Back to sign in"
+                >
                   <Text style={styles.smallLink}>Back to Sign In</Text>
                 </TouchableOpacity>
               )}
@@ -490,17 +494,35 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  authFooter: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  authFooter: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center',
     marginTop: 16,
+    flexWrap: 'wrap'
   },
-  authFooterText: {
+  authFooterText: { 
     color: '#6b7280',
+    marginRight: 8
   },
-  authFooterLink: {
-    fontWeight: 'bold',
-    marginLeft: 4,
+  toggleButton: {
+    marginTop: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  signUpButton: {
+    borderColor: '#10b981', // Emerald green for sign up
+    backgroundColor: 'transparent'
+  },
+  signUpButtonLabel: {
+    color: '#10b981', // Emerald green for sign up
+  },
+  signInButton: {
+    borderColor: '#2563eb', // Blue for sign in
+    backgroundColor: 'transparent'
+  },
+  signInButtonLabel: {
+    color: '#2563eb', // Blue for sign in
   },
   smallLink: {
     color: '#2563eb',

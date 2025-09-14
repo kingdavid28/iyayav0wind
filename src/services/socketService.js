@@ -1,5 +1,14 @@
-import { io } from 'socket.io-client';
 import { getCurrentSocketURL } from '../config/api';
+
+let io = null;
+
+// Try to import socket.io-client, but handle gracefully if not available
+try {
+  const socketIO = require('socket.io-client');
+  io = socketIO.io || socketIO.default;
+} catch (error) {
+  console.warn('socket.io-client not available, realtime features disabled');
+}
 
 class SocketService {
   constructor() {
@@ -9,6 +18,11 @@ class SocketService {
   }
 
   connect(token) {
+    if (!io) {
+      console.warn('Socket.IO not available, skipping connection');
+      return null;
+    }
+    
     if (this.socket?.connected) return this.socket;
 
     const url = getCurrentSocketURL();

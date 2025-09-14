@@ -30,48 +30,40 @@ export const __PROD__ = !__DEV__;
 // Compute a cross-platform API base URL that works for Expo Web, Android emulator, iOS simulator, and physical devices.
 const getBaseHost = () => {
   try {
-    // 1) Respect explicit env override when provided
-    const envUrl =
-      (typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL) ||
-      (typeof process !== "undefined" && process.env?.REACT_APP_API_URL);
+    // 1) Environment variable takes priority
+    const envUrl = process.env?.EXPO_PUBLIC_API_URL || process.env?.REACT_APP_API_URL;
     if (envUrl) {
-      // Normalize: remove trailing slash and a single trailing '/api' if present
       const cleaned = envUrl.replace(/\/$/, "").replace(/\/api$/i, "");
       return { mode: "env", url: cleaned };
     }
 
-    // 2) Try React Native Platform if available
+    // 2) Platform-specific defaults
     try {
-      // Use require to avoid bundling issues in non-RN contexts
       const rn = require("react-native");
       const platform = rn?.Platform?.OS;
       if (platform === "android") {
-        // Android emulator uses host loopback 10.0.2.2
         return { mode: "android-emulator", url: "http://10.0.2.2:5000" };
       }
       if (platform === "ios") {
-        // iOS simulator can access localhost - try both localhost and network IP
         return { mode: "ios-simulator", url: "http://localhost:5000" };
       }
-    } catch (_) {
-      // Platform not available
-    }
+    } catch (_) {}
 
-    // 3) Web (expo web / react-native-web) – use localhost for trustworthy origin
-    if (typeof window !== "undefined" && window.location?.hostname) {
-      // Use localhost instead of IP address for trustworthy origin
+    // 3) Web fallback
+    if (typeof window !== "undefined") {
       return { mode: "web", url: "http://localhost:5000" };
     }
 
-    // 4) Fallback - try localhost first, then network IP
+    // 4) Default fallback
     return { mode: "fallback", url: "http://localhost:5000" };
   } catch (error) {
     console.error("Error determining base host:", error);
-    return { mode: "error-fallback", url: "http://localhost:5001" };
+    return { mode: "error-fallback", url: "http://localhost:5000" };
   }
 };
 
 const baseHost = getBaseHost();
+console.log('🔗 Base host configuration:', baseHost);
 
 // API Configuration with enhanced timeout and retry settings
 export const API_CONFIG = {

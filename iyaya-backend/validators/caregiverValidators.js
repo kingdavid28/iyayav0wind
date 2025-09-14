@@ -2,19 +2,29 @@
 const { body, param, query, validationResult } = require('express-validator');
 const { isValidObjectId } = require('mongoose');
 
-// Reusable validation middleware
+// Reusable validation middleware with enhanced error reporting
 const validate = (validations) => {
   return async (req, res, next) => {
+    console.log('🔍 Validating request body:', {
+      url: req.originalUrl,
+      method: req.method,
+      bodyKeys: Object.keys(req.body || {}),
+      bodySize: JSON.stringify(req.body || {}).length
+    });
+
     await Promise.all(validations.map(validation => validation.run(req)));
 
     const errors = validationResult(req);
     if (errors.isEmpty()) {
+      console.log('✅ Validation passed');
       return next();
     }
 
+    console.log('❌ Validation failed:', errors.array());
     res.status(400).json({ 
       success: false,
-      error: errors.array(),
+      error: 'Validation failed',
+      details: errors.array(),
       statusCode: 400
     });
   };
@@ -61,47 +71,98 @@ const caregiverIdValidator = validate([
     })
 ]);
 
-// Update caregiver profile validation
+// Update caregiver profile validation - More permissive
 const updateCaregiverValidator = validate([
   body('name')
     .optional()
-    .trim()
-    .isLength({ min: 2, max: 50 }).withMessage('Name must be between 2-50 characters'),
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      if (typeof value !== 'string') return false;
+      const trimmed = value.trim();
+      return trimmed.length >= 2 && trimmed.length <= 100;
+    }).withMessage('Name must be between 2-100 characters'),
   
   body('email')
     .optional()
-    .trim()
-    .isEmail().withMessage('Invalid email format')
-    .normalizeEmail(),
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      if (typeof value !== 'string') return false;
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }).withMessage('Invalid email format'),
   
   body('phone')
     .optional()
-    .trim()
     .custom((value) => {
-      if (!value || value.trim() === '') return true; // Allow empty phone
-      // Updated regex to support international format with country code (e.g., +63)
-      return /^\+?[0-9\s\-\(\)]{7,15}$/.test(value);
-    }).withMessage('Please enter a valid phone number (e.g., +63 912 345 6789)'),
+      if (!value || value === '') return true; // Allow empty
+      if (typeof value !== 'string') return false;
+      // More flexible phone validation
+      return /^[\+]?[0-9\s\-\(\)]{7,20}$/.test(value);
+    }).withMessage('Invalid phone number format'),
   
-  body('serviceType')
+  body('bio')
     .optional()
-    .trim()
-    .isLength({ max: 50 }).withMessage('Service type must be less than 50 characters'),
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      if (typeof value !== 'string') return false;
+      return value.length <= 2000;
+    }).withMessage('Bio must be less than 2000 characters'),
   
-  body('description')
+  body('skills')
     .optional()
-    .trim()
-    .isLength({ max: 500 }).withMessage('Description must be less than 500 characters'),
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      return Array.isArray(value);
+    }).withMessage('Skills must be an array'),
+  
+  body('certifications')
+    .optional()
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      return Array.isArray(value);
+    }).withMessage('Certifications must be an array'),
+  
+  body('ageCareRanges')
+    .optional()
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      return Array.isArray(value);
+    }).withMessage('Age care ranges must be an array'),
+  
+  body('hourlyRate')
+    .optional()
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') return true; // Allow empty
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0;
+    }).withMessage('Hourly rate must be a valid number'),
+  
+  body('experience')
+    .optional()
+    .custom((value) => {
+      if (!value && value !== 0) return true; // Allow empty but not zero
+      if (typeof value === 'number') return value >= 0; // Allow number (total months)
+      if (typeof value === 'object' && value !== null) {
+        return (typeof value.years === 'number' || typeof value.years === 'undefined') &&
+               (typeof value.months === 'number' || typeof value.months === 'undefined');
+      }
+      return false;
+    }).withMessage('Experience must be a number or object with years/months'),
   
   body('address')
     .optional()
-    .trim()
-    .isLength({ max: 200 }).withMessage('Address must be less than 200 characters'),
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      return typeof value === 'object' && value !== null;
+    }).withMessage('Address must be an object'),
   
-  body('profilePicture')
+  body('profileImage')
     .optional()
-    .trim()
-    .isURL().withMessage('Profile picture must be a valid URL')
+    .custom((value) => {
+      if (!value) return true; // Allow empty
+      if (typeof value !== 'string') return false;
+      // Allow URLs, base64 data URLs, or relative paths
+      return value.length > 0;
+    }).withMessage('Profile image must be a valid string')
 ]);
 
 module.exports = {

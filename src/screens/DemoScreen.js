@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { JobCard, CaregiverCard, BookingCard, ApplicationCard, ConfirmationModal } from '../shared/ui';
-import DocumentManager from '../components/DocumentManager';
-import NetworkStatus from '../components/NetworkStatus';
+import DocumentManager from '../components/business/DocumentManager';
+import NetworkStatus from '../components/ui/feedback/NetworkStatus';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useSecurity } from '../hooks/useSecurity';
 // AuthForm component removed - using direct auth screens instead

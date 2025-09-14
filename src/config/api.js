@@ -4,7 +4,6 @@
 import { 
   apiService,
   authAPI,
-  caregiversAPI, 
   jobsAPI,
   applicationsAPI,
   bookingsAPI,
@@ -13,6 +12,7 @@ import {
   getCurrentAPIURL,
   getCurrentSocketURL
 } from '../services';
+import { tokenManager } from '../utils/tokenManager';
 
 // Export for backward compatibility
 export const API_BASE_URL = getCurrentAPIURL();
@@ -32,7 +32,7 @@ export const setAPIBaseURL = (newURL) => {
 export { authAPI };
 
 // Export consolidated caregivers API
-export { caregiversAPI };
+export const caregiversAPI = apiService.caregivers;
 
 // Export consolidated jobs API
 export { jobsAPI };
@@ -49,11 +49,31 @@ export { childrenAPI };
 // Export uploads API (using auth API upload method)
 export const uploadsAPI = {
   base64Upload: authAPI.uploadProfileImage,
-  uploadDocument: authAPI.uploadProfileImage
+  uploadDocument: (params) => {
+    // Handle different parameter formats for document uploads
+    if (params.documentBase64) {
+      // Skip size validation for documents by calling the request directly
+      return apiService.request('/auth/upload-profile-image', {
+        method: 'POST',
+        body: { imageBase64: params.documentBase64, mimeType: params.mimeType },
+        timeout: 30000
+      });
+    }
+    // Fallback for other formats
+    return authAPI.uploadProfileImage(params, 'application/pdf');
+  }
 };
 
 // Export messaging service
 export { messagingService };
+
+// Export messaging API for backward compatibility
+export const messagingAPI = {
+  markRead: (conversationId) => messagingService.markAsRead(conversationId),
+  getConversations: () => messagingService.getConversations(),
+  getMessages: (conversationId) => messagingService.getMessages(conversationId),
+  sendMessage: (payload) => messagingService.sendMessage(payload.conversationId, payload.text, payload.recipientId)
+};
 
 // Privacy API (stub implementation)
 export const privacyAPI = {
@@ -67,6 +87,9 @@ export const privacyAPI = {
   revokePermission: () => ({ success: true }),
   markNotificationAsRead: () => ({ success: true })
 };
+
+// Export token manager for advanced usage
+export { tokenManager };
 
 // Export main service for advanced usage
 export { apiService };

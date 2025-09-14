@@ -79,7 +79,10 @@ router.post('/document', async (req, res, next) => {
 
     const docType = documentType || 'document';
     const timestamp = Date.now();
-    const safeName = fileName ? fileName.replace(/[^a-zA-Z0-9_.-]/g, '_') : `${docType}_${timestamp}`;
+    // Sanitize filename to prevent path traversal
+    const safeName = fileName ? 
+      path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, '_').substring(0, 100) : 
+      `${docType}_${timestamp}`;
     const fullFileName = `${safeName}.${ext}`;
     const filePath = path.join(targetDir, fullFileName);
 

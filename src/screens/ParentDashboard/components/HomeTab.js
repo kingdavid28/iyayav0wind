@@ -24,7 +24,8 @@ const HomeTab = ({
   userData,
   caregivers = [],
   onBookCaregiver,
-  onMessageCaregiver
+  onMessageCaregiver,
+  navigation
 }) => {
   // Get latest 3 registered caregivers (sorted by creation date)
   const featuredCaregivers = caregivers
@@ -47,6 +48,7 @@ const HomeTab = ({
           profileLocation={profileLocation}
           activeTab="home"
           userData={userData}
+          navigation={navigation}
         />
         <QuickActions actions={quickActions} />
         
@@ -67,26 +69,31 @@ const HomeTab = ({
             <View style={styles.childrenList}>
               {(showAllChildren ? children : children.slice(0, 3)).map((child, index) => (
                 <View key={child._id || child.id || index} style={styles.childItemCard}>
-                  <View style={styles.childIcon}>
-                    <Text style={{ fontSize: 20, color: '#db2777' }}>👶</Text>
-                  </View>
-                  <View style={styles.childInfo}>
-                    <Text style={styles.childName}>{child.name}</Text>
-                    <Text style={styles.childDetails}>Age: {child.age} years old</Text>
-                    {child.allergies && (
-                      <Text style={styles.childAllergies}>⚠️ {child.allergies}</Text>
-                    )}
-                  </View>
-                  <View style={styles.childActions}>
-                    <TouchableOpacity style={styles.childActionButton} onPress={() => onEditChild(child)}>
-                      <Text style={styles.childActionText}>Edit</Text>
+                  <View style={styles.topRightButtons}>
+                    <TouchableOpacity 
+                      style={styles.editButtonX} 
+                      onPress={() => onEditChild(child)}
+                    >
+                      <Text style={styles.editButtonXText}>✎</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={[styles.childActionButton, styles.deleteButton]} 
+                      style={styles.deleteButtonX} 
                       onPress={() => onDeleteChild(child)}
                     >
-                      <Text style={[styles.childActionText, styles.deleteText]}>Delete</Text>
+                      <Text style={styles.deleteButtonXText}>×</Text>
                     </TouchableOpacity>
+                  </View>
+                  <View style={styles.childContentLeft}>
+                    <View style={styles.childIcon}>
+                      <Text style={{ fontSize: 20, color: '#db2777' }}>👶</Text>
+                    </View>
+                    <View style={styles.childInfo}>
+                      <Text style={styles.childName}>{child.name}</Text>
+                      <Text style={styles.childDetails}>Age: {child.age} years old</Text>
+                      {child.allergies && (
+                        <Text style={styles.childAllergies}>⚠️ {child.allergies}</Text>
+                      )}
+                    </View>
                   </View>
                 </View>
               ))}
@@ -107,8 +114,8 @@ const HomeTab = ({
         
         {/* Featured Caregivers Section */}
         {featuredCaregivers.length > 0 && (
-          <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
-            <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Featured Caregivers</Text>
+          <View style={{ paddingHorizontal: 8, marginBottom: 20, overflow: 'visible' }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 12, marginLeft: 8 }]}>Featured Caregivers</Text>
             {featuredCaregivers.map((caregiver) => (
               <CaregiverCard
                 key={caregiver.id || caregiver._id}

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Text,
   TouchableOpacity,
   View,
@@ -80,14 +81,18 @@ const ProfileModal = ({
       return;
     }
 
+    if (profileContact && profileContact.trim() && !/^[\d\s\-\+\(\)]+$/.test(profileContact.trim())) {
+      Alert.alert("Error", "Please enter a valid contact number");
+      return;
+    }
+
     setLoading(true);
     try {
       await handleSaveProfile(tempImageUri);
       setTempImageUri(null);
-      onClose();
     } catch (error) {
       console.error("ProfileModal save error:", error);
-      Alert.alert("Error", "Failed to save profile. Please try again.");
+      Alert.alert("Error", error.message || "Failed to save profile. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -99,12 +104,14 @@ const ProfileModal = ({
   };
 
   return (
-    <ModalWrapper
+    <Modal
       visible={visible}
-      onClose={onClose}
       animationType="slide"
-      style={profileModalStyles.modalContentWrapper}
+      transparent
+      onRequestClose={onClose}
     >
+      <TouchableOpacity style={profileModalStyles.topOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={profileModalStyles.topModalContent} activeOpacity={1}>
           <View style={profileModalStyles.modalHeader}>
             <Text style={profileModalStyles.modalTitle}>Edit Profile</Text>
             <TouchableOpacity
@@ -180,38 +187,18 @@ const ProfileModal = ({
               style={{ width: 100 }}
             />
           </View>
-    </ModalWrapper>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   );
 };
 
 const profileModalStyles = {
-  fullScreenOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  modalContentWrapper: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    width: "100%",
-    maxWidth: 500,
-    maxHeight: "85%",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 50,
-  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 2,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
@@ -226,7 +213,7 @@ const profileModalStyles = {
     backgroundColor: "rgba(107, 114, 128, 0.1)",
   },
   modalBody: {
-    padding: 2,
+    padding: 20,
     maxHeight: 400,
   },
   imageSection: {
@@ -298,45 +285,23 @@ const profileModalStyles = {
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 20,
-    height: 90,
     borderTopWidth: 1,
     borderTopColor: "#f3f4f6",
     gap: 16,
   },
-  cancelButton: {
+  topOverlay: {
     flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 20,
+  },
+  topModalContent: {
+    backgroundColor: 'white',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#6b7280",
-  },
-  submitButton: {
-    flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: "#db2777",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 20,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  disabledButton: {
-    backgroundColor: "#9ca3af",
-    opacity: 0.7,
+    width: '95%',
+    maxWidth: 400,
+    maxHeight: '80%',
   },
 };
 

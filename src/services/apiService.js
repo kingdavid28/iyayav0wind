@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, ERROR_CODES } from '../config/constants';
 import { logger } from '../utils/logger';
 import { authService } from './authService';
+import { tokenManager } from '../utils/tokenManager';
 
 // Make NetInfo optional for web compatibility
 let NetInfo;
@@ -62,9 +63,21 @@ class ApiService {
   }
 
   setupInterceptors() {
-    // Request Interceptor with timeout handling
+    // Request Interceptor with token management
     this.client.interceptors.request.use(
       async (config) => {
+        // Add auth token if not present
+        if (!config.headers.Authorization) {
+          try {
+            const token = await tokenManager.getValidToken();
+            if (token) {
+              config.headers.Authorization = `Bearer ${token}`;
+            }
+          } catch (error) {
+            console.warn('Failed to get token for request:', error.message);
+          }
+        }
+
         // Set request-specific timeout
         config.timeout = config.timeout || API_CONFIG.TIMEOUT?.DEFAULT || 10000;
 
@@ -76,14 +89,6 @@ class ApiService {
           retryCount: 0,
           maxRetries: config.maxRetries || API_CONFIG.RETRY?.MAX_ATTEMPTS || 3,
         };
-
-        logger.debug('🚀 API Request:', {
-          baseURL: config.baseURL,
-          url: config.url,
-          method: config.method,
-          headers: config.headers,
-          data: config.data,
-        });
 
         return config;
       },
@@ -155,13 +160,14 @@ class ApiService {
         if (response?.status === 401) {
           // If we're already trying to refresh, don't try again
           if (config._retry) {
+            tokenManager.clearCache();
             this.redirectToLogin();
             return Promise.reject(error);
           }
 
           // Try to refresh token
           try {
-            const token = await authService.refreshToken();
+            const token = await tokenManager.getValidToken(true); // Force refresh
             if (token) {
               // Update auth header and retry the request
               config.headers.Authorization = `Bearer ${token}`;
@@ -170,6 +176,7 @@ class ApiService {
             }
           } catch (refreshError) {
             console.error('Token refresh failed:', refreshError);
+            tokenManager.clearCache();
             this.redirectToLogin();
           }
         }

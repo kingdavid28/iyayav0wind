@@ -1,36 +1,23 @@
-// Explicit imports so symbols exist in module scope
-import CaregiverCard from './CaregiverCard';
-import ChildModal from '../modals/ChildModal';
-import JobApplications from './JobApplications';
-import JobCard from './JobCard';
-import JobPostingModal from '../modals/JobPostingModal';
-import NannyCard from './NannyCard';
-import ProfileModal from '../modals/ProfileModal';
-import ProfileManagement from './ProfileManagement';
-import QuickAction from './QuickAction';
+// Component exports
+export { default as BookingItem } from './BookingItem';
+export { default as BookingsTab } from './BookingsTab';
+export { default as CaregiverCard } from './CaregiverCard';
+export { default as Header } from './Header';
+export { default as HomeTab } from './HomeTab';
+export { default as JobApplications } from './JobApplications';
+export { default as JobCard } from './JobCard';
+export { default as JobsTab } from './JobsTab';
+export { default as MessagesTab } from './MessagesTab';
+export { default as MobileProfileSection } from './MobileProfileSection';
+export { default as NavigationTabs } from './NavigationTabs';
+export { default as QuickAction } from './QuickAction';
+export { default as QuickActions } from './QuickActions';
+export { default as SearchTab } from './SearchTab';
 
-// Named exports
-export {
-  CaregiverCard,
-  ChildModal,
-  JobApplications,
-  JobCard,
-  JobPostingModal,
-  NannyCard,
-  ProfileModal,
-  ProfileManagement,
-  QuickAction,
-};
-
-// Default export for convenience
-export default {
-  CaregiverCard,
-  ChildModal,
-  JobApplications,
-  JobCard,
-  JobPostingModal,
-  NannyCard,
-  ProfileModal,
-  ProfileManagement,
-  QuickAction,
-};
+// Modal exports
+export { default as BookingModal } from '../modals/BookingModal';
+export { default as ChildModal } from '../modals/ChildModal';
+export { default as FilterModal } from '../modals/FilterModal';
+export { default as JobPostingModal } from '../modals/JobPostingModal';
+export { default as PaymentModal } from '../modals/PaymentModal';
+export { default as ProfileModal } from '../modals/ProfileModal';

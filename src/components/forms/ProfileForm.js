@@ -16,7 +16,7 @@ import {
   ActivityIndicator 
 } from 'react-native-paper';
 import { validator } from '../../utils/validation';
-import ValidatedInput from './ValidatedInput';
+import ValidatedInput from '../ui/inputs/ValidatedInput';
 import DocumentUpload from './DocumentUpload';
 import { Rating } from 'react-native-ratings';
 import { searchLocation, formatLocation } from '../../utils/locationUtils';

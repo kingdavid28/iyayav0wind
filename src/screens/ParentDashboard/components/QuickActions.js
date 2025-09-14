@@ -1,21 +1,32 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View } from 'react-native';
 import { Plus, Calendar, MessageCircle, Search } from 'lucide-react-native';
-import { styles, colors } from '../../styles/ParentDashboard.styles';
+import QuickAction from './QuickAction';
+import { colors } from '../../styles/ParentDashboard.styles';
 
 const QuickActions = ({ actions }) => {
   const styleFor = (id) => {
     switch (id) {
       case 'find':
-        return { bg: '#FFF1F7', border: '#FBCFE8', icon: '#EC4899' };
+        return { color: '#EC4899', bgColor: '#FFF1F7' };
       case 'book':
-        return { bg: '#EFF6FF', border: '#BFDBFE', icon: '#3B82F6' };
+        return { color: '#3B82F6', bgColor: '#EFF6FF' };
       case 'messages':
-        return { bg: '#F5F3FF', border: '#DDD6FE', icon: '#8B5CF6' };
+        return { color: '#8B5CF6', bgColor: '#F5F3FF' };
       case 'add-child':
-        return { bg: '#ECFDF5', border: '#BBF7D0', icon: '#10B981' };
+        return { color: '#10B981', bgColor: '#ECFDF5' };
       default:
-        return { bg: colors.surface, border: colors.border, icon: colors.primary };
+        return { color: colors.primary, bgColor: colors.surface };
+    }
+  };
+
+  const renderIcon = (iconName) => {
+    switch (iconName) {
+      case 'plus': return Plus;
+      case 'calendar': return Calendar;
+      case 'message-circle': return MessageCircle;
+      case 'search': return Search;
+      default: return Plus;
     }
   };
 
@@ -24,45 +35,26 @@ const QuickActions = ({ actions }) => {
     rows.push(actions.slice(i, i + 2));
   }
 
-  const renderIcon = (iconName, color) => {
-    switch (iconName) {
-      case 'plus':
-        return <Plus size={28} color={color} />;
-      case 'calendar':
-        return <Calendar size={28} color={color} />;
-      case 'message-circle':
-        return <MessageCircle size={28} color={color} />;
-      case 'search':
-        return <Search size={28} color={color} />;
-      default:
-        return null;
-    }
-  };
-
   return (
     <View style={{ paddingTop: 4 }}>
       {rows.map((row, idx) => (
         <View key={`qa-row-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
           {row.map((action) => {
-            const s = styleFor(action.id);
+            const style = styleFor(action.id);
+            const IconComponent = renderIcon(action.icon);
             return (
-              <TouchableOpacity
+              <QuickAction
                 key={action.id}
-                style={[
-                  styles.quickAction,
-                  { borderColor: s.border, backgroundColor: s.bg, borderWidth: 1, borderRadius: 16, paddingVertical: 20 },
-                ]}
+                icon={IconComponent}
+                label={action.title}
+                color={style.color}
+                bgColor={style.bgColor}
                 onPress={action.onPress}
-                activeOpacity={0.85}
-              >
-                {renderIcon(action.icon, s.icon)}
-                <Text style={[styles.quickActionText, { color: '#111827' }]}>{action.title}</Text>
-              </TouchableOpacity>
+                testID={`quick-action-${action.id}`}
+              />
             );
           })}
-          {row.length === 1 && (
-            <View style={[styles.quickAction, { opacity: 0 }]} />
-          )}
+          {row.length === 1 && <View style={{ flex: 1 }} />}
         </View>
       ))}
     </View>

@@ -416,7 +416,9 @@
 <a name='L351'></a><a href='#L351'>351</a>
 <a name='L352'></a><a href='#L352'>352</a>
 <a name='L353'></a><a href='#L353'>353</a>
-<a name='L354'></a><a href='#L354'>354</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -582,6 +584,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -770,7 +774,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { apiService } from "./apiService"
-import { api, authAPI, nanniesAPI } from "../config/api"
+import { api, authAPI, caregiversAPI } from "../config/api"
 import { logger } from "../utils/logger"
 import { validator } from "../utils/validation"
 import { API_CONFIG, VALIDATION } from "../config/constants"
@@ -935,16 +939,18 @@ class UserService {
       })
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      logger.info(`Updating profile for user: ${userId}`)</span>
-      const updated = <span class="cstat-no" title="statement not covered" >await api.put(`/users/${userId}`, updates)</span>
+      
+      // Use authAPI.updateProfile instead of direct API call
+      const updated = <span class="cstat-no" title="statement not covered" >await authAPI.updateProfile(updates)</span>
       
       // Update cache
 <span class="cstat-no" title="statement not covered" >      try {</span>
-<span class="cstat-no" title="statement not covered" >        await apiService.setCachedData(`profile:${userId}`, updated.data)</span>
+<span class="cstat-no" title="statement not covered" >        await apiService.setCachedData(`profile:${userId}`, updated)</span>
       } catch (cacheError) {
 <span class="cstat-no" title="statement not covered" >        logger.warn('Failed to update profile cache', cacheError)</span>
       }
       
-<span class="cstat-no" title="statement not covered" >      return updated.data</span>
+<span class="cstat-no" title="statement not covered" >      return updated</span>
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      logger.error("Failed to update user profile:", error)</span>
 <span class="cstat-no" title="statement not covered" >      throw error</span>
@@ -1092,14 +1098,14 @@ class UserService {
 <span class="fstat-no" title="function not covered" >  as</span>ync searchNannies(filters = <span class="branch-0 cbranch-no" title="branch not covered" >{},</span> page = <span class="branch-0 cbranch-no" title="branch not covered" >1,</span> limit = <span class="branch-0 cbranch-no" title="branch not covered" >10)</span> {
 <span class="cstat-no" title="statement not covered" >    try {</span>
       // Create cache key based on filters
-      const cacheKey = <span class="cstat-no" title="statement not covered" >`nannies:${JSON.stringify(filters)}:${page}:${limit}`</span>
+      const cacheKey = <span class="cstat-no" title="statement not covered" >`caregivers:${JSON.stringify(filters)}:${page}:${limit}`</span>
       const cached = <span class="cstat-no" title="statement not covered" >await apiService.getCachedData(cacheKey)</span>
       
 <span class="cstat-no" title="statement not covered" >      if (cached) {</span>
 <span class="cstat-no" title="statement not covered" >        return cached</span>
       }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >      logger.info('Searching nannies with filters:', filters)</span>
+<span class="cstat-no" title="statement not covered" >      logger.info('Searching caregivers with filters:', filters)</span>
       
       // Build query string from filters
       const queryParams = <span class="cstat-no" title="statement not covered" >new URLSearchParams({</span>
@@ -1108,14 +1114,14 @@ class UserService {
         ...filters
       })
 &nbsp;
-      const result = <span class="cstat-no" title="statement not covered" >await apiService.get(`/nannies?${queryParams}`)</span>
+      const result = <span class="cstat-no" title="statement not covered" >await apiService.get(`/caregivers?${queryParams}`)</span>
       
       // Cache the result
 <span class="cstat-no" title="statement not covered" >      await apiService.setCachedData(cacheKey, result)</span>
       
 <span class="cstat-no" title="statement not covered" >      return result</span>
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >      logger.error("Failed to search nannies:", error)</span>
+<span class="cstat-no" title="statement not covered" >      logger.error("Failed to search caregivers:", error)</span>
 <span class="cstat-no" title="statement not covered" >      throw error</span>
     }
   }
@@ -1129,7 +1135,7 @@ export const userService = <span class="cstat-no" title="statement not covered" 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T00:29:37.203Z
+                at 2025-09-12T16:00:36.461Z
             </div>
         <script src="../prettify.js"></script>
         <script>

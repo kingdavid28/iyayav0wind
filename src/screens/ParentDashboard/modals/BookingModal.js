@@ -13,7 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { ModalWrapper } from '../../../shared/ui';
-import KeyboardAvoidingWrapper from '../../../components/KeyboardAvoidingWrapper';
+import KeyboardAvoidingWrapper from '../../../shared/ui/layout/KeyboardAvoidingWrapper';
 import { 
   X, 
   Calendar, 
@@ -31,8 +31,8 @@ import {
   CheckCircle, 
   User 
 } from 'lucide-react-native';
-import CustomDateTimePicker from '../../../components/DateTimePicker';
-import TimePicker from '../../../components/TimePicker';
+import CustomDateTimePicker from '../../../shared/ui/inputs/DateTimePicker';
+import TimePicker from '../../../shared/ui/inputs/TimePicker';
 import { formatAddress } from '../../../utils/addressUtils';
 
 const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visible }) => {
@@ -134,7 +134,7 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
       startTime: startTime24,
       endTime: endTime24,
       caregiver: caregiver.name,
-      caregiverId: caregiver.userId || caregiver._id || caregiver.id,
+      caregiverId: caregiver._id || caregiver.id || caregiver.userId,
       hourlyRate: resolveHourlyRate(),
       totalCost: calculateTotalCost(),
       time: `${bookingData.startTime} - ${bookingData.endTime}`,
@@ -809,8 +809,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     marginTop: 10,
-    width: 300,
-    maxHeight: '100%',
+    width: '95%',
+    maxWidth: 500,
+    alignSelf: 'center',
+    maxHeight: '95%',
   },
   modalHeader: {
     flexDirection: 'row',

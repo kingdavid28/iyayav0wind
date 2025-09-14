@@ -1,35 +1,35 @@
 import React from 'react';
-import { View, Modal, TouchableOpacity } from 'react-native';
-import { modalOverlay, modalContainer } from '../styles/common';
+import { Modal, View, TouchableOpacity, StyleSheet } from 'react-native';
 
-export default function ModalWrapper({ 
-  visible, 
-  onClose, 
-  children, 
-  animationType = 'fade',
-  transparent = true,
-  style = {}
-}) {
-  return (
-    <Modal
-      visible={visible}
-      animationType={animationType}
-      transparent={transparent}
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity 
-        style={modalOverlay} 
-        activeOpacity={1} 
-        onPress={onClose}
-      >
-        <TouchableOpacity 
-          style={[modalContainer, style]} 
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {children}
-        </TouchableOpacity>
+const ModalWrapper = ({ visible, onClose, children, animationType = 'slide', style }) => (
+  <Modal
+    visible={visible}
+    animationType={animationType}
+    transparent
+    onRequestClose={onClose}
+  >
+    <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity style={[styles.content, style]} activeOpacity={1}>
+        {children}
       </TouchableOpacity>
-    </Modal>
-  );
-}
+    </TouchableOpacity>
+  </Modal>
+);
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+});
+
+export default ModalWrapper;

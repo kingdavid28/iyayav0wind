@@ -1,18 +1,28 @@
 import React from 'react';
-import { View, Text, Platform } from 'react-native';
-import ProfileImage from '../../../components/ProfileImage';
+import { View, Text, Platform, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import ProfileImage from '../../../components/ui/feedback/ProfileImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCurrentSocketURL } from '../../../config/api';
 import { useAuth } from '../../../core/contexts/AuthContext';
 import { calculateAge } from '../../../utils/dateUtils';
 import { __DEV__ } from '../../../config/constants';
+import { useNavigation } from '@react-navigation/native';
 
 const CaregiverProfileSection = ({ profile, activeTab }) => {
   const { user } = useAuth();
+  const navigation = useNavigation();
   
   const userAge = user?.birthDate ? calculateAge(user.birthDate) : null;
   const caregiverName = profile?.name || user?.name;
   const displayName = caregiverName;
+
+  const handleEditProfile = () => {
+    navigation.navigate('EnhancedCaregiverProfileWizard', { 
+      isEdit: true, 
+      existingProfile: profile 
+    });
+  };
 
 
 
@@ -30,22 +40,21 @@ const CaregiverProfileSection = ({ profile, activeTab }) => {
         style={styles.profileCard}
       >
         <View style={styles.profileContent}>
-          <ProfileImage 
-            imageUrl={profile?.imageUrl || profile?.profileImage || profile?.image || profile?.photoUrl}
-            size={80}
-            style={styles.profileImageContainer}
-          />
-          
-          <View style={styles.profileInfo}>
+          <TouchableOpacity 
+            style={styles.editButton}
+            onPress={handleEditProfile}
+          >
+            <Ionicons name="pencil" size={16} color="#3b82f6" />
+          </TouchableOpacity>
+          <View style={styles.leftSection}>
+            <ProfileImage 
+              imageUrl={profile?.imageUrl || profile?.profileImage || profile?.image || profile?.photoUrl}
+              size={80}
+              style={styles.profileImageContainer}
+            />
             <Text style={styles.welcomeText}>
               {displayName ? `Welcome back, ${displayName}! 👋` : 'Welcome back! 👋'}
             </Text>
-            {/* Debug info - remove in production */}
-            {__DEV__ && (
-              <Text style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
-                Debug: {profile?.imageUrl ? 'Has image URL' : 'No image URL'}
-              </Text>
-            )}
             <View style={styles.profileDetails}>
               {userAge ? (
                 <Text style={styles.profileDetailText}>🎂 {userAge} years old</Text>
@@ -59,7 +68,11 @@ const CaregiverProfileSection = ({ profile, activeTab }) => {
                 <Text style={styles.profileDetailText}>💰 ₱{profile.hourlyRate}/hr</Text>
               ) : null}
               {profile?.experience ? (
-                <Text style={styles.profileDetailText}>⭐ {profile.experience}</Text>
+                <Text style={styles.profileDetailText}>
+                  ⭐ {typeof profile.experience === 'object' 
+                    ? `${profile.experience.years || 0} years experience` 
+                    : profile.experience}
+                </Text>
               ) : null}
             </View>
           </View>
@@ -89,10 +102,29 @@ const styles = {
   },
   profileContent: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    position: 'relative',
+  },
+  editButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 1,
+  },
+  leftSection: {
     alignItems: 'center',
+    flex: 1,
   },
   profileImageContainer: {
-    marginRight: 16,
+    marginBottom: 12,
   },
   profileImage: {
     width: 80,
@@ -115,14 +147,16 @@ const styles = {
     flex: 1,
   },
   welcomeText: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 8,
-    lineHeight: 28,
+    marginBottom: 12,
+    lineHeight: 24,
+    textAlign: 'center',
   },
   profileDetails: {
     gap: 4,
+    alignItems: 'center',
   },
   profileDetailText: {
     fontSize: 14,

@@ -5,6 +5,7 @@ import { authAPI } from "../../config/api";
 import { STORAGE_KEYS } from "../../config/constants";
 import { firebaseAuthService } from "../../services/firebaseAuthService";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
 
 export const AuthContext = createContext();
 
@@ -27,11 +28,11 @@ export const AuthProvider = ({ children }) => {
       const currentUser = firebaseAuthService.getCurrentUser();
       if (currentUser && currentUser.emailVerified) {
         const token = await currentUser.getIdToken();
-        await AsyncStorage.setItem('@auth_token', token);
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
         
         // Get user profile from MongoDB
         try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {
+          const response = await fetch(`${API_URL}/api/auth/firebase-profile`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -87,11 +88,11 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = firebaseAuthService.onAuthStateChanged(async (user) => {
       if (user && user.emailVerified) {
         const token = await user.getIdToken();
-        await AsyncStorage.setItem('@auth_token', token);
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
         
         // Get user profile from MongoDB
         try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {
+          const response = await fetch(`${API_URL}/api/auth/firebase-profile`, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -133,7 +134,7 @@ export const AuthProvider = ({ children }) => {
         }
       } else {
         setUser(null);
-        await AsyncStorage.removeItem('@auth_token');
+        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
       }
       setIsLoading(false);
     });
@@ -152,7 +153,7 @@ export const AuthProvider = ({ children }) => {
       console.log('✅ Firebase login successful:', res);
       
       if (res?.token) {
-        await AsyncStorage.setItem('@auth_token', res.token);
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
         console.log('💾 Token stored successfully');
       }
       
@@ -196,7 +197,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
       
       await firebaseAuthService.signOut();
-      await AsyncStorage.removeItem('@auth_token');
+      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
       
       setUser(null);
       setError(null);
@@ -220,7 +221,7 @@ export const AuthProvider = ({ children }) => {
       
       if (result.success && result.token) {
         // Store the new token
-        await AsyncStorage.setItem('@auth_token', result.token);
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);
         console.log('💾 Token stored successfully');
         
         // Use user data from verification response if available

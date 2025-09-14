@@ -32,4 +32,28 @@ const testChildCreate = async () => {
     console.log('📡 Response body:', responseText);
     
     if (response.status === 401) {
-      console.log('✅ Child creation endpoint exists (401 = needs valid auth)');\n      return true;\n    } else if (response.status === 404) {\n      console.log('❌ Child creation endpoint not found (404)');\n      return false;\n    } else {\n      console.log('⚠️ Unexpected response:', response.status);\n      return false;\n    }\n  } catch (error) {\n    console.log('❌ Child creation API test failed:', error.message);\n    \n    if (error.message.includes('Network request failed')) {\n      console.log('💡 This is the same error you\'re seeing in the app!');\n      console.log('💡 Possible causes:');\n      console.log('   - Backend not running on port 5000');\n      console.log('   - Network connectivity issue');\n      console.log('   - CORS configuration problem');\n    }\n    \n    return false;\n  }\n};\n\ntestChildCreate();
+      console.log('✅ Child creation endpoint exists (401 = needs valid auth)');
+      return true;
+    } else if (response.status === 404) {
+      console.log('❌ Child creation endpoint not found (404)');
+      return false;
+    } else {
+      console.log('⚠️ Unexpected response:', response.status);
+      return false;
+    }
+  } catch (error) {
+    console.log('❌ Child creation API test failed:', error.message);
+    
+    if (error.message.includes('Network request failed')) {
+      console.log('💡 This is the same error you are seeing in the app!');
+      console.log('💡 Possible causes:');
+      console.log('   - Backend not running on port 5000');
+      console.log('   - Network connectivity issue');
+      console.log('   - CORS configuration problem');
+    }
+    
+    return false;
+  }
+};
+
+testChildCreate();

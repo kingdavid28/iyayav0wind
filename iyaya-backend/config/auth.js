@@ -1,3 +1,10 @@
+// Debug JWT configuration
+console.log('🔧 Auth config loading JWT_SECRET:', !!process.env.JWT_SECRET);
+if (process.env.JWT_SECRET) {
+  console.log('🔧 JWT_SECRET length:', process.env.JWT_SECRET.length);
+  console.log('🔧 JWT_SECRET preview:', process.env.JWT_SECRET.substring(0, 10) + '...');
+}
+
 module.exports = {
   jwtSecret: process.env.JWT_SECRET,
   refreshTokenSecret: process.env.JWT_REFRESH_SECRET,

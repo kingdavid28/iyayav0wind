@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import CustomDateTimePicker from '../components/DateTimePicker';
+import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import profileService from '../services/profileService';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../core/contexts/AuthContext';

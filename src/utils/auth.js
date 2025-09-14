@@ -23,25 +23,35 @@ const isValidJWT = (token) => {
 
 export const getAuthToken = async () => {
   try {
-    const { STORAGE_KEYS } = await import('../config/constants');
+    // First try to get Firebase token
+    const { firebaseAuthService } = await import('../services/firebaseAuthService');
+    const currentUser = firebaseAuthService.getCurrentUser();
     
+    if (currentUser) {
+      console.log('🔄 Getting Firebase token for API calls');
+      const token = await currentUser.getIdToken();
+      if (token) {
+        console.log('✅ Firebase token obtained');
+        // Store the fresh token
+        const { STORAGE_KEYS } = await import('../config/constants');
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+        return token;
+      }
+    }
+    
+    // Fallback to stored tokens
+    const { STORAGE_KEYS } = await import('../config/constants');
     const tokenKeys = [STORAGE_KEYS.AUTH_TOKEN, 'authToken', 'token', 'userToken', 'accessToken', 'jwt'];
     
     for (const key of tokenKeys) {
       const token = await AsyncStorage.getItem(key);
       if (token) {
-        // Validate token format before returning
-        if (isValidJWT(token)) {
-          console.log(`Found valid token with key: ${key}`);
-          return token;
-        } else {
-          console.warn(`Invalid JWT format found with key: ${key}, removing...`);
-          await AsyncStorage.removeItem(key);
-        }
+        console.log(`Found stored token with key: ${key}`);
+        return token;
       }
     }
     
-    console.warn('No valid auth token found in AsyncStorage');
+    console.warn('No valid auth token found');
     return null;
   } catch (error) {
     console.error('Error getting auth token:', error);

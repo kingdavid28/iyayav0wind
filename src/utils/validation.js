@@ -1,4 +1,5 @@
 import { VALIDATION } from './constants';
+import { validateCaregiverProfile } from './caregiverValidation';
 
 /**
  * Comprehensive validation utility functions
@@ -317,3 +318,6 @@ export class Validator {
 }
 
 export const validator = new Validator();
+
+// Export caregiver validation
+export { validateCaregiverProfile };

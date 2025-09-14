@@ -8,9 +8,9 @@ import * as SplashScreen from 'expo-splash-screen';
 // Core imports
 import AppProvider from '../core/providers/AppProvider';
 import AppIntegration from './AppIntegration';
-import PrivacyProvider from '../components/Privacy/PrivacyManager';
-import ProfileDataProvider from '../components/Privacy/ProfileDataManager';
-import { ErrorBoundary, LoadingSpinner } from '../shared';
+import PrivacyProvider from '../components/features/privacy/PrivacyManager';
+import ProfileDataProvider from '../components/features/privacy/ProfileDataManager';
+import { ErrorBoundary, LoadingSpinner } from '../shared/ui';
 
 // Navigation
 import AppNavigator from './navigation/AppNavigator';

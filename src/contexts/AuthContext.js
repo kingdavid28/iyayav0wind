@@ -88,6 +88,7 @@ export const AuthProvider = ({ children }) => {
       if (user && user.emailVerified) {
         const token = await user.getIdToken();
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+        console.log('💾 Token stored in auth listener:', !!token);
         
         // Get user profile from MongoDB
         try {
@@ -153,7 +154,9 @@ export const AuthProvider = ({ children }) => {
       
       if (res?.token) {
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
-        console.log('💾 Token stored successfully');
+        console.log('💾 Token stored successfully:', !!res.token);
+      } else {
+        console.log('⚠️ No token in login response');
       }
       
       setUser(res.user);

@@ -628,59 +628,120 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
   },
   bookingCard: {
-    marginBottom: 12,
-    borderRadius: 12,
-    ...shadows.sm,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    ...shadows.md,
+  },
+  bookingContent: {
+    padding: 20,
   },
   bookingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  bookingTitleSection: {
+    flex: 1,
+    marginRight: 12,
   },
   bookingFamily: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#111827',
+    marginBottom: 4,
+    lineHeight: 22,
   },
-  bookingStatus: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  bookingStatusText: {
-    fontSize: 12,
+  bookingDate: {
+    fontSize: 14,
+    color: '#6B7280',
     fontWeight: '500',
   },
   bookingDetails: {
-    marginBottom: 12,
+    marginBottom: 20,
   },
   bookingDetailRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  bookingDetailItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    flex: 1,
   },
   bookingDetailText: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#4B5563',
     marginLeft: 8,
+    fontWeight: '500',
   },
-  bookingDetailIcon: {
-    marginLeft: 16,
-    marginRight: 4,
+  bookingLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  bookingLocationText: {
+    fontSize: 14,
+    color: '#2563EB',
+    fontWeight: '500',
+    flex: 1,
+  },
+  locationIcon: {
+    marginLeft: 6,
   },
   bookingActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: 12,
+    justifyContent: 'space-between',
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
+    gap: 12,
   },
-  bookingButton: {
-    minWidth: 100,
+  bookingSecondaryButton: {
+    flex: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    minHeight: 44,
   },
-  bookingButtonText: {
-    fontSize: 13,
-    fontWeight: '500',
+  bookingSecondaryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  bookingPrimaryButton: {
+    flex: 1,
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    minHeight: 44,
+  },
+  bookingPrimaryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  bookingConfirmButton: {
+    flex: 1,
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    minHeight: 44,
+  },
+  bookingConfirmButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   profileSection: {
     marginBottom: 16,
@@ -700,6 +761,11 @@ export const styles = StyleSheet.create({
   },
   profileSectionContent: {
     padding: 16,
+  },
+  profileSectionText: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
   },
   // Settings components styles
   settingsContainer: {
@@ -1018,5 +1084,158 @@ export const styles = StyleSheet.create({
   submitButton: {
     flex: 1,
     backgroundColor: '#2563EB',
+  },
+  // Edit Profile Modal Styles
+  editProfileModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    margin: 20,
+    maxWidth: 400,
+    width: '90%',
+    alignSelf: 'center',
+    ...shadows.lg,
+  },
+  editProfileTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  editProfileInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  editProfileSaveButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  editProfileSaveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Profile Card Styles
+  profileCard: {
+    marginBottom: 24,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    ...shadows.md,
+  },
+  profileImagePlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  profileStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  profileRate: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
+    marginRight: 16,
+  },
+  profileExperience: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  profileBio: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+  },
+  skillsPreview: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  skillsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  skillChip: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  skillChipText: {
+    color: '#2563EB',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  moreSkillsText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    alignSelf: 'center',
+  },
+  ageCarePreview: {
+    marginTop: 12,
+  },
+  ageCareTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  ageCareText: {
+    fontSize: 14,
+    color: '#4B5563',
+  },
+  editProfileSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  profileLocation: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  certificationsPreview: {
+    marginTop: 12,
+  },
+  certificationsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  certificationsContainer: {
+    marginBottom: 8,
+  },
+  certificationText: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 4,
+  },
+  moreCertificationsText: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
 });

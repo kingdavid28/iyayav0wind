@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Calendar, Clock, Baby, MapPin } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, Image, Alert } from 'react-native';
+import { Calendar, Clock, Baby, MapPin, Star, MessageCircle, Phone, CreditCard, Eye, X } from 'lucide-react-native';
 import { StatusBadge } from '../../../shared/ui';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import { formatDateFriendly, formatTimeRange } from '../../../utils/dateUtils';
-import { getCaregiverDisplayName, normalizeStatus } from '../../../utils/caregiverUtils';
+import { getCaregiverDisplayName, normalizeStatus, getStatusColor } from '../../../utils/caregiverUtils';
+import { BOOKING_STATUSES, STATUS_LABELS } from '../../../constants/bookingStatuses';
+import { getPaymentActions, calculateDeposit, calculateRemainingPayment } from '../../../utils/paymentUtils';
 import { formatAddress } from '../../../utils/addressUtils';
 
 const BookingItem = ({ 
@@ -12,26 +14,201 @@ const BookingItem = ({
   onCancelBooking, 
   onUploadPayment, 
   onViewBookingDetails, 
-  onWriteReview 
+  onWriteReview,
+  onMessageCaregiver,
+  onCallCaregiver 
 }) => {
+  const handleCancelBooking = () => {
+    Alert.alert(
+      'Cancel Booking',
+      'Are you sure you want to cancel this booking?',
+      [
+        { text: 'No', style: 'cancel' },
+        { 
+          text: 'Yes, Cancel', 
+          style: 'destructive',
+          onPress: () => onCancelBooking(item._id || item.id)
+        }
+      ]
+    );
+  };
 
+  const getChildrenDisplay = () => {
+    if (Array.isArray(item.children)) {
+      return item.children.map(child => {
+        if (typeof child === 'object' && child.name) {
+          return `${child.name} (${child.age}y)`;
+        }
+        return child;
+      }).join(', ');
+    }
+    if (typeof item.children === 'number') {
+      return `${item.children} children`;
+    }
+    return 'No children specified';
+  };
+
+  const getPaymentAmount = (paymentType) => {
+    const totalCost = item.totalCost || item.amount || 0;
+    if (paymentType === 'deposit') {
+      return calculateDeposit(totalCost);
+    }
+    if (paymentType === 'final_payment') {
+      return calculateRemainingPayment(totalCost);
+    }
+    return totalCost;
+  };
+
+  const renderStatusBadge = () => {
+    const status = normalizeStatus(item.status);
+    const statusColor = getStatusColor(status);
+    
+    return (
+      <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+        <Text style={styles.statusBadgeText}>
+          {STATUS_LABELS[status] || status}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderActionButtons = () => {
+    const status = normalizeStatus(item.status);
+    
+    switch (status) {
+      case BOOKING_STATUSES.PENDING:
+        return (
+          <View style={styles.bookingActionsRow}>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.payButton]}
+              onPress={() => onUploadPayment(item._id || item.id, 'deposit')}
+            >
+              <CreditCard size={16} color="#FFFFFF" />
+              <Text style={styles.payButtonText}>
+                Pay Deposit (₱{getPaymentAmount('deposit').toFixed(0)})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.cancelButton]}
+              onPress={handleCancelBooking}
+            >
+              <X size={16} color="#EF4444" />
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        );
+        
+      case BOOKING_STATUSES.CONFIRMED:
+        return (
+          <View style={styles.bookingActionsRow}>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.viewButton]}
+              onPress={() => onViewBookingDetails(item._id || item.id)}
+            >
+              <Eye size={16} color="#3B82F6" />
+              <Text style={styles.viewButtonText}>View Details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.messageButton]}
+              onPress={() => onMessageCaregiver && onMessageCaregiver(item.caregiver)}
+            >
+              <MessageCircle size={16} color="#10B981" />
+              <Text style={styles.messageButtonText}>Message</Text>
+            </TouchableOpacity>
+          </View>
+        );
+        
+      case BOOKING_STATUSES.IN_PROGRESS:
+        return (
+          <View style={styles.bookingActionsRow}>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.callButton]}
+              onPress={() => onCallCaregiver && onCallCaregiver(item.caregiver)}
+            >
+              <Phone size={16} color="#FFFFFF" />
+              <Text style={styles.callButtonText}>Call Caregiver</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.messageButton]}
+              onPress={() => onMessageCaregiver && onMessageCaregiver(item.caregiver)}
+            >
+              <MessageCircle size={16} color="#10B981" />
+              <Text style={styles.messageButtonText}>Message</Text>
+            </TouchableOpacity>
+          </View>
+        );
+        
+      case BOOKING_STATUSES.COMPLETED:
+        return (
+          <View style={styles.bookingActionsRow}>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.payButton]}
+              onPress={() => onUploadPayment(item._id || item.id, 'final_payment')}
+            >
+              <CreditCard size={16} color="#FFFFFF" />
+              <Text style={styles.payButtonText}>
+                Final Payment (₱{getPaymentAmount('final_payment').toFixed(0)})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.reviewButton]}
+              onPress={() => onWriteReview(item._id || item.id, item.caregiverId)}
+            >
+              <Star size={16} color="#F59E0B" />
+              <Text style={styles.reviewButtonText}>Rate & Review</Text>
+            </TouchableOpacity>
+          </View>
+        );
+        
+      case BOOKING_STATUSES.PAID:
+        return (
+          <View style={styles.bookingActionsRow}>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.reviewButton]}
+              onPress={() => onWriteReview(item._id || item.id, item.caregiverId)}
+            >
+              <Star size={16} color="#F59E0B" />
+              <Text style={styles.reviewButtonText}>Write Review</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bookingActionButton, styles.viewButton]}
+              onPress={() => onViewBookingDetails(item._id || item.id)}
+            >
+              <Eye size={16} color="#3B82F6" />
+              <Text style={styles.viewButtonText}>View Receipt</Text>
+            </TouchableOpacity>
+          </View>
+        );
+        
+      default:
+        return null;
+    }
+  };
 
   return (
     <View style={styles.bookingItemCard}>
       <View style={styles.bookingItemHeader}>
         <View style={styles.bookingCaregiverInfo}>
           <Image
-            source={{ uri: item.caregiverAvatar || 'https://via.placeholder.com/40' }}
+            source={{ 
+              uri: item.caregiverAvatar || 
+                   item.caregiver?.avatar || 
+                   item.caregiver?.profileImage || 
+                   'https://via.placeholder.com/50x50/E5E7EB/6B7280?text=CG'
+            }}
             style={styles.bookingAvatar}
           />
           <View style={styles.bookingCaregiverDetails}>
             <Text style={styles.bookingCaregiverName}>
               {getCaregiverDisplayName(item.caregiver)}
             </Text>
-            <StatusBadge status={normalizeStatus(item.status)} />
+            {renderStatusBadge()}
           </View>
         </View>
-        <Text style={styles.bookingCost}>₱{item.totalCost}</Text>
+        <View style={styles.bookingCostContainer}>
+          <Text style={styles.bookingCost}>₱{(item.totalCost || item.amount || 0).toFixed(0)}</Text>
+          <Text style={styles.bookingCostLabel}>Total</Text>
+        </View>
       </View>
       
       <View style={styles.bookingDetails}>
@@ -50,52 +227,21 @@ const BookingItem = ({
         <View style={styles.bookingDetailRow}>
           <Baby size={16} color={colors.textSecondary} />
           <Text style={styles.bookingDetailText}>
-            {item.children?.join(', ') || 'No children specified'}
+            {getChildrenDisplay()}
           </Text>
         </View>
-        {item.address && (
+        {(item.address || item.location) && (
           <View style={styles.bookingDetailRow}>
             <MapPin size={16} color={colors.textSecondary} />
             <Text style={styles.bookingDetailText} numberOfLines={1}>
-              {formatAddress(item.address)}
+              {formatAddress(item.address || item.location)}
             </Text>
           </View>
         )}
       </View>
 
       <View style={styles.bookingActions}>
-        {item.status === 'pending' && (
-          <>
-            <TouchableOpacity
-              style={[styles.bookingActionButton, styles.payButton]}
-              onPress={() => onUploadPayment(item.id)}
-            >
-              <Text style={styles.payButtonText}>Upload Payment</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.bookingActionButton, styles.cancelButton]}
-              onPress={() => onCancelBooking(item.id)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </>
-        )}
-        {item.status === 'confirmed' && (
-          <TouchableOpacity
-            style={[styles.bookingActionButton, styles.viewButton]}
-            onPress={() => onViewBookingDetails(item.id)}
-          >
-            <Text style={styles.viewButtonText}>View Details</Text>
-          </TouchableOpacity>
-        )}
-        {item.status === 'completed' && (
-          <TouchableOpacity
-            style={[styles.bookingActionButton, styles.reviewButton]}
-            onPress={() => onWriteReview(item.id, item.caregiverId)}
-          >
-            <Text style={styles.reviewButtonText}>Write Review</Text>
-          </TouchableOpacity>
-        )}
+        {renderActionButtons()}
       </View>
     </View>
   );

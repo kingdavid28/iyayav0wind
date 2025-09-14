@@ -132,14 +132,26 @@ exports.updateProfile = async (req, res, next) => {
         return res.status(400).json({ success: false, error: 'Invalid children data' });
       }
     }
-    if (address && typeof address === 'object') {
-      update.address = {
-        ...(address.street && { street: address.street }),
-        ...(address.city && { city: address.city }),
-        ...(address.province && { province: address.province }),
-        ...(address.postalCode && { postalCode: address.postalCode }),
-        ...(address.country && { country: address.country })
-      };
+    // Handle both string and object address formats
+    if (address) {
+      if (typeof address === 'string') {
+        // If address is a string, store it in the street field
+        update.address = { street: address };
+      } else if (typeof address === 'object') {
+        update.address = {
+          ...(address.street && { street: address.street }),
+          ...(address.city && { city: address.city }),
+          ...(address.province && { province: address.province }),
+          ...(address.postalCode && { postalCode: address.postalCode }),
+          ...(address.country && { country: address.country })
+        };
+      }
+    }
+    
+    // Also handle location field for compatibility
+    if (req.body.location && typeof req.body.location === 'string') {
+      if (!update.address) update.address = {};
+      update.address.street = req.body.location;
     }
 
     if (Object.keys(update).length === 0) {
@@ -1138,6 +1150,7 @@ exports.getFirebaseProfile = async (req, res, next) => {
             userType: user.userType || 'parent',
             profileImage: user.profileImage,
             address: user.address,
+            location: user.address?.street || user.address,
             children: user.children || [],
             emailVerified: user.verification?.emailVerified || false
           };

@@ -4,12 +4,31 @@ const User = require('../models/User');
 // Get user's bookings
 exports.getMyBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({
+    console.log(`getMyBookings called for user: ${req.user.id}, role: ${req.user.role}`);
+    
+    const Caregiver = require('../models/Caregiver');
+    let caregiverProfileId = null;
+    
+    if (req.user.role === 'caregiver') {
+      const caregiverProfile = await Caregiver.findOne({ userId: req.user.id });
+      caregiverProfileId = caregiverProfile ? caregiverProfile._id : null;
+      console.log(`Caregiver ${req.user.id} has profile ID: ${caregiverProfileId}`);
+    }
+    
+    const searchCriteria = {
       $or: [
         { clientId: req.user.id },
         { caregiverId: req.user.id }
       ]
-    })
+    };
+    
+    if (caregiverProfileId) {
+      searchCriteria.$or.push({ caregiverId: caregiverProfileId });
+    }
+    
+    console.log(`Search criteria:`, JSON.stringify(searchCriteria));
+    
+    const bookings = await Booking.find(searchCriteria)
     .populate('clientId', 'name email')
     .populate('caregiverId', 'name email')
     .sort({ createdAt: -1 });
@@ -168,26 +187,47 @@ exports.getBookingById = async (req, res) => {
 // Update booking status
 exports.updateBookingStatus = async (req, res) => {
   try {
+    console.log(`🔄 updateBookingStatus called for booking: ${req.params.id}, user: ${req.user.id}, role: ${req.user.role}`);
     const { status, feedback } = req.body;
     
+    const Caregiver = require('../models/Caregiver');
+    let caregiverProfileId = null;
+    
+    if (req.user.role === 'caregiver') {
+      const caregiverProfile = await Caregiver.findOne({ userId: req.user.id });
+      caregiverProfileId = caregiverProfile ? caregiverProfile._id : null;
+      console.log(`📋 Caregiver profile ID: ${caregiverProfileId}`);
+    }
+    
+    const searchCriteria = {
+      _id: req.params.id,
+      $or: [
+        { clientId: req.user.id },
+        { caregiverId: req.user.id }
+      ]
+    };
+    
+    if (caregiverProfileId) {
+      searchCriteria.$or.push({ caregiverId: caregiverProfileId });
+    }
+    
+    console.log(`🔍 Update search criteria:`, JSON.stringify(searchCriteria, null, 2));
+    
     const booking = await Booking.findOneAndUpdate(
-      { 
-        _id: req.params.id,
-        $or: [
-          { clientId: req.user.id },
-          { caregiverId: req.user.id }
-        ]
-      },
+      searchCriteria,
       { status, feedback },
       { new: true, runValidators: true }
     );
     
     if (!booking) {
+      console.log(`❌ Booking not found with criteria:`, searchCriteria);
       return res.status(404).json({
         success: false,
         error: 'Booking not found or not authorized'
       });
     }
+    
+    console.log(`✅ Booking status updated to ${status} by user: ${req.user.id}`);
     
     res.json({
       success: true,
@@ -196,7 +236,7 @@ exports.updateBookingStatus = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error updating booking status:', error);
+    console.error('❌ Error updating booking status:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update booking status'

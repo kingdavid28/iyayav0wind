@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const { validationResult } = require('express-validator');
-const { errorHandler } = require('../utils/errorHandler');
+const errorHandler = require('../utils/errorHandler');
 const { logger } = require('../utils/logger');
 
 /**
@@ -12,6 +12,13 @@ const { logger } = require('../utils/logger');
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.mongoId || req.user.id || req.user._id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found in request'
+      });
+    }
     
     const user = await User.findById(userId)
       .select('-password -refreshTokens')
@@ -69,10 +76,10 @@ exports.getProfile = async (req, res) => {
 
   } catch (error) {
     logger.error('Get profile error:', error);
-    const processedError = errorHandler.process(error);
-    res.status(500).json({
+    const processedError = errorHandler && errorHandler.process ? errorHandler.process(error) : null;
+    res.status(processedError?.statusCode || 500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error?.message || 'Failed to get profile'
     });
   }
 };
@@ -82,12 +89,26 @@ exports.getChildren = async (req, res) => {
   try {
     const userId = req.user.mongoId || req.user.id || req.user._id;
     
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found in request'
+      });
+    }
+    
     const user = await User.findById(userId).select('children role');
     
     if (!user) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
+      });
+    }
+
+    if (user.role !== 'parent') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only parents can access children information'
       });
     }
 
@@ -100,10 +121,10 @@ exports.getChildren = async (req, res) => {
 
   } catch (error) {
     logger.error('Get children error:', error);
-    const processedError = errorHandler.process(error);
-    res.status(500).json({
+    const processedError = errorHandler && errorHandler.process ? errorHandler.process(error) : null;
+    res.status(processedError?.statusCode || 500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error?.message || 'Failed to get children'
     });
   }
 };
@@ -111,8 +132,17 @@ exports.getChildren = async (req, res) => {
 // Update user profile
 exports.updateProfile = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+    console.log('🔄 Starting profile update');
+    
+    let errors;
+    try {
+      errors = validationResult(req);
+    } catch (validationError) {
+      console.log('⚠️ Validation error:', validationError);
+      errors = null;
+    }
+    
+    if (errors && !errors.isEmpty()) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
@@ -121,6 +151,14 @@ exports.updateProfile = async (req, res) => {
     }
 
     const userId = req.user.mongoId || req.user.id || req.user._id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found in request'
+      });
+    }
+    
     const updates = req.body;
 
     // Remove sensitive fields that shouldn't be updated here
@@ -149,7 +187,10 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    logger.info(`Profile updated for user ${userId}`);
+    console.log('✅ Profile updated successfully');
+    if (logger && logger.info) {
+      logger.info(`Profile updated for user ${userId}`);
+    }
 
     res.json({
       success: true,
@@ -158,11 +199,13 @@ exports.updateProfile = async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Update profile error:', error);
-    const processedError = errorHandler.process(error);
-    res.status(processedError.statusCode || 500).json({
+    console.error('❌ Update profile error:', error);
+    if (logger && logger.error) {
+      logger.error('Update profile error:', error);
+    }
+    res.status(500).json({
       success: false,
-      error: processedError.userMessage || 'Failed to update profile'
+      error: 'Failed to update profile'
     });
   }
 };
@@ -171,12 +214,28 @@ exports.updateProfile = async (req, res) => {
 exports.updateProfileImage = async (req, res) => {
   try {
     const userId = req.user.mongoId || req.user.id || req.user._id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found in request'
+      });
+    }
+    
     const { imageBase64 } = req.body;
 
     if (!imageBase64) {
       return res.status(400).json({
         success: false,
         error: 'Image data is required'
+      });
+    }
+
+    // Validate base64 string format
+    if (!imageBase64.startsWith('data:image/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid image format. Must be a valid base64 image string'
       });
     }
 
@@ -213,10 +272,9 @@ exports.updateProfileImage = async (req, res) => {
 
   } catch (error) {
     logger.error('Update profile image error:', error);
-    const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: (error && error.message) || 'Failed to update profile image'
     });
   }
 };
@@ -234,11 +292,26 @@ exports.updateChildren = async (req, res) => {
     }
 
     const userId = req.user.mongoId || req.user.id || req.user._id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found in request'
+      });
+    }
+    
     const { children } = req.body;
 
     // Verify user is a parent
     const user = await User.findById(userId);
-    if (!user || user.role !== 'parent') {
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    if (user.role !== 'parent') {
       return res.status(403).json({
         success: false,
         error: 'Only parents can update children information'
@@ -251,6 +324,17 @@ exports.updateChildren = async (req, res) => {
         success: false,
         error: 'Children must be an array'
       });
+    }
+
+    // Validate each child object
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      if (!child.name || !child.age) {
+        return res.status(400).json({
+          success: false,
+          error: `Child at index ${i} must have a name and age`
+        });
+      }
     }
 
     // Update user with children data
@@ -285,10 +369,9 @@ exports.updateChildren = async (req, res) => {
 
   } catch (error) {
     logger.error('Update children error:', error);
-    const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: error.message || 'Failed to update children'
     });
   }
 };
@@ -297,6 +380,13 @@ exports.updateChildren = async (req, res) => {
 exports.getAvailability = async (req, res) => {
   try {
     const userId = req.user.mongoId || req.user.id || req.user._id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found in request'
+      });
+    }
     
     const user = await User.findById(userId).select('availability role');
     
@@ -323,10 +413,9 @@ exports.getAvailability = async (req, res) => {
 
   } catch (error) {
     logger.error('Get availability error:', error);
-    const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: error.message || 'Failed to get availability'
     });
   }
 };
@@ -344,11 +433,26 @@ exports.updateAvailability = async (req, res) => {
     }
 
     const userId = req.user.mongoId || req.user.id || req.user._id;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found in request'
+      });
+    }
+    
     const { availability } = req.body;
 
     // Verify user is a caregiver
     const user = await User.findById(userId);
-    if (!user || user.role !== 'caregiver') {
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    if (user.role !== 'caregiver') {
       return res.status(403).json({
         success: false,
         error: 'Only caregivers can update availability'
@@ -380,10 +484,9 @@ exports.updateAvailability = async (req, res) => {
 
   } catch (error) {
     logger.error('Update availability error:', error);
-    const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: error.message || 'Failed to update availability'
     });
   }
 };

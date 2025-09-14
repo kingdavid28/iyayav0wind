@@ -1,80 +1,65 @@
-const fetch = require('node-fetch');
+// Test script to debug profile update issue
+const mongoose = require('mongoose');
 
-// Test profile update endpoint
-async function testProfileUpdate() {
-  const API_URL = 'http://192.168.1.10:5000/api';
-  
-  // Mock Firebase token (you'll need to replace this with a real token)
-  const mockToken = 'eyJhbGciOiJSUzI1NiIsImtpZCI6IjY4YTZkZjNiYzM3YTFjZmNkNDFmNGVhOCIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJpeWF5YWdpdCIsImF1dGhfdGltZSI6MTczNjY4MzI4MCwiZW1haWwiOiJraW5nZGF2aWQyOGFAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImV4cCI6MTczNjY4Njg4MCwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJlbWFpbCI6WyJraW5nZGF2aWQyOGFAZ21haWwuY29tIl19LCJzaWduX2luX3Byb3ZpZGVyIjoicGFzc3dvcmQifSwiaWF0IjoxNzM2NjgzMjgwLCJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vaXlheWFnaXQiLCJzdWIiOiJZY20yTGxzN0pNYzNvWEFqd2E2eHRZU0Y5WjcyIiwidXNlcl9pZCI6IlljbTJMbHM3Sk1jM29YQWp3YTZ4dFlTRjlaNzIifQ';
-  
+// Connect to MongoDB
+mongoose.connect('mongodb+srv://rerecentnoswu:knoockk28a@cluster0.emfxnqn.mongodb.net/iyaya?retryWrites=true&w=majority&appName=Cluster0')
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Simple test schema
+const TestCaregiverSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  name: String,
+  bio: String,
+  experience: mongoose.Schema.Types.Mixed,
+  hourlyRate: Number,
+  skills: [String],
+  address: mongoose.Schema.Types.Mixed,
+  portfolio: mongoose.Schema.Types.Mixed,
+  availability: mongoose.Schema.Types.Mixed,
+  emergencyContacts: mongoose.Schema.Types.Mixed
+}, { timestamps: true });
+
+const TestCaregiver = mongoose.model('TestCaregiver', TestCaregiverSchema);
+
+async function testUpdate() {
   try {
-    console.log('🧪 Testing profile update endpoint...');
+    console.log('🧪 Testing profile update...');
     
-    const profileData = {
-      name: 'Test User Update',
-      contact: '09123456789',
-      location: 'Test Location'
+    const testUserId = new mongoose.Types.ObjectId('68c28c70de12b199d01909a4');
+    
+    const testData = {
+      name: "Test Enhanced Profile",
+      bio: "This is a test bio from the wizard",
+      experience: 303,
+      hourlyRate: 250,
+      skills: ["Childcare", "Cooking"],
+      address: {
+        street: "Manuel oyaon sr",
+        city: "Cebu City"
+      }
     };
     
-    const response = await fetch(`${API_URL}/profile`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${mockToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(profileData)
-    });
+    console.log('📝 Test data:', testData);
     
-    const data = await response.json();
+    const result = await TestCaregiver.findOneAndUpdate(
+      { userId: testUserId },
+      testData,
+      { new: true, upsert: true }
+    );
     
-    console.log('📊 Response Status:', response.status);
-    console.log('📊 Response Data:', JSON.stringify(data, null, 2));
-    
-    if (response.ok) {
-      console.log('✅ Profile update test passed!');
-    } else {
-      console.log('❌ Profile update test failed:', data.error);
-    }
+    console.log('✅ Test update successful:', result);
     
   } catch (error) {
-    console.error('❌ Test error:', error.message);
+    console.error('❌ Test update failed:', {
+      name: error.name,
+      message: error.message,
+      path: error.path,
+      value: error.value
+    });
+  } finally {
+    mongoose.disconnect();
   }
 }
 
-// Test authentication endpoint
-async function testAuth() {
-  const API_URL = 'http://192.168.1.10:5000/api';
-  
-  try {
-    console.log('🧪 Testing authentication endpoint...');
-    
-    const response = await fetch(`${API_URL}/auth/firebase-profile`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer mock-token`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-    
-    console.log('📊 Auth Response Status:', response.status);
-    console.log('📊 Auth Response Data:', JSON.stringify(data, null, 2));
-    
-  } catch (error) {
-    console.error('❌ Auth test error:', error.message);
-  }
-}
-
-// Run tests
-async function runTests() {
-  console.log('🚀 Starting profile update tests...\n');
-  
-  await testAuth();
-  console.log('\n' + '='.repeat(50) + '\n');
-  await testProfileUpdate();
-  
-  console.log('\n✨ Tests completed!');
-}
-
-runTests();
+testUpdate();

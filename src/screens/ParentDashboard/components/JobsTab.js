@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Plus, Calendar, MapPin, Clock } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
-import PesoSign from '../../../components/PesoSign';
+import PesoSign from '../../../components/ui/feedback/PesoSign';
 
 const JobsTab = ({ 
   jobs = [], 
@@ -60,7 +60,7 @@ const JobsTab = ({
         {(job.status === 'active' || job.status === 'pending') && (
           <TouchableOpacity 
             style={[styles.jobActionButton, styles.completeButton]}
-            onPress={() => onCompleteJob(job.id || job._id)}
+            onPress={() => onCompleteJob(job._id)}
           >
             <Text style={[styles.jobActionText, styles.completeText]}>Complete</Text>
           </TouchableOpacity>
@@ -73,7 +73,7 @@ const JobsTab = ({
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.jobActionButton, styles.deleteButton]}
-          onPress={() => onDeleteJob(job.id)}
+          onPress={() => onDeleteJob(job._id)}
         >
           <Text style={[styles.jobActionText, styles.deleteText]}>Delete</Text>
         </TouchableOpacity>
@@ -136,7 +136,7 @@ const JobsTab = ({
       >
         {filteredJobs.length > 0 ? (
           filteredJobs.map((job) => (
-            <JobCard key={job.id || job._id} job={job} />
+            <JobCard key={job._id} job={job} />
           ))
         ) : (
           <View style={styles.emptyState}>

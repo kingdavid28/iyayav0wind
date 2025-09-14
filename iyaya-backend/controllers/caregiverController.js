@@ -8,8 +8,17 @@ const backgroundCheckService = require('../services/backgroundCheckService');
 const mongoose = require('mongoose');
 
 const resolveMongoId = (user) => {
-  const id = user?.mongoId || user?._id || user?.id;
-  return mongoose.isValidObjectId(id) ? id : null;
+  console.log('🔍 resolveMongoId input:', user);
+  
+  // If we already have a valid MongoDB ObjectId
+  const directId = user?.mongoId || user?._id || user?.id;
+  if (mongoose.isValidObjectId(directId)) {
+    console.log('🔍 Using direct MongoDB ID:', directId);
+    return directId;
+  }
+  
+  console.log('❌ Could not resolve MongoDB ID from:', { mongoId: user?.mongoId, _id: user?._id, id: user?.id });
+  return null;
 };
 
 // Empty profile template for new caregivers
@@ -58,7 +67,9 @@ const getDefaultProfileTemplate = () => ({
 // Get current caregiver's profile (Optimized)
 exports.getCaregiverProfile = async (req, res) => {
   try {
+    console.log('🔍 Getting caregiver profile for user:', req.user);
     const userMongoId = resolveMongoId(req.user);
+    console.log('🔍 Resolved MongoDB ID:', userMongoId);
     if (!userMongoId) {
       return res.status(401).json({ success: false, error: 'User mapping not found' });
     }
@@ -140,15 +151,24 @@ exports.getCaregiverProfile = async (req, res) => {
       caregiver
     });
   } catch (err) {
-    console.error('Get caregiver profile error:', err);
+    console.error('❌ Get caregiver profile error:', {
+      name: err.name,
+      message: err.message,
+      stack: err.stack?.split('\n').slice(0, 5),
+      user: req.user
+    });
     await logActivity('PROVIDER_PROFILE_ERROR', {
-      userId: resolveMongoId(req.user) || req.user?.id,
+      userId: req.user?.id || 'unknown',
       error: err.message
     });
     res.status(500).json({
       success: false,
       error: 'Failed to get caregiver profile',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      details: process.env.NODE_ENV === 'development' ? {
+        message: err.message,
+        name: err.name,
+        stack: err.stack
+      } : undefined
     });
   }
 };
@@ -178,11 +198,12 @@ exports.searchCaregivers = async (req, res) => {
     
     let query = {};
     
-    // Build query efficiently
-    if (search) {
+    // Build query efficiently with input sanitization
+    if (search && typeof search === 'string') {
+      const sanitizedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { skills: { $regex: search, $options: 'i' } }
+        { name: { $regex: sanitizedSearch, $options: 'i' } },
+        { skills: { $regex: sanitizedSearch, $options: 'i' } }
       ];
     }
     if (skills) {
@@ -255,7 +276,7 @@ exports.searchCaregivers = async (req, res) => {
 };
 
 // Get caregiver details
-// Get caregiver details (public info + conditional contact info)
+// Get caregiver details (complete profile for display)
 exports.getCaregiverDetails = async (req, res) => {
   try {
     const { id } = req.params;
@@ -278,34 +299,40 @@ exports.getCaregiverDetails = async (req, res) => {
     
     const caregiver = await Caregiver.findById(id)
       .populate('userId', 'name profileImage email phone role userType')
-      .populate('reviews.userId', 'name profileImage');
+      .populate('reviews.userId', 'name profileImage')
+      .lean();
+      
     if (!caregiver) {
       return res.status(404).json({ success: false, error: 'Caregiver not found' });
     }
-    // By default, only public info
-    let result = {
+
+    // Return complete profile details for display
+    const result = {
       _id: caregiver._id,
-      user: {
-        _id: caregiver.userId._id,
-        name: caregiver.userId.name,
-        profileImage: caregiver.userId.profileImage
-      },
-      skills: caregiver.skills,
+      userId: caregiver.userId,
+      name: caregiver.name,
+      bio: caregiver.bio,
+      profileImage: caregiver.profileImage || caregiver.userId?.profileImage,
+      skills: caregiver.skills || [],
       experience: caregiver.experience,
       hourlyRate: caregiver.hourlyRate,
+      education: caregiver.education || [],
+      languages: caregiver.languages || [],
+      certifications: caregiver.certifications || [],
+      ageCareRanges: caregiver.ageCareRanges || [],
       availability: caregiver.availability,
-      rating: caregiver.rating,
-      reviews: caregiver.reviews
+      rating: caregiver.rating || 0,
+      reviewCount: caregiver.reviews?.length || 0,
+      reviews: caregiver.reviews || [],
+      location: caregiver.location || caregiver.address,
+      address: caregiver.address || caregiver.location,
+      verification: caregiver.verification,
+      backgroundCheck: caregiver.backgroundCheck,
+      emergencyContacts: caregiver.emergencyContacts || [],
+      createdAt: caregiver.createdAt,
+      updatedAt: caregiver.updatedAt
     };
-    // If requester is admin or has contract, expose contact info
-    let includeContact = false;
-    if (req.user && (isAdmin(req.user) || (await hasActiveContract(req.user.id, caregiver.userId._id)))) {
-      includeContact = true;
-    }
-    if (includeContact) {
-      result.user.email = caregiver.userId.email;
-      result.user.phone = caregiver.userId.phone;
-    }
+
     await logActivity('PROVIDER_VIEW', { caregiverId: req.params.id, requestedBy: req.user?.id });
     res.json({ success: true, caregiver: result });
   } catch (err) {
@@ -318,9 +345,24 @@ exports.getCaregiverDetails = async (req, res) => {
 // Update caregiver profile (Enhanced)
 exports.updateCaregiverProfile = async (req, res) => {
   try {
-    console.log('🔄 Profile update request:', {
+    console.log('🔄 Profile update request received:', {
       userId: req.user?.id,
-      body: req.body
+      userEmail: req.user?.email,
+      method: req.method,
+      url: req.originalUrl,
+      contentType: req.headers['content-type'],
+      bodyKeys: Object.keys(req.body || {}),
+      bodySize: JSON.stringify(req.body || {}).length,
+      hasBody: !!req.body
+    });
+    
+    console.log('📋 Request body sample:', {
+      name: req.body?.name,
+      bio: req.body?.bio?.substring(0, 50) + '...',
+      skills: req.body?.skills?.length,
+      experience: req.body?.experience,
+      hourlyRate: req.body?.hourlyRate,
+      ageCareRanges: req.body?.ageCareRanges?.length
     });
 
     const errors = validationResult(req);
@@ -349,6 +391,11 @@ exports.updateCaregiverProfile = async (req, res) => {
       emergencyContacts
     } = req.body;
 
+    // Explicitly exclude email from updates - email should not be changed via profile update
+    if (req.body.email) {
+      console.log('⚠️ Email update attempted but blocked for security');
+    }
+
     const userMongoId = resolveMongoId(req.user);
     if (!userMongoId) {
       return res.status(401).json({ success: false, error: 'User mapping not found' });
@@ -366,24 +413,73 @@ exports.updateCaregiverProfile = async (req, res) => {
       return cert;
     }) || [];
 
-    const updateData = {
-      name,
-      bio,
-      profileImage,
-      experience,
-      hourlyRate,
-      education,
-      languages,
-      skills,
-      certifications: transformedCertifications,
-      ageCareRanges,
-      address,
-      documents,
-      portfolio,
-      availability,
-      emergencyContacts,
-      updatedAt: new Date()
-    };
+    // Transform experience if it's a number (total months) to object format
+    let transformedExperience = experience;
+    if (typeof experience === 'number') {
+      const totalMonths = experience;
+      const years = Math.floor(totalMonths / 12);
+      const months = totalMonths % 12;
+      transformedExperience = {
+        years,
+        months,
+        description: req.body.experienceDescription || ''
+      };
+      console.log('🔄 Transformed experience from number to object:', {
+        original: experience,
+        transformed: transformedExperience
+      });
+    } else if (experience && typeof experience === 'object') {
+      // Ensure object has required structure
+      transformedExperience = {
+        years: experience.years || 0,
+        months: experience.months || 0,
+        description: experience.description || ''
+      };
+      console.log('🔄 Normalized experience object:', {
+        original: experience,
+        transformed: transformedExperience
+      });
+    }
+
+    // Transform address if needed
+    let transformedAddress = address;
+    if (address && typeof address === 'object' && address.street) {
+      // Keep as object since schema now supports Mixed type
+      transformedAddress = address;
+      console.log('🔄 Keeping address as object (Mixed type):', address);
+    }
+
+    // Transform portfolio to ensure it matches schema
+    let transformedPortfolio = portfolio;
+    if (portfolio && typeof portfolio === 'object') {
+      transformedPortfolio = {
+        images: Array.isArray(portfolio.images) ? portfolio.images : [],
+        videos: Array.isArray(portfolio.videos) ? portfolio.videos : []
+      };
+      console.log('🔄 Normalized portfolio:', transformedPortfolio);
+    }
+
+    // Create minimal update data to avoid CastError
+    const updateData = {};
+    
+    // Only add fields that exist and are valid
+    if (name) updateData.name = name;
+    if (bio) updateData.bio = bio;
+    if (profileImage) updateData.profileImage = profileImage;
+    if (transformedExperience) updateData.experience = transformedExperience;
+    if (hourlyRate !== undefined && hourlyRate !== null) updateData.hourlyRate = Number(hourlyRate);
+    if (education) updateData.education = education;
+    if (Array.isArray(languages)) updateData.languages = languages;
+    if (Array.isArray(skills)) updateData.skills = skills;
+    if (Array.isArray(transformedCertifications)) updateData.certifications = transformedCertifications;
+    if (Array.isArray(ageCareRanges)) updateData.ageCareRanges = ageCareRanges;
+    if (transformedAddress) updateData.address = transformedAddress;
+    if (Array.isArray(documents)) updateData.documents = documents;
+    if (transformedPortfolio) updateData.portfolio = transformedPortfolio;
+    if (availability && typeof availability === 'object') updateData.availability = availability;
+    if (Array.isArray(emergencyContacts)) updateData.emergencyContacts = emergencyContacts;
+    
+    updateData.updatedAt = new Date();
 
     console.log('🔄 Caregiver profile update data:', {
       userId: userMongoId,
@@ -392,22 +488,113 @@ exports.updateCaregiverProfile = async (req, res) => {
       updateFields: Object.keys(updateData).filter(key => updateData[key] !== undefined)
     });
 
-    // Remove undefined fields
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) {
-        delete updateData[key];
-      }
+    console.log('🔍 Update data before MongoDB operation:', {
+      keys: Object.keys(updateData),
+      experience: updateData.experience,
+      hourlyRate: updateData.hourlyRate,
+      address: updateData.address,
+      portfolio: updateData.portfolio
     });
 
-    let caregiver = await Caregiver.findOneAndUpdate(
-      { userId: userMongoId },
-      updateData,
-      { new: true, runValidators: true, upsert: false }
-    ).populate('userId', 'name email');
+    console.log('📝 Final update data after cleanup:', {
+      fieldCount: Object.keys(updateData).length,
+      fields: Object.keys(updateData),
+      hasName: !!updateData.name,
+      hasBio: !!updateData.bio,
+      hasSkills: !!updateData.skills?.length,
+      hasHourlyRate: !!updateData.hourlyRate,
+      fullUpdateData: updateData
+    });
+
+    console.log('🔄 Attempting caregiver update:', {
+      userId: userMongoId,
+      updateFields: Object.keys(updateData),
+      updateDataSample: {
+        name: updateData.name,
+        bio: updateData.bio?.substring(0, 50) + '...',
+        skills: updateData.skills,
+        hourlyRate: updateData.hourlyRate
+      }
+    });
+    
+    // Add timeout to prevent hanging
+    const updateTimeout = setTimeout(() => {
+      console.error('⏰ Update operation timeout after 30 seconds');
+    }, 30000);
+
+    // Check if caregiver exists first
+    const existingCaregiver = await Caregiver.findOne({ userId: userMongoId });
+    console.log('🔍 Existing caregiver found:', !!existingCaregiver, existingCaregiver?._id);
+
+    let caregiver;
+    try {
+      console.log('🔄 Attempting MongoDB findOneAndUpdate with:', {
+        userId: userMongoId,
+        updateDataKeys: Object.keys(updateData),
+        updateDataSample: {
+          name: updateData.name,
+          experience: updateData.experience,
+          hourlyRate: updateData.hourlyRate
+        }
+      });
+      
+      caregiver = await Caregiver.findOneAndUpdate(
+        { userId: userMongoId },
+        updateData,
+        { new: true, runValidators: true, upsert: false }
+      ).populate('userId', 'name email');
+      
+      console.log('✅ MongoDB update successful');
+    } catch (updateError) {
+      clearTimeout(updateTimeout);
+      console.error('❌ MongoDB update failed:', {
+        name: updateError.name,
+        message: updateError.message,
+        path: updateError.path,
+        value: updateError.value,
+        kind: updateError.kind,
+        stack: updateError.stack?.split('\n').slice(0, 3)
+      });
+      
+      if (updateError.name === 'ValidationError') {
+        console.error('❌ Validation errors:', Object.keys(updateError.errors));
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: Object.values(updateError.errors).map(e => e.message)
+        });
+      }
+      
+      if (updateError.name === 'CastError') {
+        console.error('❌ CastError details:', {
+          path: updateError.path,
+          value: updateError.value,
+          valueType: typeof updateError.value,
+          kind: updateError.kind,
+          reason: updateError.reason
+        });
+        return res.status(400).json({
+          success: false,
+          error: `Invalid data format for field '${updateError.path}': ${updateError.message}`,
+          field: updateError.path,
+          value: updateError.value
+        });
+      }
+      
+      throw updateError;
+    }
+    
+    clearTimeout(updateTimeout);
     
     console.log('🔄 Caregiver profile update result:', {
       found: !!caregiver,
-      profileImage: caregiver?.profileImage
+      caregiverId: caregiver?._id,
+      name: caregiver?.name,
+      bio: caregiver?.bio?.substring(0, 50) + '...',
+      skills: caregiver?.skills,
+      hourlyRate: caregiver?.hourlyRate,
+      profileImage: caregiver?.profileImage,
+      updatedAt: caregiver?.updatedAt
     });
 
     if (!caregiver) {
@@ -422,10 +609,29 @@ exports.updateCaregiverProfile = async (req, res) => {
       });
       
       const created = await Caregiver.create(mergedData);
-      const hydrated = await Caregiver.findById(created._id).populate('userId', 'name email');
+      const hydrated = await Caregiver.findById(created._id)
+        .populate('userId', 'name email phone profileImage')
+        .lean();
       await logActivity('PROVIDER_PROFILE_CREATE', { userId: userMongoId });
-      return res.json({ success: true, caregiver: hydrated });
+      console.log('✅ New caregiver profile created successfully:', hydrated._id);
+      return res.json({ 
+        success: true, 
+        caregiver: hydrated,
+        profileCompletionPercentage: 0,
+        message: 'Profile created successfully'
+      });
     }
+
+    // Verify the update was actually saved
+    const verifyUpdate = await Caregiver.findById(caregiver._id).select('name bio skills hourlyRate updatedAt');
+    console.log('🔍 Post-update verification:', {
+      caregiverId: verifyUpdate._id,
+      name: verifyUpdate.name,
+      bio: verifyUpdate.bio?.substring(0, 50) + '...',
+      skillsCount: verifyUpdate.skills?.length,
+      hourlyRate: verifyUpdate.hourlyRate,
+      lastUpdated: verifyUpdate.updatedAt
+    });
 
     // Update verification status based on profile completeness (async to avoid blocking)
     setImmediate(async () => {
@@ -462,21 +668,68 @@ exports.updateCaregiverProfile = async (req, res) => {
       completionPercentage
     });
 
+    // Return complete profile for navigation
+    const completeProfile = await Caregiver.findById(caregiver._id)
+      .populate('userId', 'name email phone profileImage')
+      .lean();
+
     res.json({
       success: true,
-      caregiver,
-      profileCompletionPercentage: completionPercentage
+      caregiver: completeProfile,
+      profileCompletionPercentage: completionPercentage,
+      message: 'Profile updated successfully'
     });
   } catch (err) {
-    console.error('Update caregiver profile error:', err);
+    console.error('❌ Update caregiver profile error:', err);
+    console.error('❌ Error stack:', err.stack);
+    console.error('❌ Error name:', err.name);
+    console.error('❌ Error details:', {
+      message: err.message,
+      name: err.name,
+      code: err.code,
+      validationErrors: err.errors
+    });
+    
     await logActivity('PROVIDER_UPDATE_ERROR', {
       userId: resolveMongoId(req.user) || req.user?.id,
-      error: err.message
+      error: err.message,
+      errorName: err.name,
+      errorCode: err.code
     });
-    res.status(500).json({
+    
+    let errorMessage = 'Failed to update caregiver profile';
+    let statusCode = 500;
+    
+    if (err.name === 'ValidationError') {
+      errorMessage = 'Validation failed';
+      statusCode = 400;
+    } else if (err.name === 'CastError') {
+      errorMessage = `Invalid data format for field '${err.path}': ${err.message}`;
+      statusCode = 400;
+      console.log('❌ CastError details:', {
+        path: err.path,
+        value: err.value,
+        valueType: typeof err.value,
+        kind: err.kind,
+        message: err.message,
+        stringifiedValue: JSON.stringify(err.value)
+      });
+    } else if (err.message && err.message.includes('Invalid data format')) {
+      console.log('❌ Found "Invalid data format" error source:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack?.split('\n').slice(0, 5)
+      });
+    }
+    
+    res.status(statusCode).json({
       success: false,
-      error: 'Failed to update caregiver profile',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? {
+        message: err.message,
+        name: err.name,
+        stack: err.stack
+      } : undefined
     });
   }
 };
@@ -755,12 +1008,55 @@ exports.getVerificationStatus = async (req, res) => {
   }
 };
 
+// Simple test update endpoint
+exports.testUpdate = async (req, res) => {
+  try {
+    console.log('🧪 TEST UPDATE - Request body:', req.body);
+    
+    const userMongoId = resolveMongoId(req.user);
+    console.log('🧪 TEST UPDATE - User ID:', userMongoId);
+    
+    // Try minimal update
+    const result = await Caregiver.findOneAndUpdate(
+      { userId: userMongoId },
+      { 
+        name: req.body.name || 'Test Name',
+        bio: req.body.bio || 'Test Bio',
+        updatedAt: new Date()
+      },
+      { new: true, upsert: true }
+    );
+    
+    console.log('✅ TEST UPDATE - Success:', result._id);
+    res.json({ success: true, result });
+    
+  } catch (error) {
+    console.error('❌ TEST UPDATE - Error:', {
+      name: error.name,
+      message: error.message,
+      path: error.path,
+      value: error.value,
+      kind: error.kind
+    });
+    res.status(400).json({ 
+      success: false, 
+      error: error.message,
+      details: {
+        name: error.name,
+        path: error.path,
+        value: error.value
+      }
+    });
+  }
+};
+
 // Debug check
 console.log('Caregiver Controller Methods:', {
   getCaregiverProfile: typeof exports.getCaregiverProfile,
   searchCaregivers: typeof exports.searchCaregivers,
   getCaregiverDetails: typeof exports.getCaregiverDetails,
   updateCaregiverProfile: typeof exports.updateCaregiverProfile,
+  testUpdate: typeof exports.testUpdate,
   uploadDocuments: typeof exports.uploadDocuments,
   requestBackgroundCheck: typeof exports.requestBackgroundCheck,
   getBackgroundCheckStatus: typeof exports.getBackgroundCheckStatus,

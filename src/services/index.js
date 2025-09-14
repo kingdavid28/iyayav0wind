@@ -5,11 +5,10 @@ import { logger } from '../utils/logger';
 import { errorHandler } from '../shared/utils/errorHandler';
 import { tokenManager } from '../utils/tokenManager';
 
-// Environment detection
-const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV === 'development';
-const API_BASE_URL = isDev 
-  ? 'http://192.168.1.10:5000/api'
-  : 'https://api.iyaya.com/api';
+// Dynamic API URL from environment
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL 
+  ? `${process.env.EXPO_PUBLIC_API_URL}/api`
+  : 'http://localhost:5000/api';
 
 // Network monitoring (from apiService.js)
 let isConnected = true;
@@ -40,7 +39,7 @@ class EnhancedAPIService {
       retries = 2,
       cache = false,
       cacheKey = null,
-      timeout = 10000,
+      timeout = 30000,
       validateToken = true
     } = options;
 
@@ -105,7 +104,15 @@ class EnhancedAPIService {
           if (response.status === 401 && useAuth) {
             return this.handleUnauthorized(endpoint, options);
           }
-          throw new Error(data.error || data.message || `HTTP ${response.status}`);
+          
+          // Create detailed error with backend response info
+          const errorMessage = data?.message || data?.error || `HTTP ${response.status}`;
+          const error = new Error(errorMessage);
+          error.status = response.status;
+          error.statusCode = response.status;
+          error.response = { status: response.status, data };
+          error.details = data?.details;
+          throw error;
         }
 
         // Cache successful responses
@@ -122,6 +129,7 @@ class EnhancedAPIService {
         // Handle timeout errors specifically
         if (error.name === 'AbortError') {
           logger.error(`Request timeout after ${timeout}ms: ${method} ${endpoint}`);
+          error.code = 'NETWORK_ERROR';
         } else {
           logger.error(`API Error (attempt ${attempt}): ${method} ${endpoint}`, error);
         }
@@ -151,9 +159,25 @@ class EnhancedAPIService {
     this.isRefreshing = true;
     
     try {
-      // Clear invalid token
-      await this.clearAuthData();
-      throw new Error('Authentication required. Please log in again.');
+      // Try to refresh token first
+      const freshToken = await tokenManager.getValidToken(true);
+      
+      if (freshToken) {
+        // Retry the original request with fresh token
+        const retryOptions = {
+          ...options,
+          headers: {
+            ...options.headers,
+            'Authorization': `Bearer ${freshToken}`
+          }
+        };
+        
+        return await this.request(endpoint, retryOptions);
+      } else {
+        // No valid token available, clear auth data
+        await this.clearAuthData();
+        throw new Error('Authentication required. Please log in again.');
+      }
     } finally {
       this.isRefreshing = false;
     }
@@ -223,7 +247,7 @@ class EnhancedAPIService {
 
     updateProfile: (data) => {
       this.clearCache('profile');
-      return this.request('/profile', {
+      return this.request('/auth/profile', {
         method: 'PUT',
         body: data
       });
@@ -246,6 +270,11 @@ class EnhancedAPIService {
       });
     },
 
+    uploadProfileImageBase64: (imageBase64, mimeType) => {
+      // Alias for backward compatibility
+      return this.auth.uploadProfileImage(imageBase64, mimeType);
+    },
+
     resetPassword: (email) => this.request('/auth/reset-password', {
       method: 'POST',
       body: { email },
@@ -265,17 +294,33 @@ class EnhancedAPIService {
       cacheKey: 'caregiver-profile'
     }),
 
+    getMyProfile: () => this.request('/caregivers/profile', {
+      cache: true,
+      cacheKey: 'caregiver-profile'
+    }),
+
     updateProfile: (data) => {
       this.clearCache('caregiver');
       return this.request('/caregivers/profile', {
         method: 'PUT',
-        body: data
+        body: data,
+        timeout: 30000
+      });
+    },
+
+    updateMyProfile: (data) => {
+      this.clearCache('caregiver');
+      return this.request('/caregivers/profile', {
+        method: 'PUT',
+        body: data,
+        timeout: 30000
       });
     },
 
     createProfile: (data) => this.request('/caregivers/profile', {
       method: 'POST',
-      body: data
+      body: data,
+      timeout: 30000
     }),
 
     getAll: (filters = {}) => {
@@ -297,6 +342,13 @@ class EnhancedAPIService {
       return this.request(`/caregivers?${queryParams}`, {
         cache: true,
         cacheKey
+      });
+    },
+
+    requestBackgroundCheck: (data) => {
+      return this.request('/caregivers/background-check', {
+        method: 'POST',
+        body: data
       });
     }
   };
@@ -343,12 +395,18 @@ class EnhancedAPIService {
       });
     },
 
-    delete: (jobId) => {
-      this.clearCache('jobs');
-      this.cache.delete(`job:${jobId}`);
-      return this.request(`/jobs/${jobId}`, {
-        method: 'DELETE'
-      });
+    delete: async (jobId) => {
+      try {
+        this.clearCache('jobs');
+        this.cache.delete(`job:${jobId}`);
+        const result = await this.request(`/jobs/${jobId}`, {
+          method: 'DELETE'
+        });
+        return result;
+      } catch (error) {
+        logger.error(`Job deletion failed for ID ${jobId}:`, error);
+        throw error;
+      }
     },
 
     search: (query, filters = {}) => {
@@ -499,32 +557,48 @@ class EnhancedAPIService {
 
   // Child data validation (from userService.js)
   validateChildData(childData) {
-    if (!childData.name || typeof childData.name !== 'string') {
+    if (!childData.name || typeof childData.name !== 'string' || !childData.name.trim()) {
       throw new Error('Child name is required');
     }
     
-    if (typeof childData.age !== 'number' || childData.age < 0 || childData.age > 18) {
+    // Ensure name is trimmed
+    childData.name = childData.name.trim();
+    
+    // Convert age to number if it's a string
+    if (typeof childData.age === 'string') {
+      childData.age = parseInt(childData.age, 10);
+    }
+    
+    if (typeof childData.age !== 'number' || isNaN(childData.age) || childData.age < 0 || childData.age > 18) {
       throw new Error('Child must have a valid age between 0 and 18');
     }
     
-    // Handle allergies - ALWAYS ensure it's an array
+    // Handle allergies - ALWAYS ensure it's a string for backend compatibility
     try {
       if (childData.allergies === undefined || childData.allergies === null) {
-        childData.allergies = [];
-      } else if (typeof childData.allergies === 'string') {
-        // Convert comma-separated string to array, or empty array if empty string
-        childData.allergies = childData.allergies.trim() ? 
-          childData.allergies.split(',').map(a => a.trim()).filter(a => a) : [];
-      } else if (!Array.isArray(childData.allergies)) {
-        // If not string or array, convert to empty array
-        childData.allergies = [];
+        childData.allergies = '';
+      } else if (Array.isArray(childData.allergies)) {
+        // Convert array to comma-separated string
+        childData.allergies = childData.allergies.filter(a => a && a.trim()).join(', ');
+      } else if (typeof childData.allergies !== 'string') {
+        // Convert other types to string
+        childData.allergies = String(childData.allergies).trim();
+      } else {
+        // Already a string, just trim it
+        childData.allergies = childData.allergies.trim();
       }
-      
-      // Ensure all items in allergies array are strings
-      childData.allergies = childData.allergies.map(item => String(item).trim()).filter(item => item);
     } catch (error) {
-      // If any error occurs during conversion, just set to empty array
-      childData.allergies = [];
+      // If any error occurs during conversion, just set to empty string
+      childData.allergies = '';
+    }
+    
+    // Ensure preferences is a string
+    if (childData.preferences === undefined || childData.preferences === null) {
+      childData.preferences = '';
+    } else if (typeof childData.preferences !== 'string') {
+      childData.preferences = String(childData.preferences).trim();
+    } else {
+      childData.preferences = childData.preferences.trim();
     }
   }
 

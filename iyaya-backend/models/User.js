@@ -296,4 +296,14 @@ UserSchema.virtual('providerProfile', {
 UserSchema.index({ status: 1 });
 UserSchema.index({ 'verification.emailVerified': 1 });
 
+// Virtual for location (backward compatibility)
+UserSchema.virtual('location').get(function() {
+  if (this.address) {
+    if (typeof this.address === 'string') return this.address;
+    if (this.address.street) return this.address.street;
+    if (this.address.city) return this.address.city;
+  }
+  return null;
+});
+
 module.exports = mongoose.model('User', UserSchema);

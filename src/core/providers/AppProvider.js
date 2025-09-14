@@ -5,8 +5,8 @@ import { ThemeProvider, useThemeContext } from '../contexts/ThemeContext';
 import { PaperProvider } from 'react-native-paper';
 import { AppProvider as CoreAppProvider } from '../../contexts/AppContext';
 import { MessagingProvider } from '../../contexts/MessagingContext';
-import PrivacyProvider from '../../components/Privacy/PrivacyManager';
-import ProfileDataProvider from '../../components/Privacy/ProfileDataManager';
+import PrivacyProvider from '../../components/features/privacy/PrivacyManager';
+import ProfileDataProvider from '../../components/features/privacy/ProfileDataManager';
 
 // Wrapper component to access theme context
 const ThemeWrapper = ({ children }) => {

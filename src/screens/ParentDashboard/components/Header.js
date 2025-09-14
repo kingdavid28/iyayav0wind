@@ -5,10 +5,10 @@ import { Image, Platform, Pressable, Text, View } from 'react-native';
 import { User } from 'lucide-react-native';
 import { styles } from '../../styles/ParentDashboard.styles';
 // Privacy components temporarily disabled due to backend API not implemented
-import { usePrivacy } from '../../../components/Privacy/PrivacyManager';
-import PrivacyNotificationModal from '../../../components/Privacy/PrivacyNotificationModal';
-import { SettingsModal } from '../../../components/SettingsModal';
-import { RequestInfoModal } from '../../../components/RequestInfoModal';
+import { usePrivacy } from '../../../components/features/privacy/PrivacyManager';
+import PrivacyNotificationModal from '../../../components/features/privacy/PrivacyNotificationModal';
+import { SettingsModal } from '../../../components/ui/modals/SettingsModal';
+import { RequestInfoModal } from '../../../components/ui/modals/RequestInfoModal';
 import { useMessaging } from '../../../contexts/MessagingContext';
 import { getCurrentSocketURL } from '../../../config/api';
 
@@ -145,7 +145,7 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
             {/* Second Row - 2 icons */}
             <Pressable 
               style={styles.headerButton}
-              onPress={onProfileEdit}
+              onPress={() => navigation.navigate('ParentProfile')}
             >
               <Ionicons name="person-outline" size={22} color="#db2777" />
             </Pressable>

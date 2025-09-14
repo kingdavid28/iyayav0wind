@@ -4,6 +4,13 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { body } = require('express-validator');
 const profileController = require('../controllers/profileController');
 
+// Add logging middleware for profile routes
+router.use((req, res, next) => {
+  console.log(`📝 Profile route: ${req.method} ${req.path}`);
+  console.log(`🔑 Auth header present: ${!!req.header('Authorization')}`);
+  next();
+});
+
 // All routes require authentication
 router.use(authenticate);
 

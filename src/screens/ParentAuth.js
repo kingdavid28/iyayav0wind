@@ -1,42 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { CommonActions, useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput as RNTextInput,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  Image,
-  Dimensions,
+  ScrollView,
   StyleSheet,
-  Keyboard,
-  Linking,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
-import { TextInput, Button, useTheme } from "react-native-paper";
+import { Button, TextInput, useTheme } from "react-native-paper";
+import { useApp } from "../contexts/AppContext";
 import { useAuth } from "../core/contexts/AuthContext";
-import { useApp, ACTION_TYPES } from "../contexts/AppContext";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { useAuthForm } from '../hooks/useAuthForm';
 import { useAuthSubmit } from '../hooks/useAuthSubmit';
-import { authAPI } from "../config/api";
-import { CommonActions, useFocusEffect } from '@react-navigation/native';
-import CustomDateTimePicker from '../components/DateTimePicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS } from '../config/constants';
-import { navigateToUserDashboard } from '../utils/navigationUtils';
+import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 
 const ParentAuth = ({ navigation, route }) => {
   const theme = useTheme();
   const { dispatch } = useApp();
   const { user: authUser, login, signup, verifyEmailToken } = useAuth();
   
-  // Deep link handling is now managed by DeepLinkHandler component
-
   // Use focus effect for navigation to ensure proper timing
   useFocusEffect(
     React.useCallback(() => {
@@ -70,10 +57,6 @@ const ParentAuth = ({ navigation, route }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-
-
-
-  
   // Handle form submission
   const handleSubmit = () => {
     const formWithRole = { ...formData, role: 'parent' };
@@ -87,8 +70,6 @@ const ParentAuth = ({ navigation, route }) => {
     setMode(mode === 'login' ? 'signup' : 'login');
     resetForm();
   };
-
-
 
   return (
     <KeyboardAvoidingView 
@@ -284,15 +265,13 @@ const ParentAuth = ({ navigation, route }) => {
                 {/* Primary action button */}
                 <Button 
                   mode="contained" 
-                  onPress={() => {
-                    console.log('🔘 Button pressed, mode:', mode, 'isSubmitting:', isSubmitting);
-                    handleSubmit();
-                  }}
+                  onPress={handleSubmit}
                   loading={isSubmitting}
-                  disabled={false}
+                  disabled={isSubmitting}
                   style={[styles.authButton, styles.parentAuthButton]}
                   labelStyle={styles.authButtonLabel}
                   contentStyle={{ height: 48 }}
+                  accessibilityLabel={mode === 'signup' ? 'Create account' : mode === 'reset' ? 'Send reset link' : 'Sign in'}
                 >
                   {mode === 'signup' ? 'Create Account' : mode === 'reset' ? 'Send Reset Link' : 'Sign In'}
                 </Button>
@@ -300,27 +279,33 @@ const ParentAuth = ({ navigation, route }) => {
                 {/* Footer links */}
                 {mode !== 'reset' ? (
                   <>
-                    <TouchableOpacity onPress={() => setMode('reset')} accessibilityLabel="Switch to reset password">
+                    <TouchableOpacity 
+                      onPress={() => setMode('reset')} 
+                      accessibilityLabel="Reset password"
+                    >
                       <Text style={styles.smallLink}>Forgot password?</Text>
                     </TouchableOpacity>
                     
-
                     <View style={styles.authFooter}>
                       <Text style={styles.authFooterText}>
                         {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
                       </Text>
-                      <TouchableOpacity 
+                      <Button
+                        mode="outlined"
                         onPress={toggleMode}
+                        style={[styles.toggleButton, mode === 'login' ? styles.signUpButton : styles.signInButton]}
+                        labelStyle={mode === 'login' ? styles.signUpButtonLabel : styles.signInButtonLabel}
                         accessibilityLabel={mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
                       >
-                        <Text style={[styles.authFooterLink, { color: '#16a34a' }]}>
-                          {mode === 'signup' ? 'Sign In' : 'Sign Up'}
-                        </Text>
-                      </TouchableOpacity>
+                        {mode === 'signup' ? 'Sign In' : 'Sign Up'}
+                      </Button>
                     </View>
                   </>
                 ) : (
-                  <TouchableOpacity onPress={() => setMode('login')} accessibilityLabel="Back to sign in">
+                  <TouchableOpacity 
+                    onPress={() => setMode('login')} 
+                    accessibilityLabel="Back to sign in"
+                  >
                     <Text style={styles.smallLink}>Back to Sign In</Text>
                   </TouchableOpacity>
                 )}
@@ -371,7 +356,12 @@ const styles = StyleSheet.create({
     color: '#db2777',
     marginTop: 8,
   },
-  authContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 40 },
+  authContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    paddingHorizontal: 24, 
+    paddingBottom: 40 
+  },
   authCard: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -392,16 +382,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-  authTitle: { fontSize: 18, fontWeight: '600', color: '#db2777', textAlign: 'center' },
+  authTitle: { 
+    fontSize: 18, 
+    fontWeight: '600', 
+    color: '#db2777', 
+    textAlign: 'center' 
+  },
   formContainer: { marginTop: 16 },
   input: { marginBottom: 8, backgroundColor: 'white' },
-  authButton: { marginTop: 16, borderRadius: 8, paddingVertical: 8 },
+  authButton: { 
+    marginTop: 16, 
+    borderRadius: 8, 
+    paddingVertical: 8 
+  },
   parentAuthButton: { backgroundColor: '#db2777' },
   authButtonLabel: { color: 'white', fontWeight: 'bold' },
-  authFooter: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
-  authFooterText: { color: '#6b7280' },
-  authFooterLink: { fontWeight: 'bold', marginLeft: 4 },
-  smallLink: { color: '#db2777', textAlign: 'center', marginTop: 8 },
+  authFooter: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    marginTop: 16,
+    flexWrap: 'wrap'
+  },
+  authFooterText: { 
+    color: '#6b7280',
+    marginRight: 8
+  },
+  toggleButton: {
+    marginTop: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  signUpButton: {
+    borderColor: '#10b981', // Emerald green for sign up
+    backgroundColor: 'transparent'
+  },
+  signUpButtonLabel: {
+    color: '#10b981', // Emerald green for sign up
+  },
+  signInButton: {
+    borderColor: '#db2777', // Pink for sign in
+    backgroundColor: 'transparent'
+  },
+  signInButtonLabel: {
+    color: '#db2777', // Pink for sign in
+  },
+  smallLink: { 
+    color: '#db2777', 
+    textAlign: 'center', 
+    marginTop: 8 
+  },
   requiredFieldsNote: {
     fontSize: 12,
     color: '#6b7280',

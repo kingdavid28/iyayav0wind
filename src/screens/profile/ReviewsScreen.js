@@ -4,8 +4,8 @@ import { Text, Button, useTheme, FAB, Appbar } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../../../contexts/AuthContext';
 import { reviewService } from '../../../services/reviewService';
-import ReviewList from '../../components/profile/ReviewList';
-import ReviewForm from '../../components/profile/ReviewForm';
+import ReviewList from '../../components/features/profile/ReviewList';
+import ReviewForm from '../../components/forms/ReviewForm';
 
 const ReviewsScreen = () => {
   const theme = useTheme();

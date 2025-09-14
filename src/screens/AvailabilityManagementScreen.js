@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import TimePicker from '../components/TimePicker';
+import TimePicker from '../shared/ui/inputs/TimePicker';
 import profileService from '../services/profileService';
 import { useApi } from '../hooks/useApi';
 import { styles } from './styles/AvailabilityManagementScreen.styles';

@@ -21,7 +21,7 @@ const seedCaregivers = async () => {
     const caregiverData = [
       {
         email: 'maria.santos@example.com',
-        password: 'password123',
+        password: process.env.TEST_PASSWORD || 'password123',
         name: 'Maria Santos',
         userType: 'caregiver',
         caregiver: {
@@ -49,7 +49,7 @@ const seedCaregivers = async () => {
       },
       {
         email: 'ana.cruz@example.com',
-        password: 'password123',
+        password: process.env.TEST_PASSWORD || 'password123',
         name: 'Ana Cruz',
         userType: 'caregiver',
         caregiver: {
@@ -76,7 +76,7 @@ const seedCaregivers = async () => {
       },
       {
         email: 'jenny.reyes@example.com',
-        password: 'password123',
+        password: process.env.TEST_PASSWORD || 'password123',
         name: 'Jenny Reyes',
         userType: 'caregiver',
         caregiver: {

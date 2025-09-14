@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/184</span>
+                <span class='fraction'>0/185</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/129</span>
+                <span class='fraction'>0/128</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/33</span>
+                <span class='fraction'>0/34</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/149</span>
+                <span class='fraction'>0/151</span>
             </div>
         
             
@@ -366,10 +366,7 @@
 <a name='L301'></a><a href='#L301'>301</a>
 <a name='L302'></a><a href='#L302'>302</a>
 <a name='L303'></a><a href='#L303'>303</a>
-<a name='L304'></a><a href='#L304'>304</a>
-<a name='L305'></a><a href='#L305'>305</a>
-<a name='L306'></a><a href='#L306'>306</a>
-<a name='L307'></a><a href='#L307'>307</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L304'></a><a href='#L304'>304</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -400,6 +397,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -477,8 +475,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -488,12 +484,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -501,20 +491,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -679,7 +673,7 @@
 import { useAuth } from '../core/contexts/AuthContext';
 import messageService from '../services/notificationService';
 import { messagingAPI } from '../config/api';
-import { initRealtime, on as onSocket, emit as emitSocket, getSocket } from '../services/realtime';
+import socketService from '../services/socketService';
 import { subscribeToNewMessages, fetchHistory, fetchConversations, sendMessage as chatSendMessage } from '../services/chatClient';
 &nbsp;
 const MessagingContext = <span class="cstat-no" title="statement not covered" >createContext();</span>
@@ -707,7 +701,8 @@ export const MessagingProvider = <span class="cstat-no" title="statement not cov
 <span class="cstat-no" title="statement not covered" >      try {</span>
         // Only attempt socket.io realtime if explicitly enabled
 <span class="cstat-no" title="statement not covered" >        if (enableRealtime) {</span>
-<span class="cstat-no" title="statement not covered" >          await initRealtime(<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >user?.getIdToken?.())</span>;</span>
+          const token = <span class="cstat-no" title="statement not covered" >await user?.getIdToken?.();</span>
+<span class="cstat-no" title="statement not covered" >          socketService.connect(token);</span>
         }
       } catch {
         // Ignore realtime init errors
@@ -779,21 +774,23 @@ export const MessagingProvider = <span class="cstat-no" title="statement not cov
       });
 &nbsp;
       // Listen for typing events via socket.io if available
-      const sock = <span class="cstat-no" title="statement not covered" >getSocket?.();</span>
-<span class="cstat-no" title="statement not covered" >      if (sock) {</span>
-<span class="cstat-no" title="statement not covered" >        offTypingStart = onSocket('typing:start', <span class="fstat-no" title="function not covered" >(p</span>ayload) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >      if (socketService.isConnected) {</span>
+        const handleTypingStart = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(p</span>ayload) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >          if (!mounted) <span class="cstat-no" title="statement not covered" >return;</span></span>
-          // Only react for current conversation
-<span class="cstat-no" title="statement not covered" >          if (payload?.userId &amp;&amp; payload?.conversationId &amp;&amp; payload.conversationId !== activeConversation.id) <span class="cstat-no" title="statement not covered" >return;</span></span>
+<span class="cstat-no" title="statement not covered" >          if (payload?.conversationId &amp;&amp; payload.conversationId !== activeConversation.id) <span class="cstat-no" title="statement not covered" >return;</span></span>
 <span class="cstat-no" title="statement not covered" >          setOtherTyping(true);</span>
 <span class="cstat-no" title="statement not covered" >          if (typingStopTimeout) <span class="cstat-no" title="statement not covered" >clearTimeout(typingStopTimeout);</span></span>
 <span class="cstat-no" title="statement not covered" >          typingStopTimeout = setTimeout(<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >setOtherTyping(false),</span> 3000);</span>
-        });
-<span class="cstat-no" title="statement not covered" >        offTypingStop = onSocket('typing:stop', <span class="fstat-no" title="function not covered" >(p</span>ayload) =&gt; {</span>
+        };
+        const handleTypingStop = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(p</span>ayload) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >          if (!mounted) <span class="cstat-no" title="statement not covered" >return;</span></span>
 <span class="cstat-no" title="statement not covered" >          if (payload?.conversationId &amp;&amp; payload.conversationId !== activeConversation.id) <span class="cstat-no" title="statement not covered" >return;</span></span>
 <span class="cstat-no" title="statement not covered" >          setOtherTyping(false);</span>
-        });
+        };
+<span class="cstat-no" title="statement not covered" >        socketService.onTypingStart(handleTypingStart);</span>
+<span class="cstat-no" title="statement not covered" >        socketService.onTypingStop(handleTypingStop);</span>
+<span class="cstat-no" title="statement not covered" >        offTypingStart = <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >socketService.off('typing:start', handleTypingStart);</span></span>
+<span class="cstat-no" title="statement not covered" >        offTypingStop = <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >socketService.off('typing:stop', handleTypingStop);</span></span>
       }
     };
 &nbsp;
@@ -810,17 +807,11 @@ export const MessagingProvider = <span class="cstat-no" title="statement not cov
   // Expose typing helpers
   const startTyping = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    if (!activeConversation?.id) <span class="cstat-no" title="statement not covered" >return;</span></span>
-<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >emitSocket('typing:start', { conversationId: activeConversation.id }); </span>} catch (error) {</span>
-      // Ignore socket errors
-<span class="cstat-no" title="statement not covered" >      console.warn('Typing start failed:', error);</span>
-    }
+<span class="cstat-no" title="statement not covered" >    socketService.startTyping(activeConversation.id);</span>
   };
   const stopTyping = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    if (!activeConversation?.id) <span class="cstat-no" title="statement not covered" >return;</span></span>
-<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >emitSocket('typing:stop', { conversationId: activeConversation.id }); </span>} catch (error) {</span>
-      // Ignore socket errors
-<span class="cstat-no" title="statement not covered" >      console.warn('Typing stop failed:', error);</span>
-    }
+<span class="cstat-no" title="statement not covered" >    socketService.stopTyping(activeConversation.id);</span>
   };
 &nbsp;
   // Start or get existing conversation
@@ -988,7 +979,7 @@ export default MessagingContext;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T00:29:37.203Z
+                at 2025-09-12T16:00:36.461Z
             </div>
         <script src="../prettify.js"></script>
         <script>

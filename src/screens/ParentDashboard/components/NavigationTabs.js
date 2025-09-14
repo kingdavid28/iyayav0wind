@@ -54,15 +54,7 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.navItem, activeTab === 'profile' && styles.activeNavItem]}
-        onPress={onProfilePress}
-      >
-        <User size={20} color={activeTab === 'profile' ? colors.secondary : colors.textTertiary} />
-        <Text style={[styles.navText, activeTab === 'profile' && styles.activeNavText]}>
-          Profile
-        </Text>
-      </TouchableOpacity>
+
       </ScrollView>
     </View>
   );

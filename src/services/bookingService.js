@@ -131,6 +131,20 @@ class BookingService {
     }
   }
 
+  // Update booking status (for caregiver actions)
+  async updateStatus(bookingId, status) {
+    try {
+      const response = await this.makeRequest(`/${bookingId}/status`, {
+        method: 'PATCH',
+        body: { status },
+      });
+      return response.data;
+    } catch (error) {
+      logger.error('Update booking status failed:', error);
+      throw new Error('Failed to update booking status');
+    }
+  }
+
   // Get booking statistics
   async getBookingStats() {
     try {

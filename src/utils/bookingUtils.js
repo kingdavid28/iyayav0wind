@@ -14,7 +14,10 @@ import { logger } from './logger';
 export const extractBookingsFromResponse = (response) => {
   let list = [];
   
-  if (response?.data?.data?.bookings) {
+  if (response?.bookings && Array.isArray(response.bookings)) {
+    // Handle direct { bookings: [] } format (current API response)
+    list = response.bookings;
+  } else if (response?.data?.data?.bookings) {
     // Handle the new format with pagination { data: { data: { bookings: [] } } }
     list = response.data.data.bookings;
   } else if (response?.data?.bookings) {
@@ -26,9 +29,6 @@ export const extractBookingsFromResponse = (response) => {
   } else if (Array.isArray(response)) {
     // Fallback for direct array response
     list = response;
-  } else if (response?.bookings) {
-    // Fallback for old format { bookings: [] }
-    list = response.bookings;
   }
   
   return list;
@@ -43,7 +43,7 @@ export const fetchCaregiverData = async (caregiverId) => {
     
     // Normalize caregiver ID
     const id = typeof caregiverId === 'object' 
-      ? (caregiverId._id || caregiverId.id) 
+      ? caregiverId._id 
       : caregiverId;
     
     if (!id) return null;
@@ -77,24 +77,36 @@ export const fetchCaregiverData = async (caregiverId) => {
 export const enrichBookingsWithCaregiverData = async (bookings) => {
   return await Promise.all(bookings.map(async (booking) => {
     try {
+      console.log('Enriching booking:', booking._id, 'caregiverId:', booking.caregiverId);
+      
       // If we don't have a caregiver ID, return the booking as is
-      if (!booking.caregiverId) return booking;
+      if (!booking.caregiverId) {
+        console.log('No caregiverId found for booking:', booking._id);
+        return booking;
+      }
       
       const freshCaregiverData = await fetchCaregiverData(booking.caregiverId);
+      console.log('Fresh caregiver data:', freshCaregiverData);
       
-      if (!freshCaregiverData) return booking;
+      if (!freshCaregiverData) {
+        console.log('No fresh caregiver data found');
+        return booking;
+      }
       
       // Merge the fresh caregiver data with the existing booking data
-      return {
+      const enrichedBooking = {
         ...booking,
         caregiver: {
           ...(booking.caregiver || {}), // Keep existing caregiver data as fallback
           ...freshCaregiverData, // Add/override with fresh data
           _id: typeof booking.caregiverId === 'object' 
-            ? (booking.caregiverId._id || booking.caregiverId.id)
+            ? booking.caregiverId._id
             : booking.caregiverId
         }
       };
+      
+      console.log('Enriched booking caregiver:', enrichedBooking.caregiver);
+      return enrichedBooking;
     } catch (error) {
       logger.error('Error enriching booking with caregiver data:', error);
       return booking; // Return original booking if there's an error
@@ -115,13 +127,13 @@ export const extractCaregiverInfo = (booking) => {
   if (booking.caregiver && (booking.caregiver.name || booking.caregiver._id)) {
     caregiverInfo = booking.caregiver;
     caregiverName = booking.caregiver.name || 'Unknown Caregiver';
-    caregiverId = booking.caregiver._id || booking.caregiver.id;
+    caregiverId = booking.caregiver._id;
   } 
   // Fallback to other possible sources
   else if (booking.caregiverId) {
     if (typeof booking.caregiverId === 'object') {
       caregiverName = booking.caregiverId.name || 'Unknown Caregiver';
-      caregiverId = booking.caregiverId._id || booking.caregiverId.id;
+      caregiverId = booking.caregiverId._id;
     } else {
       // If it's just an ID, we can't get the name
       caregiverName = 'Unknown Caregiver';
@@ -187,41 +199,23 @@ export const sortBookingsByDate = (bookings) => {
  * Normalize a single booking object
  */
 export const normalizeBooking = (booking) => {
-  const { caregiverInfo, caregiverName, caregiverId } = extractCaregiverInfo(booking);
-  const childrenList = processChildrenList(booking.children);
-  const scheduleStr = generateScheduleString(booking.date, booking.startTime, booking.endTime);
+  const validStatuses = ['pending', 'confirmed', 'in_progress', 'completed', 'paid'];
+  const status = validStatuses.includes(booking.status) ? booking.status : 'pending';
   
-  // Format date
-  const date = booking.date ? new Date(booking.date) : new Date();
-  const formattedDate = date.toISOString().split('T')[0];
-  
-  // Get payment status and amount
-  const paymentStatus = booking.paymentStatus || 'pending';
-  const amount = booking.totalCost || 0;
-  
-  // Return normalized booking object
-  const normalizedBooking = {
-    id: booking._id || booking.id || `booking-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    caregiver: caregiverName,
-    caregiverId,
-    caregiverProfile: booking.caregiverId?.caregiverProfile || null,
-    status: normalizeStatus(booking.status || booking.bookingStatus || 'pending'),
-    date: formattedDate,
-    startTime: booking.startTime || booking.start || '09:00',
-    endTime: booking.endTime || booking.end || '17:00',
-    schedule: scheduleStr,
-    children: childrenList,
-    paymentStatus: paymentStatus,
-    amount: amount,
-    currency: booking.currency || 'USD',
-    _raw: process.env.NODE_ENV === 'development' ? booking : undefined
+  return {
+    _id: booking._id,
+    caregiver: booking.caregiver || booking.caregiverId,
+    caregiverId: booking.caregiverId,
+    status: status,
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    children: booking.children || [],
+    totalCost: booking.totalCost,
+    address: booking.address,
+    depositPaid: booking.depositPaid || false,
+    finalPaymentPaid: booking.finalPaymentPaid || false
   };
-  
-  if (process.env.NODE_ENV === 'development') {
-    logger.debug('Normalized booking:', normalizedBooking);
-  }
-  
-  return normalizedBooking;
 };
 
 /**

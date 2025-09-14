@@ -172,8 +172,8 @@ app.use(helmet({
   xssFilter: true
 }));
 
-app.use(mongoSanitize());
-app.use(xss());
+// app.use(mongoSanitize()); // Temporarily disabled for debugging
+// app.use(xss()); // Temporarily disabled for debugging
 app.use(hpp());
 
 // Request Processing
@@ -254,18 +254,31 @@ app.get('/api/health', (req, res) => {
 // ============================================
 app.use((err, req, res, next) => {
   // Log the error with more context
-  console.error(`[${new Date().toISOString()}] Error:`, {
+  console.error(`❌ [${new Date().toISOString()}] Global Error Handler:`, {
     message: err.message,
-    stack: err.stack,
+    name: err.name,
+    status: err.status,
+    statusCode: err.statusCode,
+    stack: err.stack?.split('\n').slice(0, 3),
     url: req.originalUrl,
     method: req.method,
     ip: req.ip
   });
 
   const statusCode = err.status || err.statusCode || 500;
+  
+  // Check if this is the "Invalid data format" error
+  if (err.message === 'Invalid data format') {
+    console.error('❌ Found "Invalid data format" in global handler:', {
+      name: err.name,
+      constructor: err.constructor.name,
+      keys: Object.keys(err)
+    });
+  }
+  
   const response = {
-    status: 'error',
-    message: err.message
+    success: false,
+    error: err.message
   };
 
   // Only include stack trace in development

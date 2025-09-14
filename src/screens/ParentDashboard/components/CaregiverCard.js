@@ -34,7 +34,7 @@ import {
  * @param {string} [props.testID] - Test ID for testing frameworks
  * @returns {JSX.Element} Rendered CaregiverCard component
  */
-const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
+const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID, style }) => {
   // Log the caregiver data for debugging
   useEffect(() => {
     const getLocationString = (location) => {
@@ -144,7 +144,7 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
 
   return (
     <Card
-      style={{ marginBottom: spacing.md }}
+      style={[{ marginBottom: spacing.md }, style]}
       variant="elevated"
     >
       <View
@@ -292,20 +292,7 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
         <View style={styles.flexRow}>
           <TouchableOpacity
             style={[styles.iconButton, { marginRight: spacing.sm }]}
-            onPress={async () => {
-              try {
-                const conversation = await messagingService.startConversation(
-                  caregiver.id || caregiver._id,
-                  caregiver.name,
-                  'caregiver',
-                  `Hi ${caregiver.name}, I'm interested in your services.`
-                );
-                onMessagePress(caregiver, conversation);
-              } catch (error) {
-                console.error('Failed to start conversation:', error);
-                onMessagePress(caregiver);
-              }
-            }}
+            onPress={() => onMessagePress(caregiver)}
             accessibilityLabel={messageButtonLabel}
             accessibilityRole="button"
           >
@@ -316,19 +303,7 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID }) => {
               styles.button,
               { flexDirection: "row", alignItems: "center" },
             ]}
-            onPress={async () => {
-              try {
-                // Check availability before booking
-                const conflicts = await bookingService.checkConflicts({
-                  caregiverId: caregiver.id || caregiver._id,
-                  date: new Date().toISOString().split('T')[0]
-                });
-                onPress(caregiver, { hasConflicts: conflicts.length > 0 });
-              } catch (error) {
-                console.error('Failed to check availability:', error);
-                onPress(caregiver);
-              }
-            }}
+            onPress={() => onPress(caregiver)}
             accessibilityLabel={bookButtonLabel}
             accessibilityRole="button"
           >

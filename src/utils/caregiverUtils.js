@@ -48,3 +48,36 @@ export const countActiveFilters = (filters) => {
     (filters.rating > 0 ? 1 : 0)
   );
 };
+
+export const getCaregiverDisplayName = (caregiver) => {
+  console.log('getCaregiverDisplayName input:', caregiver);
+  
+  if (!caregiver) return 'No caregiver assigned';
+  if (typeof caregiver === 'string') return caregiver;
+  
+  // Try multiple possible name fields
+  const name = caregiver?.name || 
+               caregiver?.firstName || 
+               caregiver?.fullName || 
+               caregiver?.displayName ||
+               caregiver?.user?.name ||
+               caregiver?.user?.firstName;
+               
+  console.log('Extracted name:', name);
+  return name || 'No caregiver assigned';
+};
+
+export const normalizeStatus = (status) => {
+  return status || 'pending';
+};
+
+export const getStatusColor = (status) => {
+  const colors = {
+    'pending': '#F59E0B',
+    'confirmed': '#3B82F6', 
+    'in_progress': '#10B981',
+    'completed': '#8B5CF6',
+    'paid': '#059669'
+  };
+  return colors[status] || '#6B7280';
+};

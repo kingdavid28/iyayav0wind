@@ -25,8 +25,7 @@ export const formatAddress = (locationData) => {
       return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     }
     
-    // Last resort: log the object for debugging
-    console.log('Location object:', JSON.stringify(locationObj, null, 2));
+    // Return default message for empty/null locations without logging
     return 'Location not specified';
   } catch (e) {
     console.error('Error processing location:', e);

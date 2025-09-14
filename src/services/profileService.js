@@ -10,12 +10,16 @@ import { tokenManager } from '../utils/tokenManager';
 class ProfileService {
 
   constructor() {
+    const fallbackUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
     if (!API_CONFIG || !API_CONFIG.BASE_URL) {
-      console.error('API_CONFIG.BASE_URL is undefined. Check your environment configuration.');
-      this.baseURL = 'http://192.168.1.10:5000/api/profile'; // Updated fallback URL
+      console.error('API_CONFIG.BASE_URL is undefined. Using fallback.');
+      this.baseURL = `${fallbackUrl}/api/profile`;
     } else {
       this.baseURL = `${API_CONFIG.BASE_URL}/profile`;
     }
+    console.log('🔗 ProfileService using URL:', this.baseURL);
+    console.log('🔗 API_CONFIG:', API_CONFIG);
+    console.log('🔗 EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
   }
 
   /**
@@ -62,7 +66,11 @@ class ProfileService {
       let authToken = token;
       
       const makeRequest = async (authToken) => {
-        return await fetch(`${this.baseURL}`, {
+        console.log('🔄 Making profile update request to:', this.baseURL);
+        console.log('🔑 Using token preview:', authToken ? authToken.substring(0, 50) + '...' : 'No token');
+        console.log('📤 Profile data:', JSON.stringify(profileData, null, 2));
+        
+        const response = await fetch(`${this.baseURL}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${authToken}`,
@@ -70,22 +78,31 @@ class ProfileService {
           },
           body: JSON.stringify(profileData),
         });
+        
+        console.log('📡 Response received:', response.status, response.statusText);
+        return response;
       };
 
       let response = await makeRequest(authToken);
       
       // If 401, try to refresh token and retry
       if (response.status === 401) {
+        console.log('⚠️ Got 401, attempting token refresh...');
         logger.info('Token expired, attempting to refresh...');
         const freshToken = await this.getFreshToken();
         
         if (freshToken) {
+          console.log('✅ Got fresh token, retrying request');
           authToken = freshToken;
           response = await makeRequest(authToken);
+        } else {
+          console.log('❌ Failed to get fresh token');
         }
       }
 
       const data = await response.json();
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || `Profile update failed: ${response.status}`);
@@ -95,6 +112,11 @@ class ProfileService {
       return data.data;
 
     } catch (error) {
+      console.error('❌ Profile update error details:', {
+        message: error.message,
+        stack: error.stack,
+        url: this.baseURL
+      });
       logger.error('Update profile error:', error);
       throw errorHandler.process(error);
     }
@@ -249,6 +271,77 @@ class ProfileService {
       throw errorHandler.process(error);
     }
   }
+
+  /**
+   * Get caregiver profile (uses /api/caregivers/profile endpoint)
+   */
+  async getCaregiverProfile(token) {
+    try {
+      let authToken = token || await this.getFreshToken();
+      const caregiverUrl = `${API_CONFIG.BASE_URL}/caregivers/profile`;
+      
+      console.log('🔗 Getting caregiver profile from:', caregiverUrl);
+      
+      const response = await fetch(caregiverUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('📥 Caregiver profile response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch caregiver profile');
+      }
+
+      logger.info('Caregiver profile fetched successfully');
+      return data.caregiver;
+
+    } catch (error) {
+      logger.error('Get caregiver profile error:', error);
+      throw errorHandler.process(error);
+    }
+  }
+
+  /**
+   * Update caregiver profile (uses /api/caregivers/profile endpoint)
+   */
+  async updateCaregiverProfile(profileData, token) {
+    try {
+      let authToken = token || await this.getFreshToken();
+      const caregiverUrl = `${API_CONFIG.BASE_URL}/caregivers/profile`;
+      
+      console.log('🔄 Updating caregiver profile at:', caregiverUrl);
+      console.log('📤 Profile data:', JSON.stringify(profileData, null, 2));
+      
+      const response = await fetch(caregiverUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(profileData),
+      });
+      
+      const data = await response.json();
+      console.log('📥 Update response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update caregiver profile');
+      }
+
+      logger.info('Caregiver profile updated successfully');
+      return data.caregiver;
+
+    } catch (error) {
+      logger.error('Update caregiver profile error:', error);
+      throw errorHandler.process(error);
+    }
+  }
 }
 
-export default new ProfileService();
+export const profileService = new ProfileService();
+export default profileService;

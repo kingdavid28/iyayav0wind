@@ -5,9 +5,9 @@ import { Alert } from 'react-native';
 // Environment-based configuration
 const Config = {
   API_BASE_URL: __DEV__ 
-    ? 'http://10.162.42.117:5000/api'  // Fixed port to match backend
+    ? 'http://192.168.1.10:5000/api'  // Match the network IP and backend port
     : 'https://api.iyaya.com/api',
-  TIMEOUT: 10000,
+  TIMEOUT: 15000,  // Increased timeout
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000
 };
@@ -92,11 +92,21 @@ class APIClient {
 
   handleError(error) {
     if (!error.response) {
-      // Network error
+      // Handle specific network errors
+      if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+        return {
+          message: 'Request timeout. Please try again.',
+          type: 'TIMEOUT_ERROR',
+          originalError: error,
+          retryable: true
+        };
+      }
+      // General network error
       return {
         message: 'Network error. Please check your connection.',
         type: 'NETWORK_ERROR',
-        originalError: error
+        originalError: error,
+        retryable: true
       };
     }
 
@@ -124,9 +134,11 @@ class APIClient {
       try {
         return await requestFn();
       } catch (error) {
-        if (i === attempts - 1 || error.type !== 'NETWORK_ERROR') {
+        const shouldRetry = error.type === 'NETWORK_ERROR' || error.type === 'TIMEOUT_ERROR' || error.retryable;
+        if (i === attempts - 1 || !shouldRetry) {
           throw error;
         }
+        console.log(`Network error, retrying... (${attempts - i - 1} attempts left)`);
         await new Promise(resolve => setTimeout(resolve, Config.RETRY_DELAY * (i + 1)));
       }
     }

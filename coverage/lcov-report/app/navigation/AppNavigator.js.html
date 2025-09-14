@@ -191,21 +191,7 @@
 <a name='L126'></a><a href='#L126'>126</a>
 <a name='L127'></a><a href='#L127'>127</a>
 <a name='L128'></a><a href='#L128'>128</a>
-<a name='L129'></a><a href='#L129'>129</a>
-<a name='L130'></a><a href='#L130'>130</a>
-<a name='L131'></a><a href='#L131'>131</a>
-<a name='L132'></a><a href='#L132'>132</a>
-<a name='L133'></a><a href='#L133'>133</a>
-<a name='L134'></a><a href='#L134'>134</a>
-<a name='L135'></a><a href='#L135'>135</a>
-<a name='L136'></a><a href='#L136'>136</a>
-<a name='L137'></a><a href='#L137'>137</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L129'></a><a href='#L129'>129</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -278,8 +264,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -344,38 +328,32 @@ import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "../../core/contexts/AuthContext";
 import { useThemeContext } from "../../core/contexts/ThemeContext";
 &nbsp;
-// Feature imports
-import {
-  WelcomeScreen,
-  ParentAuth,
-  CaregiverAuth,
-  EmailVerificationScreen,
-  VerificationSuccessScreen
-} from "../../features/auth";
-import {
-  ParentDashboard,
-  CaregiverDashboard
-} from "../../features/dashboard";
+// Main screen imports
+import WelcomeScreen from "../../screens/WelcomeScreen";
+import ParentAuth from "../../screens/ParentAuth";
+import CaregiverAuth from "../../screens/CaregiverAuth";
+import EmailVerificationScreen from "../../screens/EmailVerificationScreen";
+import VerificationSuccessScreen from "../../screens/VerificationSuccessScreen";
+import ParentDashboard from "../../screens/ParentDashboard";
+import CaregiverDashboard from "../../screens/CaregiverDashboard";
 &nbsp;
 // Legacy screen imports (to be migrated)
 import AvailabilityManagementScreen from "../../screens/AvailabilityManagementScreen";
 import BookingFlowScreen from "../../screens/BookingManagementScreen";
 import BookingManagementScreen from "../../screens/BookingManagementScreen";
 import Bookings from "../../screens/BookingManagementScreen";
-import CaregiversList from "../../screens/CaregiversList";
-import ChatScreen from "../../screens/ChatScreen";
-import Children from "../../screens/Children";
 import ChildrenManagementScreen from "../../screens/ChildrenManagementScreen";
 import EnhancedCaregiverProfileWizard from "../../screens/EnhancedCaregiverProfileWizard";
 import JobPostingScreen from "../../screens/JobPostingScreen";
 import JobSearchScreen from "../../screens/JobSearchScreen";
-import Messages from "../../screens/Messages";
 import MessagingScreen from "../../screens/MessagingScreen";
+import MessagesScreen from "../../screens/MessagesScreen";
 import OnboardingScreen from "../../screens/OnboardingScreen";
 import PaymentConfirmationScreen from "../../screens/PaymentConfirmationScreen";
 import ProfileScreen from "../../screens/profile/ProfileScreen";
 import EmailVerificationPendingScreen from "../../screens/EmailVerificationPendingScreen";
 import DeepLinkHandler from "../../components/DeepLinkHandler";
+import DemoScreen from "../../screens/DemoScreen";
 &nbsp;
 // Utils
 import { hasSeenOnboarding } from "../../utils/onboarding";
@@ -448,17 +426,14 @@ const AppNavigator = <span class="cstat-no" title="statement not covered" ><span
         &lt;Stack.Screen name="CaregiverAuth" component={CaregiverAuth} options={{ title: "Caregiver Login", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="ParentDashboard" component={ParentDashboard} options={{ headerShown: false }} /&gt;
         &lt;Stack.Screen name="CaregiverDashboard" component={CaregiverDashboard} options={{ headerShown: false }} /&gt;
-        &lt;Stack.Screen name="Caregivers" component={CaregiversList} options={{ title: "Caregivers" }} /&gt;
-        &lt;Stack.Screen name="Children" component={Children} options={{ title: "Your Children" }} /&gt;
-        &lt;Stack.Screen name="Bookings" component={Bookings} options={{ title: "Bookings" }} /&gt;
         &lt;Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Edit Profile", headerBackTitle: "Back" }} /&gt;
-        &lt;Stack.Screen name="Chat" component={ChatScreen} options={{ title: "Chat", headerBackTitle: "Back" }} /&gt;
+        &lt;Stack.Screen name="Chat" component={MessagingScreen} options={{ title: "Chat", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} options={{ title: "Confirm Payment", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="JobPosting" component={JobPostingScreen} options={{ title: "Post a Job", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="JobSearch" component={JobSearchScreen} options={{ title: "Find Jobs", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="BookingFlow" component={BookingFlowScreen} options={{ title: "Book Caregiver", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="BookingManagement" component={BookingManagementScreen} options={{ title: "Manage Bookings", headerBackTitle: "Back" }} /&gt;
-        &lt;Stack.Screen name="Messages" component={Messages} options={{ title: "Messages", headerBackTitle: "Back", headerShown: false }} /&gt;
+        &lt;Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages", headerBackTitle: "Back", headerShown: false }} /&gt;
         &lt;Stack.Screen name="Messaging" component={MessagingScreen} options={{ title: "Chat", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="ChildrenManagement" component={ChildrenManagementScreen} options={{ title: "Manage Children", headerBackTitle: "Back" }} /&gt;
         &lt;Stack.Screen name="AvailabilityManagement" component={AvailabilityManagementScreen} options={{ title: "Manage Availability", headerBackTitle: "Back" }} /&gt;
@@ -466,6 +441,7 @@ const AppNavigator = <span class="cstat-no" title="statement not covered" ><span
         &lt;Stack.Screen name="EmailVerification" component={EmailVerificationScreen} options={{ title: "Verifying Email", headerShown: false }} /&gt;
         &lt;Stack.Screen name="VerificationSuccess" component={VerificationSuccessScreen} options={{ title: "Verification Complete", headerShown: false }} /&gt;
         &lt;Stack.Screen name="EmailVerificationPending" component={EmailVerificationPendingScreen} options={{ title: "Verify Your Email", headerShown: false }} /&gt;
+        &lt;Stack.Screen name="Demo" component={DemoScreen} options={{ title: "Component Demo", headerBackTitle: "Back" }} /&gt;
       &lt;/Stack.Navigator&gt;
     &lt;/NavigationContainer&gt;
   );
@@ -478,7 +454,7 @@ export default AppNavigator;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T00:29:37.203Z
+                at 2025-09-12T16:00:36.461Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -1,101 +1,77 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS } from '../config/constants';
 import { firebaseAuthService } from '../services/firebaseAuthService';
-import { logger } from './logger';
+import { STORAGE_KEYS } from '../config/constants';
+import { performanceMonitor } from './performanceMonitor';
 
-/**
- * Token Manager - Handles Firebase token refresh and validation
- */
 class TokenManager {
   constructor() {
-    this.refreshPromise = null;
+    this.tokenCache = null;
+    this.tokenPromise = null;
+    this.lastRefresh = 0;
+    this.REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes
   }
 
-  /**
-   * Get a valid token, refreshing if necessary
-   */
   async getValidToken(forceRefresh = false) {
+    const now = Date.now();
+    
+    // Return cached token if recent and not forcing refresh
+    if (!forceRefresh && this.tokenCache && (now - this.lastRefresh) < this.REFRESH_THRESHOLD) {
+      console.log('💾 Valid token obtained and stored');
+      return this.tokenCache;
+    }
+
+    // If already refreshing, wait for that promise
+    if (this.tokenPromise) {
+      return this.tokenPromise;
+    }
+
+    // Start token refresh
+    this.tokenPromise = this._refreshToken();
+    
     try {
-      // If already refreshing, wait for that to complete
-      if (this.refreshPromise) {
-        return await this.refreshPromise;
-      }
-
-      const currentUser = firebaseAuthService.getCurrentUser();
-      if (!currentUser) {
-        logger.warn('No current user found');
-        return null;
-      }
-
-      // Get stored token first
-      let token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      
-      // If no token or force refresh, get fresh token
-      if (!token || forceRefresh || this.isTokenExpired(token)) {
-        logger.info('Getting fresh Firebase token...');
-        
-        this.refreshPromise = this.refreshToken(currentUser);
-        token = await this.refreshPromise;
-        this.refreshPromise = null;
-      }
-
+      const token = await this.tokenPromise;
+      this.tokenCache = token;
+      this.lastRefresh = now;
+      console.log('💾 Valid token obtained and stored');
       return token;
-    } catch (error) {
-      logger.error('Failed to get valid token:', error);
-      this.refreshPromise = null;
-      return null;
+    } finally {
+      this.tokenPromise = null;
     }
   }
 
-  /**
-   * Refresh Firebase token
-   */
-  async refreshToken(currentUser) {
+  async _refreshToken() {
+    console.log('🔄 Getting Firebase token, force refresh: false');
+    performanceMonitor.trackTokenRefresh();
+    performanceMonitor.startTimer('token-refresh');
+    
     try {
-      const freshToken = await currentUser.getIdToken(true);
-      await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, freshToken);
-      logger.info('✅ Token refreshed successfully');
-      return freshToken;
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
+
+      const token = await currentUser.getIdToken(false); // Don't force refresh
+      await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+      performanceMonitor.endTimer('token-refresh');
+      return token;
     } catch (error) {
-      logger.error('Failed to refresh token:', error);
+      console.error('Token refresh failed:', error);
+      performanceMonitor.endTimer('token-refresh');
+      this.clearCache();
       throw error;
     }
   }
 
-  /**
-   * Check if token is expired (basic check)
-   */
-  isTokenExpired(token) {
-    try {
-      if (!token) return true;
-      
-      // Decode JWT payload (Firebase tokens are JWT)
-      const parts = token.split('.');
-      if (parts.length !== 3) return true;
-      
-      const payload = JSON.parse(atob(parts[1]));
-      const now = Math.floor(Date.now() / 1000);
-      
-      // Check if token expires within next 5 minutes
-      return payload.exp && (payload.exp - now) < 300;
-    } catch (error) {
-      logger.error('Error checking token expiration:', error);
-      return true; // Assume expired if can't parse
-    }
+  clearCache() {
+    this.tokenCache = null;
+    this.tokenPromise = null;
+    this.lastRefresh = 0;
   }
 
-  /**
-   * Clear stored token
-   */
-  async clearToken() {
-    try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      logger.info('Token cleared');
-    } catch (error) {
-      logger.error('Failed to clear token:', error);
-    }
+  async logout() {
+    this.clearCache();
+    await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
   }
 }
 
 export const tokenManager = new TokenManager();
-export default tokenManager;

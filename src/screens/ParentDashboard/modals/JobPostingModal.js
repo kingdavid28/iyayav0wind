@@ -25,8 +25,8 @@ import {
 import jobService from '../../../services/jobService';
 import { useAuth } from '../../../core/contexts/AuthContext';
 
-import CustomDateTimePicker from '../../../components/DateTimePicker';
-import TimePicker from '../../../components/TimePicker';
+import CustomDateTimePicker from '../../../shared/ui/inputs/DateTimePicker';
+import TimePicker from '../../../shared/ui/inputs/TimePicker';
 
 // Try to load DateTimePicker if available. Falls back gracefully if not installed.
 let DateTimePicker = null;

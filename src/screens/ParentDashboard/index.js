@@ -1,17 +1,26 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useAuth } from '../../core/contexts/AuthContext';
-import { caregiversAPI, authAPI } from '../../config/api';
-import { jobsAPI, bookingsAPI, childrenAPI } from '../../config/api';
-import { apiService } from '../../services/index';
-import { formatAddress } from '../../utils/addressUtils';
-import { styles } from '../styles/ParentDashboard.styles';
-// Privacy components
-import PrivacyProvider from '../../components/Privacy/PrivacyManager';
-import ProfileDataProvider from '../../components/Privacy/ProfileDataManager';
 
+// Core imports
+import { useAuth } from '../../core/contexts/AuthContext';
+import { useApp } from '../../contexts/AppContext';
+import { useParentDashboard } from '../../hooks/useParentDashboard';
+
+// API imports
+import { childrenAPI, bookingsAPI, jobsAPI, authAPI } from '../../config/api';
+import { apiService } from '../../services/index';
+
+// Utility imports
+import { applyFilters, countActiveFilters } from '../../utils/caregiverUtils';
+import { styles } from '../styles/ParentDashboard.styles';
+
+// Privacy components
+import PrivacyProvider from '../../components/features/privacy/PrivacyManager';
+import ProfileDataProvider from '../../components/features/privacy/ProfileDataManager';
+
+// Component imports
 import Header from './components/Header';
 import NavigationTabs from './components/NavigationTabs';
 import HomeTab from './components/HomeTab';
@@ -19,8 +28,8 @@ import SearchTab from './components/SearchTab';
 import BookingsTab from './components/BookingsTab';
 import MessagesTab from './components/MessagesTab';
 import JobsTab from './components/JobsTab';
-// import ProfileTab from './components/ProfileTab';
-import MobileProfileSection from './components/MobileProfileSection';
+
+// Modal imports
 import ProfileModal from './modals/ProfileModal';
 import FilterModal from './modals/FilterModal';
 import JobPostingModal from './modals/JobPostingModal';
@@ -28,93 +37,118 @@ import BookingModal from './modals/BookingModal';
 import PaymentModal from './modals/PaymentModal';
 import ChildModal from './modals/ChildModal';
 
+// Constants
+const DEFAULT_FILTERS = {
+  availability: { availableNow: false, days: [] },
+  location: { distance: 10, location: '' },
+  rate: { min: 0, max: 1000 },
+  experience: { min: 0, max: 30 },
+  certifications: [],
+  rating: 0,
+};
 
-// Import services
-// import { userService } from '../../services/userService';
-import { useApp } from '../../contexts/AppContext';
-
-// Import utilities
-import { fetchAndProcessBookings } from '../../utils/bookingUtils';
-// import { getCaregiverDisplayName } from '../../utils/caregiverUtils';
-import { applyFilters, countActiveFilters } from '../../utils/caregiverUtils';
-
-// No sample data - all data comes from database
-const SAMPLE_CHILDREN = [];
-const SAMPLE_CAREGIVERS = [];
+const DEFAULT_CAREGIVER = {
+  _id: '1',
+  userId: '1',
+  name: 'Ana Dela Cruz',
+  avatar: 'https://example.com/avatar.jpg',
+  rating: 4.8,
+  reviews: 124,
+  hourlyRate: 350,
+  rate: '₱350/hr'
+};
 
 const ParentDashboard = () => {
   const navigation = useNavigation();
   const { signOut, user } = useAuth();
   const { state } = useApp();
   
-  // State management
+  // Custom hook for dashboard data
+  const {
+    activeTab, setActiveTab,
+    profile,
+    jobs, caregivers, bookings, children,
+    loading,
+    loadProfile, fetchJobs, fetchCaregivers, fetchBookings, fetchChildren
+  } = useParentDashboard();
+  
+  // UI State
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
-  const [showChildModal, setShowChildModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showJobPostingModal, setShowJobPostingModal] = useState(false);
-  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [showAllChildren, setShowAllChildren] = useState(false);
-  const [jobs, setJobs] = useState([]);
-  const [caregivers, setCaregivers] = useState([]);
+  
+  // Modal states
+  const [modals, setModals] = useState({
+    child: false,
+    profile: false,
+    jobPosting: false,
+    filter: false,
+    payment: false,
+    booking: false
+  });
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [filteredCaregivers, setFilteredCaregivers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState(null);
-  const [caregiversLoading, setCaregiversLoading] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  
-  // Filter state
-  const [filters, setFilters] = useState({
-    availability: { availableNow: false, days: [] },
-    location: { distance: 10, location: '' },
-    rate: { min: 0, max: 1000 },
-    experience: { min: 0, max: 30 },
-    certifications: [],
-    rating: 0,
-  });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [activeFilters, setActiveFilters] = useState(0);
-
-  // Local UI state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [children, setChildren] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  const [bookingsFilter, setBookingsFilter] = useState('upcoming');
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentBookingId, setPaymentBookingId] = useState(null);
-  const [paymentBase64, setPaymentBase64] = useState('');
-  const [paymentMime, setPaymentMime] = useState('image/jpeg');
-
-
-
-  // Child form state
-  const [childName, setChildName] = useState('');
-  const [childAge, setChildAge] = useState('');
-  const [childAllergies, setChildAllergies] = useState('');
-  const [childNotes, setChildNotes] = useState('');
-  const [editingChildId, setEditingChildId] = useState(null);
-
-  // Profile form state
-  const [profileName, setProfileName] = useState('');
-  const [profileContact, setProfileContact] = useState('');
-  const [profileLocation, setProfileLocation] = useState('');
-  const [profileImage, setProfileImage] = useState('');
   
-  // Booking modal state
-  const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
-  const [selectedCaregiver, setSelectedCaregiver] = useState({
-    id: '1',
-    name: 'Ana Dela Cruz',
-    avatar: 'https://example.com/avatar.jpg',
-    rating: 4.8,
-    reviews: 124,
-    rate: '$18/hr',
+  // Form states
+  const [childForm, setChildForm] = useState({
+    name: '',
+    age: '',
+    allergies: '',
+    notes: '',
+    editingId: null
   });
+  
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    contact: '',
+    location: '',
+    image: ''
+  });
+  
+  // Booking state
+  const [bookingsFilter, setBookingsFilter] = useState('upcoming');
+  const [selectedCaregiver, setSelectedCaregiver] = useState(DEFAULT_CAREGIVER);
+  const [paymentData, setPaymentData] = useState({
+    bookingId: null,
+    base64: '',
+    mimeType: 'image/jpeg'
+  });
+  
+  // Update profile form when profile data changes
+  useEffect(() => {
+    if (profile) {
+
+      setProfileForm({
+        name: profile.name || '',
+        contact: profile.email || profile.contact || '',
+        location: profile.location || profile.address || '',
+        image: profile.profileImage || profile.avatar || ''
+      });
+    }
+  }, [profile]);
 
   // Derived data
-  const displayName = (user?.displayName || (user?.email ? String(user.email).split('@')[0] : '') || '').trim();
-  const greetingName = (profileName && String(profileName).trim()) || displayName;
+  const displayName = useMemo(() => {
+    return (user?.displayName || (user?.email ? String(user.email).split('@')[0] : '') || '').trim();
+  }, [user]);
+  
+  const greetingName = useMemo(() => {
+    return (profileForm.name && String(profileForm.name).trim()) || displayName;
+  }, [profileForm.name, displayName]);
 
+  // Modal handlers
+  const toggleModal = useCallback((modalName, isOpen = null) => {
+    setModals(prev => ({
+      ...prev,
+      [modalName]: isOpen !== null ? isOpen : !prev[modalName]
+    }));
+  }, []);
+  
   // Quick actions
   const quickActions = useMemo(() => [
     {
@@ -128,33 +162,20 @@ const ParentDashboard = () => {
       icon: 'calendar',
       title: 'Book Service',
       onPress: () => {
-        if (caregivers?.length > 0) {
-          const cg = caregivers[0];
-          setSelectedCaregiver({
-            _id: cg._id || cg.id,
-            id: cg._id || cg.id,
-            userId: cg.userId || null,
-            name: cg.name,
-            avatar: cg.avatar || cg.profileImage,
-            rating: cg.rating,
-            reviews: cg.reviewCount,
-            hourlyRate: cg.hourlyRate,
-            rate: cg.hourlyRate ? `₱${cg.hourlyRate}/hr` : undefined,
-          });
-        } else {
-          setSelectedCaregiver({
-            _id: '1',
-            id: '1',
-            userId: '1',
-            name: 'Ana Dela Cruz',
-            avatar: 'https://example.com/avatar.jpg',
-            rating: 4.8,
-            reviews: 124,
-            hourlyRate: 350,
-            rate: '₱350/hr'
-          });
-        }
-        setIsBookingModalVisible(true);
+        const caregiver = caregivers?.length > 0 ? {
+          _id: caregivers[0]._id || caregivers[0].id,
+          id: caregivers[0].id || caregivers[0]._id,
+          userId: caregivers[0].userId || null,
+          name: caregivers[0].name,
+          avatar: caregivers[0].avatar || caregivers[0].profileImage,
+          rating: caregivers[0].rating,
+          reviews: caregivers[0].reviewCount,
+          hourlyRate: caregivers[0].hourlyRate,
+          rate: caregivers[0].hourlyRate ? `₱${caregivers[0].hourlyRate}/hr` : undefined,
+        } : DEFAULT_CAREGIVER;
+        
+        setSelectedCaregiver(caregiver);
+        toggleModal('booking', true);
       }
     },
     {
@@ -168,193 +189,67 @@ const ParentDashboard = () => {
       icon: 'plus',
       title: 'Add Child',
       onPress: () => openAddChild()
-    },
-    // {
-    //   id: 'post-job',
-    //   icon: 'briefcase',
-    //   title: 'Post Job',
-    //   onPress: () => setActiveTab('jobs')
-    // },
-  ], [caregivers, navigation]);
-
-  // Data loading functions
-  const handleFetchBookings = useCallback(async () => {
-    try {
-      setRefreshing(true);
-      console.log('🔍 Fetching bookings from backend...');
-      
-      const normalizedBookings = await fetchAndProcessBookings(bookingsAPI);
-      setBookings(normalizedBookings);
-      console.log(`✅ Loaded ${normalizedBookings.length} real bookings from backend`);
-      
-    } catch (error) {
-      console.error('❌ Backend bookings fetch failed:', error.message);
-      // Fallback to empty bookings
-      console.log('🔄 Using empty bookings as fallback');
-      setBookings([]);
-    } finally {
-      setRefreshing(false);
     }
-  }, []);
-
-  const fetchCaregivers = useCallback(async () => {
-    try {
-      setCaregiversLoading(true);
-      console.log('🔍 Fetching caregivers using integrated service...');
-      
-      const caregiversList = await apiService.caregivers.getAll();
-      
-      const transformedCaregivers = (caregiversList.caregivers || caregiversList.data || caregiversList || []).map(caregiver => ({
-        ...caregiver,
-        id: caregiver.id || caregiver._id,
-        name: caregiver.name || 'Unnamed Caregiver',
-        rating: typeof caregiver.rating === 'number' ? caregiver.rating : 0,
-        reviewCount: caregiver.reviewCount || 0,
-        hourlyRate: caregiver.hourlyRate || 0,
-        location: caregiver.location || caregiver.address || 'Location not specified',
-        skills: Array.isArray(caregiver.skills) ? caregiver.skills : [],
-        experience: caregiver.experience || { years: 0, months: 0, description: 'No experience information' },
-        availability: caregiver.availability || { days: [] },
-        ageCareRanges: Array.isArray(caregiver.ageCareRanges) ? caregiver.ageCareRanges : []
-      }));
-      
-      setCaregivers(transformedCaregivers);
-      console.log(`✅ Loaded ${transformedCaregivers.length} caregivers via consolidated service`);
-      return transformedCaregivers;
-      
-    } catch (error) {
-      console.error('❌ Consolidated service caregivers fetch failed:', error.message);
-      setCaregivers([]);
-      return [];
-    } finally {
-      setCaregiversLoading(false);
-    }
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Loading profile data from backend...');
-      
-      const profile = await authAPI.getProfile();
-      console.log('📋 Backend profile response:', profile);
-      setUserData(profile.data);
-
-      // Initialize profile form data from API response
-      if (profile.data) {
-        setProfileName(profile.data.name || '');
-        setProfileContact(profile.data.email || profile.data.contact || '');
-        setProfileLocation(profile.data.location || '');
-        
-        const imageUrl = profile.data.profileImage || 
-                        profile.data.avatar || 
-                        profile.data.user?.profileImage || 
-                        profile.data.user?.avatar || 
-                        profile.profileImage ||
-                        profile.avatar ||
-                        '';
-        setProfileImage(imageUrl);
-        console.log('🖼️ Profile image loaded:', imageUrl);
-      }
-
-      // Load jobs from backend
-      const jobsResponse = await jobsAPI.getMyJobs();
-      const jobsList = jobsResponse?.data?.jobs || jobsResponse?.jobs || [];
-      setJobs(jobsList);
-      console.log(`✅ Loaded ${jobsList.length} real jobs from backend`);
-      
-    } catch (error) {
-      console.error('❌ Backend profile/jobs fetch failed:', error.message);
-      // Set fallback values if backend fails
-      console.log('🔄 Using fallback profile data');
-      setProfileName('User');
-      setProfileContact('No email available');
-      setProfileLocation('Location not set');
-      setProfileImage('');
-      setJobs([]); // Empty jobs array as fallback
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMyChildren = useCallback(async () => {
-    try {
-      console.log('🔍 Fetching children from backend...');
-      const response = await childrenAPI.getMyChildren();
-      const childrenList = response?.data?.children || response?.children || [];
-      
-      console.log(`✅ Loaded ${childrenList.length} children from backend`);
-      setChildren(childrenList);
-    } catch (err) {
-      console.error('❌ Backend children fetch failed:', err.message);
-      console.log('🔄 No children available - backend unavailable');
-      setChildren([]);
-    }
-  }, []);
-
-
+  ], [caregivers, setActiveTab, toggleModal]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await Promise.all([
-        loadData(),
+        loadProfile(),
+        fetchJobs(),
         fetchCaregivers(),
-        handleFetchBookings(),
-        fetchMyChildren()
+        fetchBookings(),
+        fetchChildren()
       ]);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [loadData, fetchCaregivers, handleFetchBookings, fetchMyChildren]);
+  }, [loadProfile, fetchJobs, fetchCaregivers, fetchBookings, fetchChildren]);
 
 
 
-  // Initial data load
-  const didInitRef = useRef(false);
-  useEffect(() => {
-    if (didInitRef.current) return;
-    didInitRef.current = true;
-    
-    const loadInitialData = async () => {
-      await Promise.all([
-        loadData(),
-        fetchCaregivers(),
-        handleFetchBookings(),
-        fetchMyChildren()
-      ]);
-    };
-    
-    loadInitialData();
-  }, []);
+  // Initial data load handled by hook
 
   // Refetch bookings when tab becomes active
   useEffect(() => {
     if (activeTab === 'bookings') {
-      handleFetchBookings();
+      fetchBookings();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchBookings]);
+
+  // Refresh profile when returning from navigation
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProfile();
+    });
+    return unsubscribe;
+  }, [navigation, loadProfile]);
 
   // Child management functions
   const openAddChild = useCallback(() => {
-    setEditingChildId(null);
-    setChildName('');
-    setChildAge('');
-    setChildAllergies('');
-    setChildNotes('');
-    setShowChildModal(true);
-  }, []);
+    setChildForm({
+      name: '',
+      age: '',
+      allergies: '',
+      notes: '',
+      editingId: null
+    });
+    toggleModal('child', true);
+  }, [toggleModal]);
 
   const openEditChild = useCallback((child) => {
-    setEditingChildId(child._id || child.id);
-    setChildName(child.name || '');
-    setChildAge(String(child.age ?? ''));
-    setChildAllergies(child.allergies || '');
-    setChildNotes(child.preferences || '');
-    setShowChildModal(true);
-  }, []);
+    setChildForm({
+      name: child.name || '',
+      age: String(child.age ?? ''),
+      allergies: child.allergies || '',
+      notes: child.preferences || '',
+      editingId: child._id || child.id
+    });
+    toggleModal('child', true);
+  }, [toggleModal]);
 
   const handleDeleteChild = useCallback(async (child) => {
     Alert.alert(
@@ -367,99 +262,75 @@ const ParentDashboard = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Remove from local state immediately for better UX
-              const childId = child._id || child.id;
-              setChildren(prevChildren => prevChildren.filter(c => (c._id || c.id) !== childId));
-              
-              await childrenAPI.delete(childId);
+              await childrenAPI.delete(child._id || child.id);
+              await fetchChildren();
               Alert.alert('Success', 'Child deleted successfully!');
             } catch (error) {
-              console.error('❌ Child delete failed:', error);
-              // Restore the child if delete failed
-              await fetchMyChildren();
+              console.error('Child delete failed:', error);
               Alert.alert('Error', 'Failed to delete child. Please try again.');
             }
           }
         }
       ]
     );
-  }, [fetchMyChildren]);
+  }, [fetchChildren]);
 
   const handleAddOrSaveChild = useCallback(async () => {
-    const trimmedName = (childName || '').trim();
+    const trimmedName = childForm.name.trim();
     if (!trimmedName) return;
     
-    const ageNum = Number(childAge || 0);
     const childData = {
       name: trimmedName,
-      age: ageNum,
-      allergies: childAllergies || '',
-      preferences: childNotes || ''
+      age: Number(childForm.age || 0),
+      allergies: childForm.allergies || '',
+      preferences: childForm.notes || ''
     };
     
     try {
-      console.log('🔍 Attempting to save child:', childData);
-      
-      if (editingChildId) {
-        // Update existing child
-        const result = await childrenAPI.update(editingChildId, childData);
-        console.log('✅ Child updated successfully:', result);
+      if (childForm.editingId) {
+        await childrenAPI.update(childForm.editingId, childData);
       } else {
-        // Create new child
-        const result = await childrenAPI.create(childData);
-        console.log('✅ Child created successfully:', result);
+        await childrenAPI.create(childData);
       }
       
-      // Refresh children list
-      await fetchMyChildren();
+      await fetchChildren();
+      toggleModal('child', false);
+      setChildForm({ name: '', age: '', allergies: '', notes: '', editingId: null });
       
-      // Close modal and reset form
-      setShowChildModal(false);
-      setEditingChildId(null);
-      setChildName('');
-      setChildAge('');
-      setChildAllergies('');
-      setChildNotes('');
-      
-      Alert.alert('Success', editingChildId ? 'Child updated successfully!' : 'Child added successfully!');
+      Alert.alert('Success', childForm.editingId ? 'Child updated successfully!' : 'Child added successfully!');
     } catch (error) {
-      console.error('❌ Child save failed:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        stack: error.stack,
-        childData
-      });
+      console.error('Child save failed:', error);
       
-      let errorMessage = 'Failed to save child. Please try again.';
+      const errorMessages = {
+        'Network request failed': 'Network connection failed. Please check your internet connection and try again.',
+        'No auth token found': 'Authentication error. Please log out and log back in.',
+        '401': 'Authentication expired. Please log out and log back in.'
+      };
       
-      if (error.message.includes('Network request failed')) {
-        errorMessage = 'Network connection failed. Please check your internet connection and try again.';
-      } else if (error.message.includes('No auth token found')) {
-        errorMessage = 'Authentication error. Please log out and log back in.';
-      } else if (error.message.includes('401')) {
-        errorMessage = 'Authentication expired. Please log out and log back in.';
-      }
+      const errorMessage = Object.keys(errorMessages).find(key => error.message.includes(key))
+        ? errorMessages[Object.keys(errorMessages).find(key => error.message.includes(key))]
+        : 'Failed to save child. Please try again.';
       
       Alert.alert('Error', errorMessage);
     }
-  }, [childName, childAge, childAllergies, childNotes, editingChildId, fetchMyChildren]);
+  }, [childForm, fetchChildren, toggleModal]);
 
   // Caregiver interaction functions
   const handleViewCaregiver = (caregiver) => {
-    navigation.navigate('CaregiverProfile', { caregiverId: caregiver.id });
+    navigation.navigate('CaregiverProfile', { caregiverId: caregiver._id });
   };
 
   const handleMessageCaregiver = async (caregiver) => {
     try {
       const conversation = await apiService.messaging.startConversation(
-        caregiver.id,
+        caregiver._id,
         caregiver.name,
         'caregiver',
         `Hi ${caregiver.name}, I'm interested in your services.`
       );
       
       navigation.navigate('Messaging', { 
-        recipientId: caregiver.id,
+        recipientId: caregiver._id,
         recipientName: caregiver.name,
         recipientAvatar: caregiver.avatar,
         conversationId: conversation.conversation?.id
@@ -468,16 +339,17 @@ const ParentDashboard = () => {
       console.error('Failed to start conversation:', error);
       // Fallback to direct navigation
       navigation.navigate('Messaging', { 
-        recipientId: caregiver.id,
+        recipientId: caregiver._id,
         recipientName: caregiver.name,
         recipientAvatar: caregiver.avatar
       });
     }
   };
 
-  const handleBookCaregiver = (caregiver) => {
+  const handleBookCaregiver = useCallback((caregiver) => {
     setSelectedCaregiver({
-      id: caregiver.id,
+      _id: caregiver._id || caregiver.id,
+      id: caregiver.id || caregiver._id,
       name: caregiver.name,
       avatar: caregiver.avatar,
       rating: caregiver.rating,
@@ -485,8 +357,8 @@ const ParentDashboard = () => {
       hourlyRate: caregiver.hourlyRate,
       rate: caregiver.hourlyRate ? `₱${caregiver.hourlyRate}/hr` : undefined,
     });
-    setIsBookingModalVisible(true);
-  };
+    toggleModal('booking', true);
+  }, [toggleModal]);
 
   // Booking functions
   const handleBookingConfirm = async (bookingData) => {
@@ -531,8 +403,8 @@ const ParentDashboard = () => {
       console.log('✅ Booking created successfully:', booking);
       
       setActiveTab('bookings');
-      await handleFetchBookings();
-      setIsBookingModalVisible(false);
+      await fetchBookings();
+      toggleModal('booking', false);
       Alert.alert('Success', 'Booking created successfully!');
       
       return booking;
@@ -543,37 +415,39 @@ const ParentDashboard = () => {
     }
   };
 
-  const handleCancelBooking = async (bookingId) => {
+  const handleCancelBooking = useCallback(async (bookingId) => {
     try {
       setRefreshing(true);
       await bookingsAPI.cancel(bookingId);
-    } catch (e) {
-      console.warn('Failed to cancel booking:', e?.message || e);
+    } catch (error) {
+      console.warn('Failed to cancel booking:', error?.message || error);
     } finally {
-      await handleFetchBookings();
+      await fetchBookings();
+      setRefreshing(false);
     }
-  };
+  }, [fetchBookings]);
 
-  const openPaymentModal = (bookingId) => {
-    setPaymentBookingId(bookingId);
-    setPaymentBase64('');
-    setPaymentMime('image/jpeg');
-    setShowPaymentModal(true);
-  };
+  const openPaymentModal = useCallback((bookingId, paymentType = 'deposit') => {
+    setPaymentData({
+      bookingId,
+      base64: '',
+      mimeType: 'image/jpeg'
+    });
+    toggleModal('payment', true);
+  }, [toggleModal]);
 
-  const handleUploadPayment = async () => {
-    if (!paymentBookingId || !paymentBase64) return;
+  const handleUploadPayment = useCallback(async () => {
+    if (!paymentData.bookingId || !paymentData.base64) return;
     
     try {
-      await bookingsAPI.uploadPaymentProof(paymentBookingId, paymentBase64, paymentMime);
-      setShowPaymentModal(false);
-      setPaymentBookingId(null);
-      setPaymentBase64('');
-      await handleFetchBookings();
-    } catch (e) {
-      console.warn('Failed to upload payment proof:', e?.message || e);
+      await bookingsAPI.uploadPaymentProof(paymentData.bookingId, paymentData.base64, paymentData.mimeType);
+      toggleModal('payment', false);
+      setPaymentData({ bookingId: null, base64: '', mimeType: 'image/jpeg' });
+      await fetchBookings();
+    } catch (error) {
+      console.warn('Failed to upload payment proof:', error?.message || error);
     }
-  };
+  }, [paymentData, toggleModal, fetchBookings]);
 
   // Search function
   const handleSearch = useCallback((query) => {
@@ -609,16 +483,16 @@ const ParentDashboard = () => {
   };
 
   // Job management functions
-  const handleCreateJob = () => {
-    setShowJobPostingModal(true);
-  };
+  const handleCreateJob = useCallback(() => {
+    toggleModal('jobPosting', true);
+  }, [toggleModal]);
 
-  const handleEditJob = (job) => {
+  const handleEditJob = useCallback((job) => {
     // Set job data for editing
-    setShowJobPostingModal(true);
-  };
+    toggleModal('jobPosting', true);
+  }, [toggleModal]);
 
-  const handleCompleteJob = async (jobId) => {
+  const handleCompleteJob = useCallback(async (jobId) => {
     Alert.alert(
       'Complete Job',
       'Mark this job as completed?',
@@ -628,30 +502,20 @@ const ParentDashboard = () => {
           text: 'Complete',
           onPress: async () => {
             try {
-              setLoading(true);
               await jobsAPI.update(jobId, { status: 'completed' });
-              
-              // Update job status in local state immediately
-              setJobs(prevJobs => prevJobs.map(job => 
-                (job.id === jobId || job._id === jobId) 
-                  ? { ...job, status: 'completed' }
-                  : job
-              ));
-              
+              await fetchJobs();
               Alert.alert('Success', 'Job marked as completed');
             } catch (error) {
               console.error('Error completing job:', error);
               Alert.alert('Error', 'Failed to complete job');
-            } finally {
-              setLoading(false);
             }
           }
         }
       ]
     );
-  };
+  }, [fetchJobs]);
 
-  const handleDeleteJob = async (jobId) => {
+  const handleDeleteJob = useCallback(async (jobId) => {
     Alert.alert(
       'Delete Job',
       'Are you sure you want to delete this job posting?',
@@ -662,89 +526,66 @@ const ParentDashboard = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              setLoading(true);
               await jobsAPI.delete(jobId);
-              
-              // Remove job from local state immediately
-              setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId && job._id !== jobId));
-              
               Alert.alert('Success', 'Job deleted successfully');
-              await loadData(); // Refresh jobs list
+              await fetchJobs();
             } catch (error) {
               console.error('Error deleting job:', error);
               Alert.alert('Error', 'Failed to delete job');
-            } finally {
-              setLoading(false);
             }
           }
         }
       ]
     );
-  };
+  }, [fetchJobs]);
 
-  const handleJobPosted = async (newJob) => {
+  const handleJobPosted = useCallback(async (newJob) => {
     try {
-      // Add new job to local state immediately
-      setJobs(prevJobs => [newJob, ...prevJobs]);
-      setShowJobPostingModal(false);
+      toggleModal('jobPosting', false);
       Alert.alert('Success', 'Job posted successfully!');
-      
-      // Refresh data to sync with backend
-      await loadData();
+      await fetchJobs();
     } catch (error) {
       console.error('Error handling job post:', error);
     }
-  };
+  }, [toggleModal, fetchJobs]);
 
-  // Handle view all children
-  const handleViewAllChildren = () => {
-    setShowAllChildren(!showAllChildren);
-  };
+  const handleViewAllChildren = useCallback(() => {
+    setShowAllChildren(prev => !prev);
+  }, []);
 
   // Profile functions
-  const handleSaveProfile = async (imageUri = null) => {
+  const handleSaveProfile = useCallback(async (imageUri = null) => {
     try {
       const updateData = {
-        name: profileName.trim(),
-        contact: profileContact.trim(),
-        location: profileLocation.trim()
+        name: profileForm.name.trim(),
+        phone: profileForm.contact.trim(),
+        address: profileForm.location.trim(),
+        location: profileForm.location.trim()
       };
+      
+      console.log('Profile form location:', profileForm.location);
+      console.log('Update data being sent:', updateData);
+      
 
-      console.log('Updating profile with data:', updateData);
       
       // Handle image upload if provided
       if (imageUri) {
         try {
-          // Convert image to base64 using FileSystem (React Native compatible)
           const base64Image = await FileSystem.readAsStringAsync(imageUri, {
             encoding: 'base64',
           });
           
-          // Upload image first
           const imageResult = await authAPI.uploadProfileImage(base64Image, 'image/jpeg');
-          console.log('Image upload result:', imageResult);
-          
-          // Handle different response structures
           const imageUrl = imageResult?.data?.url || imageResult?.url || imageResult?.data?.profileImageUrl;
+          
           if (imageUrl) {
-            setProfileImage(imageUrl);
-            console.log('✅ Profile image updated to:', imageUrl);
+            setProfileForm(prev => ({ ...prev, image: imageUrl }));
             
-            // If image upload response contains updated user data, update profile info and skip separate API call
             if (imageResult?.data?.user) {
-              const userData = imageResult.data.user;
-              
-              // Update local state with image upload response data
-              setProfileName(updateData.name); // Use the form data for name
-              setProfileContact(updateData.contact); // Use the form data for contact
-              setProfileLocation(updateData.location); // Use the form data for location
-              setProfileImage(userData.profileImage || imageUrl);
-              setUserData({ ...userData, ...updateData });
-              
-              setShowProfileModal(false);
+              toggleModal('profile', false);
               Alert.alert('Success', 'Profile updated successfully');
-              await loadData();
-              return; // Skip the separate profile update call since image upload already updated the profile
+              await loadProfile();
+              return;
             }
           }
         } catch (imageError) {
@@ -753,7 +594,6 @@ const ParentDashboard = () => {
         }
       }
       
-      // Get fresh token before making the request
       const { tokenManager } = await import('../../utils/tokenManager');
       const freshToken = await tokenManager.getValidToken(true);
       
@@ -761,23 +601,22 @@ const ParentDashboard = () => {
         throw new Error('Authentication required. Please log in again.');
       }
       
-      // Make profile update call only if no image was uploaded or image upload failed
       const result = await authAPI.updateProfile(updateData);
       
-      console.log('Profile update result:', result);
-      
-      // Update local state with API response
-      if (result && result.data) {
-        setProfileName(result.data.name || profileName);
-        setProfileContact(result.data.contact || result.data.email || profileContact);
-        setProfileLocation(result.data.location || profileLocation);
-        if (result.data.profileImage) {
-          setProfileImage(result.data.profileImage);
-        }
+      if (result?.data) {
+        console.log('Profile update result:', result.data);
+        // Keep the location we just saved since server doesn't return it
+        setProfileForm(prev => ({
+          ...prev,
+          name: result.data.name || prev.name,
+          contact: result.data.contact || result.data.email || prev.contact,
+          location: prev.location, // Keep our saved location
+          image: result.data.profileImage || prev.image
+        }));
         
-        setShowProfileModal(false);
+        toggleModal('profile', false);
         Alert.alert('Success', 'Profile updated successfully');
-        await loadData();
+        await loadProfile();
       } else {
         Alert.alert('Error', 'Failed to update profile');
       }
@@ -785,7 +624,7 @@ const ParentDashboard = () => {
       console.error('Error saving profile:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     }
-  };
+  }, [profileForm, toggleModal, loadProfile]);
 
   // Render functions
   const renderActiveTab = () => {
@@ -803,13 +642,13 @@ const ParentDashboard = () => {
             onViewAllChildren={handleViewAllChildren}
             showAllChildren={showAllChildren}
             greetingName={greetingName}
-            profileImage={profileImage}
-            profileContact={profileContact}
-            profileLocation={profileLocation}
-            userData={userData}
+            profileImage={profileForm.image}
+            profileContact={profileForm.contact}
+            profileLocation={profile.location || profile.address || profileForm.location}
             caregivers={caregivers}
             onBookCaregiver={handleBookCaregiver}
             onMessageCaregiver={handleMessageCaregiver}
+            navigation={navigation}
           />
         );
       case 'search':
@@ -826,7 +665,7 @@ const ParentDashboard = () => {
             onMessageCaregiver={handleMessageCaregiver}
             onViewCaregiver={handleViewCaregiver}
             onSearch={handleSearch}
-            onOpenFilter={() => setShowFilterModal(true)}
+            onOpenFilter={() => toggleModal('filter', true)}
           />
         );
       case 'bookings':
@@ -841,6 +680,24 @@ const ParentDashboard = () => {
             onUploadPayment={openPaymentModal}
             onViewBookingDetails={(bookingId) => navigation.navigate('BookingDetails', { bookingId })}
             onWriteReview={(bookingId, caregiverId) => navigation.navigate('Review', { bookingId, caregiverId })}
+            onCreateBooking={() => {
+              const caregiver = caregivers?.length > 0 ? {
+                _id: caregivers[0]._id || caregivers[0].id,
+                id: caregivers[0].id || caregivers[0]._id,
+                userId: caregivers[0].userId || null,
+                name: caregivers[0].name,
+                avatar: caregivers[0].avatar || caregivers[0].profileImage,
+                rating: caregivers[0].rating,
+                reviews: caregivers[0].reviewCount,
+                hourlyRate: caregivers[0].hourlyRate,
+                rate: caregivers[0].hourlyRate ? `₱${caregivers[0].hourlyRate}/hr` : undefined,
+              } : DEFAULT_CAREGIVER;
+              
+              setSelectedCaregiver(caregiver);
+              toggleModal('booking', true);
+            }}
+            onMessageCaregiver={handleMessageCaregiver}
+            navigation={navigation}
           />
         );
       case 'messages':
@@ -874,21 +731,21 @@ const ParentDashboard = () => {
         <View style={styles.container}>
       <Header 
         navigation={navigation} 
-        onProfilePress={() => setShowProfileModal(true)} 
+        onProfilePress={() => toggleModal('profile', true)} 
         onSignOut={signOut}
         greetingName={greetingName}
-        onProfileEdit={() => setShowProfileModal(true)}
-        profileName={profileName}
-        profileImage={profileImage}
-        profileContact={profileContact}
-        profileLocation={profileLocation}
+        onProfileEdit={() => toggleModal('profile', true)}
+        profileName={profileForm.name}
+        profileImage={profileForm.image}
+        profileContact={profileForm.contact}
+        profileLocation={profileForm.location}
         setActiveTab={setActiveTab}
       />
       
       <NavigationTabs 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        onProfilePress={() => setShowProfileModal(true)}
+        onProfilePress={() => toggleModal('profile', true)}
         navigation={navigation}
       />
       
@@ -896,58 +753,64 @@ const ParentDashboard = () => {
 
       {/* Modals */}
       <ChildModal
-        visible={showChildModal}
-        onClose={() => setShowChildModal(false)}
-        childName={childName}
-        setChildName={setChildName}
-        childAge={childAge}
-        setChildAge={setChildAge}
-        childAllergies={childAllergies}
-        setChildAllergies={setChildAllergies}
-        childNotes={childNotes}
-        setChildNotes={setChildNotes}
+        visible={modals.child}
+        onClose={() => toggleModal('child', false)}
+        childName={childForm.name}
+        setChildName={(name) => setChildForm(prev => ({ ...prev, name }))}
+        childAge={childForm.age}
+        setChildAge={(age) => setChildForm(prev => ({ ...prev, age }))}
+        childAllergies={childForm.allergies}
+        setChildAllergies={(allergies) => setChildForm(prev => ({ ...prev, allergies }))}
+        childNotes={childForm.notes}
+        setChildNotes={(notes) => setChildForm(prev => ({ ...prev, notes }))}
         onSave={handleAddOrSaveChild}
-        editing={!!editingChildId}
+        editing={!!childForm.editingId}
       />
 
       <ProfileModal
-        visible={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-        profileName={profileName}
-        setProfileName={setProfileName}
-        profileContact={profileContact}
-        setProfileContact={setProfileContact}
-        profileLocation={profileLocation}
-        setProfileLocation={setProfileLocation}
-        profileImage={profileImage}
-        setProfileImage={setProfileImage}
+        visible={modals.profile}
+        onClose={() => toggleModal('profile', false)}
+        profileName={profileForm.name}
+        setProfileName={(name) => setProfileForm(prev => ({ ...prev, name }))}
+        profileContact={profileForm.contact}
+        setProfileContact={(contact) => setProfileForm(prev => ({ ...prev, contact }))}
+        profileLocation={profileForm.location}
+        setProfileLocation={(location) => setProfileForm(prev => ({ ...prev, location }))}
+        profileImage={profileForm.image}
+        setProfileImage={(image) => setProfileForm(prev => ({ ...prev, image }))}
         handleSaveProfile={handleSaveProfile}
       />
 
       <FilterModal
-        visible={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
+        visible={modals.filter}
+        onClose={() => toggleModal('filter', false)}
         filters={filters}
         onApplyFilters={handleApplyFilters}
       />
 
       <JobPostingModal
-        visible={showJobPostingModal}
-        onClose={() => setShowJobPostingModal(false)}
+        visible={modals.jobPosting}
+        onClose={() => toggleModal('jobPosting', false)}
         onJobPosted={handleJobPosted}
       />
 
       <PaymentModal
-        visible={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        paymentBase64={paymentBase64}
-        setPaymentBase64={setPaymentBase64}
-        onUpload={handleUploadPayment}
+        visible={modals.payment}
+        onClose={() => toggleModal('payment', false)}
+        bookingId={paymentData.bookingId}
+        amount={bookings.find(b => b._id === paymentData.bookingId)?.totalCost}
+        caregiverName={bookings.find(b => b._id === paymentData.bookingId)?.caregiver?.name}
+        bookingDate={bookings.find(b => b._id === paymentData.bookingId)?.date}
+        paymentType={bookings.find(b => b._id === paymentData.bookingId)?.status === 'completed' ? 'final_payment' : 'deposit'}
+        onPaymentSuccess={() => {
+          toggleModal('payment', false);
+          fetchBookings();
+        }}
       />
 
       <BookingModal
-        visible={isBookingModalVisible}
-        onClose={() => setIsBookingModalVisible(false)}
+        visible={modals.booking}
+        onClose={() => toggleModal('booking', false)}
         caregiver={selectedCaregiver}
         childrenList={children}
         onConfirm={handleBookingConfirm}

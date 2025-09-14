@@ -33,7 +33,9 @@ class ErrorHandler {
       keys: Object.keys(error || {}),
       string: String(error),
       message: error?.message,
-      stack: error?.stack
+      stack: error?.stack,
+      status: error?.status,
+      statusCode: error?.statusCode
     });
 
 
@@ -65,8 +67,12 @@ class ErrorHandler {
     return (
       error.code === "NETWORK_ERROR" ||
       error.code === "ECONNABORTED" ||
+      error.code === "ECONNREFUSED" ||
       error.message?.includes("Network Error") ||
       error.message?.includes("timeout") ||
+      error.message?.includes("Failed to fetch") ||
+      error.message?.includes("fetch") ||
+      error.name === "TypeError" ||
       !error.response
     )
   }

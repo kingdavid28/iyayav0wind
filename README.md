@@ -162,22 +162,87 @@ iyayav0CleanStart/
 └── components/          # Reusable components (if needed)
 \`\`\`
 
-## API Endpoints (MongoDB Backend)
+## API Endpoints Reference
 
-You'll need to create a Node.js/Express backend with the following endpoints:
+### Authentication Routes (`/api/auth`)
+- `POST /register` - Register new user (parent/caregiver)
+- `POST /login` - User login
+- `POST /logout` - User logout
+- `POST /refresh-token` - Refresh JWT token
+- `POST /reset-password` - Request password reset
+- `POST /confirm-reset-password` - Confirm password reset
+- `POST /check-email` - Check if email exists
+- `GET /verify-email/:token` - Verify email address
+- `POST /resend-verification` - Resend verification email
+- `POST /firebase-sync` - Sync Firebase user
+- `GET /firebase-profile` - Get Firebase profile
+- `PUT /firebase-profile` - Update Firebase profile
+- `POST /send-custom-verification` - Send custom verification
+- `GET /me` - Get current user profile
+- `GET /profile` - Get user profile (alias)
+- `PUT /profile` - Update user profile
+- `PATCH /role` - Update user role
+- `POST /profile/image-base64` - Upload profile image
+- `PUT /profile/children` - Update children info
+- `GET /health-check` - Service health check
 
-### Jobs
-- `GET /api/jobs` - Get all jobs
-- `POST /api/jobs` - Create new job
-- `GET /api/jobs/:id` - Get job by ID
-- `POST /api/jobs/:id/apply` - Apply to job
+### Caregiver Routes (`/api/caregivers`)
+- `GET /` - Search/browse caregivers (public)
+- `GET /:id` - Get caregiver details (public)
+- `GET /profile` - Get authenticated caregiver profile
+- `PUT /profile` - Update caregiver profile
+- `POST /documents` - Upload documents/certifications
+- `POST /refresh-token` - Refresh auth token
+- `POST /background-check` - Request background check
 
-### Users
-- `GET /api/nannies` - Get all nannies
-- `GET /api/nannies/:id` - Get nanny by ID
-- `PUT /api/nannies/:id` - Update nanny profile
-- `GET /api/employers/:id` - Get employer by ID
-- `PUT /api/employers/:id` - Update employer profile
+### Job Routes (`/api/jobs`)
+- `GET /` - Get all available jobs
+- `GET /my` - Get user's posted jobs
+- `POST /` - Create new job posting
+- `PUT /:id` - Update job
+- `GET /:id` - Get job by ID
+- `DELETE /:id` - Delete job
+- `GET /:id/applications` - Get applications for job
+
+### Application Routes (`/api/applications`)
+- `POST /` - Apply to job
+- `GET /my-applications` - Get caregiver's applications
+- `GET /my` - Get applications (alias)
+- `GET /:id` - Get single application
+- `PATCH /:id/status` - Update application status
+- `DELETE /:id` - Withdraw application
+- `GET /job/:jobId` - Get applications for specific job
+
+### Booking Routes (`/api/bookings`)
+- `POST /` - Create new booking
+- `GET /my` - Get user's bookings
+- `GET /:id` - Get booking details
+- `PATCH /:id/status` - Update booking status
+- `POST /:id/payment-proof` - Upload payment proof
+- `DELETE /:id` - Cancel booking
+
+### Message Routes (`/api/messages`)
+- `GET /conversations` - Get all conversations
+- `GET /conversation/:id` - Get conversation messages
+- `GET /conversation/:id/info` - Get conversation info
+- `POST /` - Send message
+- `POST /conversation/:id/read` - Mark messages as read
+- `POST /start` - Start new conversation
+- `DELETE /:messageId` - Delete message
+
+### Other Routes
+- `/api/profile` - User profile management
+- `/api/children` - Child profile management
+- `/api/uploads` - File upload handling
+- `/api/contracts` - Service contract management
+- `/api/privacy` - Privacy settings
+- `/api/notifications` - Push notifications
+- `/api/payments` - Payment processing
+- `/api/data` - Data export/import
+- `/api/availability` - Caregiver availability
+- `/api/health` - Server health check
+
+**Authentication**: All protected routes require `Authorization: Bearer <token>` header with Firebase or JWT token.
 
 ## Features to Implement
 
@@ -192,7 +257,7 @@ You'll need to create a Node.js/Express backend with the following endpoints:
 ### Phase 2 (Future)
 - [ ] Real-time messaging with Socket.IO
 - [ ] Push notifications
-- [ ] Image upload for profiles
+- [🔄] Image upload for profiles (Backend ✅, Frontend partial)
 - [ ] Advanced filtering and search
 - [ ] Rating and review system
 - [ ] Payment integration

@@ -36,10 +36,10 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CustomDateTimePicker from '../components/DateTimePicker';
-import TimePicker from '../components/TimePicker';
+import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
+import TimePicker from '../shared/ui/inputs/TimePicker';
 import { useAuth } from '../core/contexts/AuthContext';
-import { jobsAPI, applicationsAPI, bookingsAPI, caregiversAPI, authAPI, uploadsAPI } from "../config/api";
+import { jobsAPI, applicationsAPI, bookingsAPI, caregiversAPI, authAPI, uploadsAPI, getCurrentAPIURL } from "../config/api";
 import { VALIDATION, CURRENCY, FEATURES } from '../config/constants';
 import { getCurrentSocketURL } from '../config/api';
 import { styles } from './styles/EnhancedCaregiverProfileWizard.styles';
@@ -515,7 +515,12 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Document upload failed:', error);
-      Alert.alert('Upload Failed', 'Failed to upload document. Please try again.');
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      Alert.alert('Upload Failed', error.message || 'Failed to upload document. Please try again.');
     } finally {
       setDocumentUploading(false);
     }
@@ -569,15 +574,27 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
   const requestBackgroundCheck = async () => {
     try {
       setLoading(true);
-      await caregiversAPI.requestBackgroundCheck();
+      const personalInfo = {
+        firstName: formData.name.split(' ')[0],
+        lastName: formData.name.split(' ').slice(1).join(' '),
+        dateOfBirth: null, // This would need to be collected in the form
+        address: formData.address
+      };
+      await caregiversAPI.requestBackgroundCheck({ personalInfo });
       showSnackbar('Background check requested successfully');
       updateFormData('backgroundCheck', {
         ...formData.backgroundCheck,
         requestBackgroundCheck: true
       });
     } catch (error) {
-      console.error('Background check request failed:', error);
-      Alert.alert('Request Failed', 'Failed to request background check. Please try again.');
+      console.error('Background check request failed:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        error: error
+      });
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to request background check. Please try again.';
+      Alert.alert('Request Failed', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -981,10 +998,10 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
 
       const profileData = {
         name: formData.name,
-        phone: formData.phone || '+63', // Provide default phone if empty
+        phone: formData.phone && formData.phone.trim() !== '+63' ? formData.phone : '+639123456789', // Valid default phone
         bio: formData.bio,
-        experience: formData.experience,
-        hourlyRate: parseFloat(formData.hourlyRate),
+        experience: (formData.experience.years || 0) * 12 + (formData.experience.months || 0), // Convert to total months
+        hourlyRate: parseFloat(formData.hourlyRate) || 0,
         education: formData.education,
         languages: formData.languages,
         skills: formData.skills,
@@ -1006,26 +1023,146 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         documents: normalizedDocuments,
       };
 
+      console.log('📤 FULL PROFILE DATA BEING SENT:', JSON.stringify(profileData, null, 2));
+      console.log('📤 Profile data summary:', {
+        isEdit,
+        dataKeys: Object.keys(profileData),
+        name: profileData.name,
+        bio: profileData.bio?.substring(0, 50) + '...',
+        skillsCount: profileData.skills?.length,
+        hourlyRate: profileData.hourlyRate,
+        hasEmergencyContacts: !!profileData.emergencyContacts,
+        emergencyContactsCount: profileData.emergencyContacts?.length,
+        hasDocuments: !!profileData.documents,
+        documentsCount: profileData.documents?.length,
+        hasAddress: !!profileData.address,
+        hasCertifications: !!profileData.certifications,
+        certificationsCount: profileData.certifications?.length
+      });
+
+      let result;
       if (isEdit) {
-        await caregiversAPI.updateMyProfile(profileData);
-        showSnackbar('Profile updated successfully');
+        console.log('🔄 Calling updateProfile API...');
+        // Get Firebase token directly
+        const { firebaseAuthService } = await import('../services/firebaseAuthService');
+        const currentUser = firebaseAuthService.getCurrentUser();
+        const token = currentUser ? await currentUser.getIdToken() : null;
+        
+        console.log('🔑 Auth token check:', {
+          hasUser: !!user,
+          hasToken: !!token,
+          tokenLength: token?.length,
+          userId: user?.id
+        });
+        
+        if (!token) {
+          throw new Error('No authentication token available');
+        }
+        
+        try {
+          // Use the correct caregiver endpoint
+          const baseURL = getCurrentAPIURL();
+          const caregiverEndpoint = `${baseURL}/caregivers/profile`;
+          
+          console.log('🎯 Using caregiver endpoint:', caregiverEndpoint);
+          
+          const response = await fetch(caregiverEndpoint, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(profileData),
+          });
+          
+          console.log('📡 Caregiver endpoint response:', response.status, response.statusText);
+          
+          const responseData = await response.json();
+          console.log('📥 Caregiver response data:', responseData);
+          
+          if (!response.ok) {
+            throw new Error(responseData.error || `Caregiver profile update failed: ${response.status}`);
+          }
+          
+          result = responseData;
+          console.log('✅ CAREGIVER PROFILE UPDATE SUCCESS:', JSON.stringify(result, null, 2));
+        } catch (updateError) {
+          console.error('❌ Caregiver profile update failed:', updateError);
+          throw updateError;
+        }
       } else {
-        await caregiversAPI.createProfile(profileData);
-        showSnackbar('Profile created successfully');
+        console.log('🆕 Creating new caregiver profile...');
+        // For new profiles, also use the caregiver endpoint
+        const baseURL = getCurrentAPIURL();
+        const caregiverEndpoint = `${baseURL}/caregivers/profile`;
+        
+        const { firebaseAuthService } = await import('../services/firebaseAuthService');
+        const currentUser = firebaseAuthService.getCurrentUser();
+        const token = currentUser ? await currentUser.getIdToken() : null;
+        
+        if (!token) {
+          throw new Error('No authentication token available');
+        }
+        
+        const response = await fetch(caregiverEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(profileData),
+        });
+        
+        const responseData = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(responseData.error || `Caregiver profile creation failed: ${response.status}`);
+        }
+        
+        result = responseData;
+        console.log('✅ CAREGIVER PROFILE CREATED:', JSON.stringify(result, null, 2));
         await AsyncStorage.removeItem(`@enhanced_caregiver_profile_draft_${user?.id}`);
       }
       
-      // Navigate back with refresh params
-      navigation.navigate('CaregiverDashboard', { refreshProfile: Date.now() });
+      if (result) {
+        showSnackbar(isEdit ? 'Profile updated successfully' : 'Profile created successfully');
+        
+        // Force refresh the auth context to get updated profile data
+        const { useAuth } = await import('../core/contexts/AuthContext');
+        // Trigger a profile refresh in the auth context
+        
+        setTimeout(() => {
+          navigation.navigate('CaregiverDashboard', { refreshProfile: Date.now() });
+        }, 1000);
+      }
+
     } catch (error) {
-      console.error('Profile submission failed:', error);
-      console.error('Error details:', {
+      console.error('❌ Profile submission failed:', error);
+      console.error('📝 Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        config: error.config
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data ? 'Data present' : 'No data'
       });
-      Alert.alert('Submission Failed', error.response?.data?.message || error.message || 'Failed to save profile. Please try again.');
+      
+      let errorMessage = 'Failed to save profile. Please try again.';
+      if (error.response?.status === 404) {
+        errorMessage = 'Profile endpoint not found. Please check backend.';
+      } else if (error.response?.status === 401 || error.message.includes('401')) {
+        errorMessage = 'Session expired. Please login again.';
+        // Optionally trigger logout
+        setTimeout(() => {
+          navigation.navigate('Welcome');
+        }, 2000);
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Submission Failed', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -1179,20 +1316,7 @@ const handleProfileImageUpload = async () => {
         {errors.name}
       </HelperText>
 
-      <TextInput
-        label="Email Address *"
-        value={formData.email}
-        onChangeText={(text) => updateFormData('email', text)}
-        mode="outlined"
-        style={styles.input}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        error={!!errors.email}
-        left={<TextInput.Icon icon="email" />}
-      />
-      <HelperText type="error" visible={!!errors.email}>
-        {errors.email}
-      </HelperText>
+
 
       <TextInput
         label="Phone Number *"
@@ -1746,7 +1870,8 @@ const handleProfileImageUpload = async () => {
           {formData.documents.length} of {DOCUMENT_TYPES.length} document types uploaded
         </Text>
         <Text style={styles.summarySubtext}>
-          Required documents: {DOCUMENT_TYPES.filter(dt => dt.required).length}
+          Required documents: {DOCUMENT_TYPES.filter(dt => dt.required).length} | 
+          Uploaded required: {formData.documents.filter(doc => DOCUMENT_TYPES.find(dt => dt.key === doc.type && dt.required)).length}
         </Text>
       </View>
     </View>
@@ -1898,7 +2023,7 @@ const handleProfileImageUpload = async () => {
           <View style={styles.reviewItem}>
             <Text style={styles.reviewLabel}>Experience:</Text>
             <Text style={styles.reviewValue}>
-              {formData.experience.years} years, {formData.experience.months} months
+              {formData.experience?.years || 0} years, {formData.experience?.months || 0} months
             </Text>
           </View>
           <View style={styles.reviewItem}>

@@ -59,7 +59,7 @@ exports.getConversations = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error.message || 'Failed to get conversations'
     });
   }
 };
@@ -119,7 +119,7 @@ exports.getConversationMessages = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error.message || 'Failed to get conversation messages'
     });
   }
 };
@@ -203,7 +203,9 @@ exports.sendMessage = async (req, res) => {
           if (!base64) continue;
 
           const ext = (mimeType && mimeType.split('/')[1]) || 'bin';
-          const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-${name || 'file'}.${ext}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+          // Sanitize filename to prevent path traversal
+          const sanitizedName = name ? path.basename(name).replace(/[^a-zA-Z0-9_.-]/g, '_').substring(0, 50) : 'file';
+          const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}-${sanitizedName}.${ext}`;
           const filePath = path.join(uploadDir, fileName);
           const buffer = Buffer.from(base64, 'base64');
           
@@ -263,7 +265,7 @@ exports.sendMessage = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error.message || 'Failed to send message'
     });
   }
 };
@@ -317,7 +319,7 @@ exports.markMessagesAsRead = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error.message || 'Failed to mark messages as read'
     });
   }
 };
@@ -400,7 +402,7 @@ exports.startConversation = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error.message || 'Failed to start conversation'
     });
   }
 };
@@ -440,7 +442,7 @@ exports.deleteMessage = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error.message || 'Failed to delete message'
     });
   }
 };
@@ -501,7 +503,7 @@ exports.getConversationInfo = async (req, res) => {
     const processedError = errorHandler.process(error);
     res.status(500).json({
       success: false,
-      error: processedError.userMessage
+      error: processedError?.userMessage || error.message || 'Failed to get conversation info'
     });
   }
 };
