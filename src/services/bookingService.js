@@ -55,9 +55,18 @@ class BookingService {
         }
       });
 
-      const endpoint = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      const endpoint = `/my${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await this.makeRequest(endpoint);
-      return response.data;
+      
+      console.log('📋 BookingService - Raw response:', response);
+      console.log('📋 BookingService - Bookings data:', response.bookings);
+      
+      if (response.bookings && response.bookings.length > 0) {
+        console.log('📋 BookingService - First booking structure:', response.bookings[0]);
+        console.log('📋 BookingService - First booking caregiver:', response.bookings[0].caregiverId);
+      }
+      
+      return response.bookings || response.data || [];
     } catch (error) {
       logger.error('Get bookings failed:', error);
       throw new Error('Failed to load bookings');

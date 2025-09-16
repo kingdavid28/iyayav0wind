@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { Button } from 'react-native-paper';
-import { ToggleSwitch } from '../../index';
+import { ToggleSwitch } from '../../ui/inputs/ToggleSwitch';
 
 export function PaymentSettings({ user, userType, data, onSave, isLoading, isSaving, colors }) {
   const [localData, setLocalData] = useState({

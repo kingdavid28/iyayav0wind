@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/46</span>
+                <span class='fraction'>0/47</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/20</span>
+                <span class='fraction'>0/16</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/46</span>
+                <span class='fraction'>0/47</span>
             </div>
         
             
@@ -338,13 +338,7 @@
 <a name='L273'></a><a href='#L273'>273</a>
 <a name='L274'></a><a href='#L274'>274</a>
 <a name='L275'></a><a href='#L275'>275</a>
-<a name='L276'></a><a href='#L276'>276</a>
-<a name='L277'></a><a href='#L277'>277</a>
-<a name='L278'></a><a href='#L278'>278</a>
-<a name='L279'></a><a href='#L279'>279</a>
-<a name='L280'></a><a href='#L280'>280</a>
-<a name='L281'></a><a href='#L281'>281</a>
-<a name='L282'></a><a href='#L282'>282</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L276'></a><a href='#L276'>276</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -377,26 +371,20 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -405,7 +393,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -417,6 +404,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -657,48 +645,42 @@ export const __PROD__ = <span class="cstat-no" title="statement not covered" >!_
 // Compute a cross-platform API base URL that works for Expo Web, Android emulator, iOS simulator, and physical devices.
 const getBaseHost = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >  try {</span>
-    // 1) Respect explicit env override when provided
-    const envUrl =
-<span class="cstat-no" title="statement not covered" >      (typeof process !== "undefined" &amp;&amp; process.env?.EXPO_PUBLIC_API_URL) ||</span>
-      (typeof process !== "undefined" &amp;&amp; process.env?.REACT_APP_API_URL);
+    // 1) Environment variable takes priority
+    const envUrl = <span class="cstat-no" title="statement not covered" >process.env?.EXPO_PUBLIC_API_URL || process.env?.REACT_APP_API_URL;</span>
 <span class="cstat-no" title="statement not covered" >    if (envUrl) {</span>
-      // Normalize: remove trailing slash and a single trailing '/api' if present
       const cleaned = <span class="cstat-no" title="statement not covered" >envUrl.replace(/\/$/, "").replace(/\/api$/i, "");</span>
 <span class="cstat-no" title="statement not covered" >      return { mode: "env", url: cleaned };</span>
     }
 &nbsp;
-    // 2) Try React Native Platform if available
+    // 2) Platform-specific defaults
 <span class="cstat-no" title="statement not covered" >    try {</span>
-      // Use require to avoid bundling issues in non-RN contexts
       const rn = <span class="cstat-no" title="statement not covered" >require("react-native");</span>
       const platform = <span class="cstat-no" title="statement not covered" >rn?.Platform?.OS;</span>
 <span class="cstat-no" title="statement not covered" >      if (platform === "android") {</span>
-        // Android emulator uses host loopback 10.0.2.2
 <span class="cstat-no" title="statement not covered" >        return { mode: "android-emulator", url: "http://10.0.2.2:5000" };</span>
       }
 <span class="cstat-no" title="statement not covered" >      if (platform === "ios") {</span>
-        // iOS simulator can access localhost - try both localhost and network IP
 <span class="cstat-no" title="statement not covered" >        return { mode: "ios-simulator", url: "http://localhost:5000" };</span>
       }
     } catch (_) {
-      // Platform not available
+      // Ignore require errors for react-native in web environments
     }
 &nbsp;
-    // 3) Web (expo web / react-native-web) – use localhost for trustworthy origin
-<span class="cstat-no" title="statement not covered" >    if (typeof window !== "undefined" &amp;&amp; window.location?.hostname) {</span>
-      // Use localhost instead of IP address for trustworthy origin
+    // 3) Web fallback
+<span class="cstat-no" title="statement not covered" >    if (typeof window !== "undefined") {</span>
 <span class="cstat-no" title="statement not covered" >      return { mode: "web", url: "http://localhost:5000" };</span>
     }
 &nbsp;
-    // 4) Fallback - try localhost first, then network IP
+    // 4) Default fallback
 <span class="cstat-no" title="statement not covered" >    return { mode: "fallback", url: "http://localhost:5000" };</span>
   } catch (error) {
 <span class="cstat-no" title="statement not covered" >    console.error("Error determining base host:", error);</span>
-<span class="cstat-no" title="statement not covered" >    return { mode: "error-fallback", url: "http://localhost:5001" };</span>
+<span class="cstat-no" title="statement not covered" >    return { mode: "error-fallback", url: "http://localhost:5000" };</span>
   }
 };
 &nbsp;
 const baseHost = <span class="cstat-no" title="statement not covered" >getBaseHost();</span>
+<span class="cstat-no" title="statement not covered" >console.log('🔗 Base host configuration:', baseHost);</span>
 &nbsp;
 // API Configuration with enhanced timeout and retry settings
 export const API_CONFIG = <span class="cstat-no" title="statement not covered" >{</span>
@@ -913,7 +895,7 @@ export const NETWORK = <span class="cstat-no" title="statement not covered" >{</
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T16:00:36.461Z
+                at 2025-09-14T16:58:41.890Z
             </div>
         <script src="../prettify.js"></script>
         <script>

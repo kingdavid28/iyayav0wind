@@ -5,25 +5,94 @@ const { validationResult } = require('express-validator');
 const { process: processError } = require('../utils/errorHandler');
 const logger = require('../utils/logger');
 
-// In-memory storage for demo applications (cleared for fresh start)
-let demoApplications = [];
+// Helper function to calculate total cost
+const calculateTotalCost = (startTime, endTime, hourlyRate) => {
+  const start = new Date(`2024-01-01T${startTime}`);
+  const end = new Date(`2024-01-01T${endTime}`);
+  const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+  return Math.max(0, hours * hourlyRate);
+};
+
+
+
+// Helper to get consistent user ID
+const getUserId = (user) => {
+  return user?.id || user?.uid || user?.mongoId || 'demo-caregiver-id';
+};
 
 // Ensure we always use a valid Mongo ObjectId for DB operations
 const mongoose = require('mongoose');
-const resolveMongoId = (user) => {
-  const id = user?.mongoId || user?._id || user?.id;
-  return mongoose.isValidObjectId(id) ? id : null;
+const resolveMongoId = async (user) => {
+  console.log('🔍 resolveMongoId called with user:', {
+    id: user?.id,
+    uid: user?.uid,
+    mongoId: user?.mongoId,
+    _id: user?._id
+  });
+  
+  // First try direct MongoDB IDs, but prioritize caregiver profile lookup
+  const directId = user?.mongoId || user?._id;
+  if (directId && mongoose.isValidObjectId(directId)) {
+    console.log('✅ Found direct MongoDB ID:', directId);
+    
+    // Check if this is a User ID and find corresponding Caregiver profile
+    try {
+      const caregiver = await require('../models/Caregiver').findOne({ 
+        userId: directId 
+      });
+      
+      if (caregiver) {
+        console.log('✅ Found caregiver profile for user ID:', caregiver._id);
+        return caregiver._id;
+      }
+    } catch (error) {
+      console.error('❌ Error finding caregiver by user ID:', error);
+    }
+    
+    return directId;
+  }
+  
+  // If user has Firebase UID, find corresponding user in User collection
+  if (user?.id || user?.uid) {
+    try {
+      const userId = user.id || user.uid;
+      console.log('🔍 Looking for user with firebaseUid:', userId);
+      
+      // First find the user by Firebase UID
+      const userDoc = await require('../models/User').findOne({ 
+        firebaseUid: userId 
+      });
+      
+      if (userDoc) {
+        // Then find caregiver profile using the user's MongoDB ID
+        const caregiver = await require('../models/Caregiver').findOne({ 
+          userId: userDoc._id 
+        });
+        
+        if (caregiver) {
+          console.log('✅ Found caregiver profile ID:', caregiver._id);
+          return caregiver._id;
+        }
+        
+        console.log('✅ Found user MongoDB ID:', userDoc._id);
+        return userDoc._id;
+      }
+
+    } catch (error) {
+      console.error('❌ Error finding user:', error);
+    }
+  }
+  
+  console.log('❌ No MongoDB ID found for user');
+  return null;
 };
 
 // Caregiver applies to a job
-exports.applyToJob = (req, res) => {
+exports.applyToJob = async (req, res) => {
   try {
     const { jobId, coverLetter, proposedRate, message } = req.body;
+    const caregiverMongoId = await resolveMongoId(req.user);
     
-    console.log('Application request:', { jobId, coverLetter, proposedRate, message });
-    console.log('User info:', req.user);
-    
-    // Basic validation
     if (!jobId) {
       return res.status(400).json({ 
         success: false,
@@ -31,9 +100,19 @@ exports.applyToJob = (req, res) => {
       });
     }
     
-    // Check for duplicate application (user-specific)
-    const userId = req.user?.id || req.user?.mongoId || 'demo-caregiver-id';
-    const existingApp = demoApplications.find(app => app.jobId === jobId && app.caregiverId === userId);
+    if (!caregiverMongoId) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'User not properly authenticated' 
+      });
+    }
+
+    // Check for duplicate application
+    const existingApp = await Application.findOne({
+      jobId,
+      caregiverId: caregiverMongoId
+    });
+    
     if (existingApp) {
       return res.status(400).json({ 
         success: false,
@@ -41,23 +120,17 @@ exports.applyToJob = (req, res) => {
       });
     }
 
-    // Create mock application for demo purposes
-    const application = {
-      _id: `app-${Date.now()}`,
-      jobId: jobId,
-      caregiverId: userId,
+    // Create application in database
+    const application = new Application({
+      jobId,
+      caregiverId: caregiverMongoId,
       coverLetter: coverLetter || '',
       proposedRate: proposedRate ? Number(proposedRate) : undefined,
       message: message || '',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+      status: 'pending'
+    });
 
-    // Store in memory for duplicate checking
-    demoApplications.push(application);
-    
-    console.log('Created application:', application);
+    await application.save();
 
     res.status(201).json({ 
       success: true, 
@@ -99,7 +172,7 @@ exports.updateApplicationStatus = async (req, res) => {
 
     const application = await Application.findById(id)
       .populate('caregiverId', 'name email avatar')
-      .populate('jobId', 'title parentId');
+      .populate('jobId', 'title clientId');
       
     if (!application) {
       return res.status(404).json({ 
@@ -109,7 +182,7 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 
     // Verify parent owns the job
-    if (application.jobId.parentId.toString() !== parentId.toString()) {
+    if (application.jobId.clientId.toString() !== parentId.toString()) {
       return res.status(403).json({ 
         success: false,
         error: 'Not authorized to modify this application' 
@@ -148,6 +221,25 @@ exports.updateApplicationStatus = async (req, res) => {
       job.assignedCaregiver = application.caregiverId._id;
       await job.save();
 
+      // Create booking from accepted application
+      const Booking = require('../models/Booking');
+      const booking = new Booking({
+        clientId: parentId,
+        caregiverId: application.caregiverId._id,
+        date: job.date,
+        startTime: job.startTime,
+        endTime: job.endTime,
+        address: job.location,
+        hourlyRate: job.hourlyRate,
+        totalCost: calculateTotalCost(job.startTime, job.endTime, job.hourlyRate),
+        status: 'confirmed',
+        jobId: job._id,
+        applicationId: application._id
+      });
+      
+      await booking.save();
+      console.log('✅ Booking created from accepted application:', booking._id);
+
       // Reject other pending applications for this job
       await Application.updateMany(
         { 
@@ -185,24 +277,33 @@ exports.updateApplicationStatus = async (req, res) => {
 // Get my applications (caregiver)
 exports.getMyApplications = async (req, res) => {
   try {
-    const caregiverMongoId = resolveMongoId(req.user);
+    console.log('🔍 getMyApplications - User role check:', {
+      userId: req.user?.id,
+      role: req.user?.role,
+      userType: req.user?.userType
+    });
     
-    // Handle mock users - return empty applications list
-    if (!caregiverMongoId || req.user?.mock) {
-      console.log('🔧 Mock user detected, returning empty applications list');
-      return res.json({ 
-        success: true,
-        data: {
-          applications: [],
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 0,
-            pages: 0
-          }
-        }
+    // Check if user is a caregiver
+    if (req.user?.role !== 'caregiver') {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. Only caregivers can view applications.'
       });
     }
+    
+    const caregiverMongoId = await resolveMongoId(req.user);
+    console.log('🔍 Resolved caregiver MongoDB ID:', caregiverMongoId);
+    
+    if (!caregiverMongoId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Caregiver profile not found. Please complete your caregiver registration.'
+      });
+    }
+    
+    // Check if any applications exist for this caregiver
+    const applicationCount = await Application.countDocuments({ caregiverId: caregiverMongoId });
+    console.log('🔍 Applications count in DB for caregiver ID:', applicationCount);
 
     const { 
       status,
@@ -222,22 +323,42 @@ exports.getMyApplications = async (req, res) => {
     const skip = (Number(page) - 1) * Number(limit);
     const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
-    const [applications, total] = await Promise.all([
-      Application.find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(Number(limit))
-        .populate({
-          path: 'jobId', 
-          select: 'title location rate startDate endDate status urgency',
-          populate: {
-            path: 'parentId',
-            select: 'name avatar rating reviewCount'
+    console.log('🔍 Query filter:', filter);
+    
+    const applications = await Application.find(filter)
+      .sort(sort)
+      .skip(skip)
+      .limit(Number(limit))
+      .lean();
+    
+    // Manually populate job data
+    console.log('🔍 Starting job population for', applications.length, 'applications');
+    for (let i = 0; i < applications.length; i++) {
+      const app = applications[i];
+      console.log('🔍 Processing application', i, 'with jobId:', app.jobId);
+      if (app.jobId) {
+        try {
+          const job = await Job.findById(app.jobId).lean();
+          if (job) {
+            app.jobId = job;
+            console.log('✅ Populated job:', job.title);
+          } else {
+            console.log('❌ Job not found for ID:', app.jobId);
           }
-        })
-        .lean(),
-      Application.countDocuments(filter)
-    ]);
+        } catch (error) {
+          console.log('❌ Error populating job:', error.message);
+        }
+      }
+    }
+    console.log('🔍 Job population completed');
+    
+    const total = await Application.countDocuments(filter);
+    
+    console.log('🔍 Found applications:', applications.length, 'Total:', total);
+    
+    if (applications.length > 0) {
+      console.log('🔍 First application data:', JSON.stringify(applications[0], null, 2));
+    }
 
     res.json({ 
       success: true, 
@@ -270,7 +391,7 @@ exports.getJobApplications = async (req, res) => {
     const { status, page = 1, limit = 10 } = req.query;
 
     // Verify parent owns the job
-    const job = await Job.findOne({ _id: jobId, parentId });
+    const job = await Job.findOne({ _id: jobId, clientId: parentId });
     if (!job) {
       return res.status(404).json({
         success: false,
@@ -335,10 +456,10 @@ exports.getApplicationById = async (req, res) => {
       .populate('caregiverId', 'name avatar rating reviewCount experience hourlyRate bio location')
       .populate({
         path: 'jobId',
-        select: 'title description location rate startDate endDate parentId status',
+        select: 'title description location hourlyRate date startTime endTime clientId status',
         populate: {
-          path: 'parentId',
-          select: 'name avatar rating reviewCount'
+          path: 'clientId',
+          select: 'name avatar'
         }
       });
 
@@ -351,7 +472,7 @@ exports.getApplicationById = async (req, res) => {
 
     // Check authorization - either the caregiver who applied or the parent who owns the job
     const isCaregiver = application.caregiverId?._id?.toString() === userId?.toString();
-    const isParent = application.jobId?.parentId?._id?.toString() === userId?.toString();
+    const isParent = application.jobId?.clientId?._id?.toString() === userId?.toString();
 
     if (!isCaregiver && !isParent) {
       return res.status(403).json({
@@ -378,7 +499,7 @@ exports.getApplicationById = async (req, res) => {
 exports.withdrawApplication = async (req, res) => {
   try {
     const { id } = req.params;
-    const caregiverMongoId = resolveMongoId(req.user);
+    const caregiverMongoId = await resolveMongoId(req.user);
 
     const application = await Application.findOne({
       _id: id,
@@ -414,6 +535,38 @@ exports.withdrawApplication = async (req, res) => {
     res.status(500).json({
       success: false,
       error: processedError?.userMessage || error.message || 'An error occurred'
+    });
+  }
+};
+
+// Debug endpoint to check caregiver ID resolution
+exports.debugCaregiverInfo = async (req, res) => {
+  try {
+    const caregiverMongoId = await resolveMongoId(req.user);
+    const applicationCount = await Application.countDocuments({ caregiverId: caregiverMongoId });
+    
+    res.json({
+      success: true,
+      debug: {
+        userInfo: {
+          id: req.user?.id,
+          role: req.user?.role,
+          mongoId: req.user?.mongoId
+        },
+        resolvedCaregiverMongoId: caregiverMongoId,
+        applicationsInDB: applicationCount
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      debug: {
+        userInfo: {
+          id: req.user?.id,
+          role: req.user?.role
+        }
+      }
     });
   }
 };

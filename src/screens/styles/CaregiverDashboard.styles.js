@@ -368,8 +368,9 @@ export const styles = StyleSheet.create({
     color: '#6B7280',
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 10,
     paddingHorizontal: 16,
+    paddingTop: 16,
   },
   promotionCard: {
     borderRadius: 16,
@@ -437,21 +438,25 @@ export const styles = StyleSheet.create({
   },
   horizontalScroll: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingLeft: 0,
+    paddingRight: 0,
   },
   jobCard: {
-    width: '50%',
-    marginRight: 0,
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    ...shadows.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    marginVertical: 4,
   },
   jobCardHorizontal: {
     width: 300,
     marginRight: 16,
-    marginBottom: 5,
-    height: 300,
-    //maxHeight: 280,
+    marginBottom: 4,
+    minHeight: 280,
+    padding: 0,
   },
   jobCardTablet: {
     width: '31%',
@@ -459,18 +464,21 @@ export const styles = StyleSheet.create({
   jobHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
   jobTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    color: '#1F2937',
+    marginBottom: 8,
+    lineHeight: 24,
   },
   jobMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+    marginBottom: 4,
   },
   jobMetaText: {
     fontSize: 12,
@@ -495,12 +503,13 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   jobDetails: {
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 8,
   },
   jobDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   jobDetailText: {
     fontSize: 13,
@@ -510,19 +519,21 @@ export const styles = StyleSheet.create({
   requirementsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 6,
   },
   requirementTag: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 8,
-    marginBottom: 8,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
   requirementText: {
     fontSize: 12,
-    color: '#4B5563',
+    color: '#2563EB',
+    fontWeight: '500',
   },
   moreRequirementsText: {
     fontSize: 12,
@@ -531,9 +542,10 @@ export const styles = StyleSheet.create({
   },
   jobFooter: {
     flexDirection: 'column',
-    paddingTop: 12,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
+    gap: 12,
   },
   postedDate: {
     fontSize: 12,
@@ -541,14 +553,14 @@ export const styles = StyleSheet.create({
   },
   jobActionButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   secondaryButton: {
-    marginRight: 8,
+    flex: 1,
     borderColor: '#D1D5DB',
-    paddingHorizontal: 10,
-    flexShrink: 1,
+    borderRadius: 8,
+    height: 40,
   },
   secondaryButtonText: {
     color: '#374151',
@@ -556,8 +568,10 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
   },
   primaryButton: {
+    flex: 1,
     backgroundColor: '#2563EB',
-    flexShrink: 1,
+    borderRadius: 8,
+    height: 40,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -878,9 +892,6 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  certificationsContainer: {
-    marginBottom: 8,
-  },
   certificationItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -888,10 +899,6 @@ export const styles = StyleSheet.create({
   },
   certificationIcon: {
     marginRight: 12,
-  },
-  certificationText: {
-    fontSize: 14,
-    color: '#4B5563',
   },
   emptyState: {
     alignItems: 'center',

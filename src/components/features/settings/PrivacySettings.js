@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { ToggleSwitch } from '../../index';
+import { ToggleSwitch } from '../../ui/inputs/ToggleSwitch';
 
 export function PrivacySettings({ user, userType, data, onSave, isLoading, isSaving, colors }) {
   const [localData, setLocalData] = useState({

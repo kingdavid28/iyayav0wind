@@ -21,5 +21,7 @@
     ".expo": true,
     "dist": true,
     "build": true
-  }
+  },
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python-envs.pythonProjects": []
 }

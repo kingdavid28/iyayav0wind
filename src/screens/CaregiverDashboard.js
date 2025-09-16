@@ -46,7 +46,7 @@ function JobCard({ job, showActions = true, onApply, hasApplied, onLearnMore, jo
   return (
     <Card style={[styles.jobCard, jobCardStyle]}>
       <View style={{ overflow: 'hidden' }}>
-      <Card.Content>
+      <Card.Content style={{ padding: 16 }}>
         <View style={styles.jobHeader}>
           <View>
             <Text style={styles.jobTitle} numberOfLines={gridMode ? 2 : undefined}>{job.title}</Text>
@@ -73,22 +73,24 @@ function JobCard({ job, showActions = true, onApply, hasApplied, onLearnMore, jo
           </View>
           <View style={styles.jobDetailRow}>
             <Ionicons name="cash" size={16} color="#6B7280" />
-            <Text style={styles.jobDetailText}>${job.hourlyRate}/hr</Text>
+            <Text style={styles.jobDetailText}>₱{job.hourlyRate}/hr</Text>
           </View>
         </View>
 
-        <View style={styles.requirementsContainer}>
-          {job.requirements.slice(0, maxRequirementChips).map((req, index) => (
-            <View key={index} style={styles.requirementTag}>
-              <Text style={styles.requirementText}>{req}</Text>
-            </View>
-          ))}
-          {job.requirements.length > maxRequirementChips && (
-            <Text style={styles.moreRequirementsText}>
-              +{job.requirements.length - maxRequirementChips} more
-            </Text>
-          )}
-        </View>
+        {job.requirements && job.requirements.length > 0 && (
+          <View style={styles.requirementsContainer}>
+            {job.requirements.slice(0, maxRequirementChips).map((req, index) => (
+              <View key={index} style={styles.requirementTag}>
+                <Text style={styles.requirementText}>{req}</Text>
+              </View>
+            ))}
+            {job.requirements.length > maxRequirementChips && (
+              <Text style={styles.moreRequirementsText}>
+                +{job.requirements.length - maxRequirementChips} more
+              </Text>
+            )}
+          </View>
+        )}
 
         {showActions && (
           <View style={styles.jobFooter}>
@@ -247,7 +249,7 @@ function BookingCard({ booking, onMessage, onViewDetails, onConfirmAttendance })
             mode="outlined" 
             style={styles.bookingSecondaryButton}
             labelStyle={styles.bookingSecondaryButtonText}
-            onPress={onViewDetails}
+            onPress={() => onViewDetails && onViewDetails(booking)}
             accessibilityLabel="View booking details"
           >
             Details
@@ -295,7 +297,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const {
     activeTab, setActiveTab,
     profile, setProfile,
-    jobs, applications, bookings,
+    jobs, applications, setApplications, bookings,
     jobsLoading,
     loadProfile, fetchJobs, fetchApplications, fetchBookings
   } = useCaregiverDashboard();
@@ -430,7 +432,16 @@ export default function CaregiverDashboard({ onLogout, route }) {
           hourlyRate: proposedRate || (matchedJob ? matchedJob.hourlyRate : undefined)
         }
         
-        await refreshApplications()
+        // Add to local state immediately for instant UI update
+        setApplications(prev => [newApplication, ...prev]);
+        
+        // Refresh from server to get latest data
+        setTimeout(() => {
+          fetchApplications();
+        }, 500);
+        
+
+        
         showToast('Application submitted successfully!', 'success')
         setShowJobApplication(false)
         setSelectedJob(null)
@@ -706,6 +717,8 @@ export default function CaregiverDashboard({ onLogout, route }) {
             setActiveTab(tab.id)
             if (tab.id === 'jobs') {
               fetchJobs()
+            } else if (tab.id === 'applications') {
+              fetchApplications()
             }
           }
           const iconColor = active ? '#3b83f5' : '#6B7280'
@@ -825,43 +838,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
             </View>
 
             <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recommended Jobs</Text>
-                <Pressable onPress={() => setActiveTab('jobs')}>
-                  <Text style={styles.seeAllText}>See All</Text>
-                </Pressable>
-              </View>
-              {jobsLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                  <Text style={styles.loadingText}>Loading jobs...</Text>
-                </View>
-              ) : (
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false} 
-                  style={styles.horizontalScroll}
-                  contentContainerStyle={{ paddingRight: 16 }}
-                >
-                  {(jobs || []).slice(0, 3).map((job, index) => (
-                    <JobCard
-                      key={job.id || index}
-                      job={job}
-                      showActions={true}
-                      onApply={handleJobApplication}
-                      onLearnMore={handleViewJob}
-                      hasApplied={(id) => applications.some((a) => a.jobId === id)}
-                      jobCardStyle={[
-                        styles.jobCardHorizontal,
-                        { marginRight: index === 2 ? 0 : 16 }
-                      ]}
-                    />
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-
-            <View style={styles.section}>
               <Card style={[styles.promotionCard, { backgroundColor: '#f0f9ff', borderColor: '#3b82f6' }]}>
                 <Card.Content>
                   <View style={styles.promotionHeader}>
@@ -897,20 +873,42 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Recent Applications</Text>
-                <Pressable onPress={() => setActiveTab("applications")}>
-                  <Text style={styles.seeAllText}>View All</Text>
+                <Text style={styles.sectionTitle}>Recommended Jobs</Text>
+                <Pressable onPress={() => setActiveTab('jobs')}>
+                  <Text style={styles.seeAllText}>See All</Text>
                 </Pressable>
               </View>
-              {(applications || []).slice(0, 2).map((application, index) => (
-                <ApplicationCard 
-                  key={application.id || index} 
-                  application={application}
-                  onViewDetails={handleViewApplication}
-                  onMessage={handleMessageFamily}
-                />
-              ))}
+              {jobsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                  <Text style={styles.loadingText}>Loading jobs...</Text>
+                </View>
+              ) : (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false} 
+                  style={styles.horizontalScroll}
+                  contentContainerStyle={{ paddingLeft: 2, paddingRight: 2 }}
+                >
+                  {(jobs || []).slice(0, 3).map((job, index) => (
+                    <JobCard
+                      key={job.id || index}
+                      job={job}
+                      showActions={true}
+                      onApply={handleJobApplication}
+                      onLearnMore={handleViewJob}
+                      hasApplied={(id) => applications.some((a) => a.jobId === id)}
+                      jobCardStyle={[
+                        styles.jobCardHorizontal,
+                        { marginRight: index === 2 ? 0 : 26 }
+                      ]}
+                    />
+                  ))}
+                </ScrollView>
+              )}
             </View>
+
+
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -971,28 +969,41 @@ export default function CaregiverDashboard({ onLogout, route }) {
                   <ActivityIndicator size="large" color="#3B82F6" />
                   <Text style={styles.loadingText}>Loading jobs...</Text>
                 </View>
-              ) : jobs && jobs.length > 0 ? (
-                <View style={[styles.jobsGrid, columns === 1 && { flexDirection: 'column' }]}>
-                  {jobs.map((job) => (
-                    <JobCard
-                      key={job.id}
-                      job={job}
-                      showActions={true}
-                      onApply={handleJobApplication}
-                      onLearnMore={handleViewJob}
-                      hasApplied={(id) => applications.some((a) => a.jobId === id)}
-                      jobCardStyle={columns === 1 ? { width: '100%', ...(gridCardHeight ? { height: gridCardHeight } : {}) } : { width: gridCardWidth, height: gridCardHeight }}
-                      gridMode
-                    />
-                  ))}
-                </View>
-              ) : (
-                <EmptyState 
-                  icon="briefcase" 
-                  title="No jobs available"
-                  subtitle="Please check back later or adjust your filters"
-                />
-              )}
+              ) : (() => {
+                const filteredJobs = jobs.filter(job => {
+                  if (!debouncedSearch) return true;
+                  const searchLower = debouncedSearch.toLowerCase();
+                  return (
+                    job.title?.toLowerCase().includes(searchLower) ||
+                    job.family?.toLowerCase().includes(searchLower) ||
+                    job.location?.toLowerCase().includes(searchLower) ||
+                    job.requirements?.some(req => req.toLowerCase().includes(searchLower))
+                  );
+                });
+                
+                return filteredJobs.length > 0 ? (
+                  <View style={[styles.jobsGrid, columns === 1 && { flexDirection: 'column' }]}>
+                    {filteredJobs.map((job, index) => (
+                      <JobCard
+                        key={job.id || `job-${index}`}
+                        job={job}
+                        showActions={true}
+                        onApply={handleJobApplication}
+                        onLearnMore={handleViewJob}
+                        hasApplied={(id) => applications.some((a) => a.jobId === id)}
+                        jobCardStyle={columns === 1 ? { width: '100%', marginBottom: 16 } : { width: gridCardWidth, marginBottom: 16, marginRight: 8 }}
+                        gridMode
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <EmptyState 
+                    icon="briefcase" 
+                    title={debouncedSearch ? "No matching jobs" : "No jobs available"}
+                    subtitle={debouncedSearch ? `No jobs found for "${debouncedSearch}"` : "Please check back later or adjust your filters"}
+                  />
+                );
+              })()}
             </View>
           </ScrollView>
         )}
@@ -1000,6 +1011,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
         {activeTab === "applications" && (
           <ScrollView style={styles.content}>
             <View style={styles.section}>
+
               {applications.length > 0 ? (
                 (applications || []).map((application, index) => (
                   <ApplicationCard 

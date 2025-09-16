@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>0/7</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/2</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -109,8 +109,19 @@
 <a name='L44'></a><a href='#L44'>44</a>
 <a name='L45'></a><a href='#L45'>45</a>
 <a name='L46'></a><a href='#L46'>46</a>
-<a name='L47'></a><a href='#L47'>47</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -141,6 +152,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -156,59 +180,71 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React from 'react';
-import { View, Text, TextInput } from 'react-native';
-import { inputStyle } from '../../styles/common';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
 &nbsp;
-export default function <span class="fstat-no" title="function not covered" >FormTextArea(</span>{ 
-  label, 
-  value, 
-  onChangeText, 
-  placeholder, 
-  error, 
+export default function <span class="fstat-no" title="function not covered" >FormTextArea(</span>{
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  error,
   rows = <span class="branch-0 cbranch-no" title="branch not covered" >4,</span>
-  style = <span class="branch-0 cbranch-no" title="branch not covered" >{},</span>
-  ...props 
+  style,
+  ...props
 }) {
 <span class="cstat-no" title="statement not covered" >  return (</span>
-    &lt;View style={{ marginBottom: 16 }}&gt;
-      {label &amp;&amp; (
-        &lt;Text style={{ fontSize: 16, fontWeight: '500', color: '#374151', marginBottom: 8 }}&gt;
-          {label}
-        &lt;/Text&gt;
-      )}
+    &lt;View style={[styles.container, style]}&gt;
+      {label &amp;&amp; &lt;Text style={styles.label}&gt;{label}&lt;/Text&gt;}
       &lt;TextInput
-        style={[
-          inputStyle,
-          { 
-            minHeight: rows * 20 + 20, 
-            textAlignVertical: 'top' 
-          },
-          error &amp;&amp; { borderColor: '#ef4444' },
-          style
-        ]}
+        style={[styles.textArea, { height: rows * 20 + 24 }, error &amp;&amp; styles.textAreaError]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor="#9CA3AF"
         multiline
-        numberOfLines={rows}
+        textAlignVertical="top"
         {...props}
       /&gt;
-      {error &amp;&amp; (
-        &lt;Text style={{ color: '#ef4444', fontSize: 14, marginTop: 5 }}&gt;
-          {error}
-        &lt;/Text&gt;
-      )}
+      {error &amp;&amp; &lt;Text style={styles.error}&gt;{error}&lt;/Text&gt;}
     &lt;/View&gt;
   );
-}</pre></td></tr></table></pre>
+}
+&nbsp;
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  textAreaError: {
+    borderColor: '#EF4444',
+  },
+  error: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
+  },
+});</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T16:00:36.461Z
+                at 2025-09-14T16:58:41.890Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

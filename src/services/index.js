@@ -39,7 +39,7 @@ class EnhancedAPIService {
       retries = 2,
       cache = false,
       cacheKey = null,
-      timeout = 30000,
+      timeout = 8000,
       validateToken = true
     } = options;
 
@@ -242,7 +242,8 @@ class EnhancedAPIService {
     getProfile: () => this.request('/auth/firebase-profile', {
       cache: true,
       cacheKey: 'user-profile',
-      timeout: 8000
+      timeout: 5000,
+      retries: 1
     }),
 
     updateProfile: (data) => {
@@ -324,9 +325,11 @@ class EnhancedAPIService {
     }),
 
     getAll: (filters = {}) => {
-      const cacheKey = `caregivers:${JSON.stringify(filters)}`;
-      const queryParams = new URLSearchParams(filters).toString();
-      const endpoint = queryParams ? `/caregivers?${queryParams}` : '/caregivers';
+      // Ensure we only get users with caregiver role
+      const caregiverFilters = { ...filters, role: 'caregiver' };
+      const cacheKey = `caregivers:${JSON.stringify(caregiverFilters)}`;
+      const queryParams = new URLSearchParams(caregiverFilters).toString();
+      const endpoint = queryParams ? `/caregivers?${queryParams}` : '/caregivers?role=caregiver';
       
       return this.request(endpoint, {
         cache: true,
@@ -335,7 +338,8 @@ class EnhancedAPIService {
     },
 
     search: (filters = {}, page = 1, limit = 10) => {
-      const searchParams = { ...filters, page, limit };
+      // Ensure we only search users with caregiver role
+      const searchParams = { ...filters, page, limit, role: 'caregiver' };
       const cacheKey = `caregivers-search:${JSON.stringify(searchParams)}`;
       const queryParams = new URLSearchParams(searchParams).toString();
       
@@ -440,6 +444,10 @@ class EnhancedAPIService {
         method: 'PATCH',
         body: { status }
       });
+    },
+
+    getForJob: (jobId, page = 1, limit = 10) => {
+      return this.request(`/applications/job/${jobId}?page=${page}&limit=${limit}`);
     }
   };
 

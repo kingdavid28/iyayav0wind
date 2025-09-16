@@ -27,7 +27,8 @@ import HomeTab from './components/HomeTab';
 import SearchTab from './components/SearchTab';
 import BookingsTab from './components/BookingsTab';
 import MessagesTab from './components/MessagesTab';
-import JobsTab from './components/JobsTab';
+import PostJobsTab from './components/PostJobsTab';
+import MyJobsTab from './components/MyJobsTab';
 
 // Modal imports
 import ProfileModal from './modals/ProfileModal';
@@ -149,6 +150,22 @@ const ParentDashboard = () => {
     }));
   }, []);
   
+  // Helper function to create caregiver object
+  const createCaregiverObject = useCallback((caregiverData = null) => {
+    const caregiver = caregiverData || (caregivers?.length > 0 ? caregivers[0] : null);
+    return caregiver ? {
+      _id: caregiver._id || caregiver.id,
+      id: caregiver.id || caregiver._id,
+      userId: caregiver.userId || null,
+      name: caregiver.name,
+      avatar: caregiver.avatar || caregiver.profileImage,
+      rating: caregiver.rating,
+      reviews: caregiver.reviewCount,
+      hourlyRate: caregiver.hourlyRate,
+      rate: caregiver.hourlyRate ? `₱${caregiver.hourlyRate}/hr` : undefined,
+    } : DEFAULT_CAREGIVER;
+  }, [caregivers]);
+
   // Quick actions
   const quickActions = useMemo(() => [
     {
@@ -162,19 +179,7 @@ const ParentDashboard = () => {
       icon: 'calendar',
       title: 'Book Service',
       onPress: () => {
-        const caregiver = caregivers?.length > 0 ? {
-          _id: caregivers[0]._id || caregivers[0].id,
-          id: caregivers[0].id || caregivers[0]._id,
-          userId: caregivers[0].userId || null,
-          name: caregivers[0].name,
-          avatar: caregivers[0].avatar || caregivers[0].profileImage,
-          rating: caregivers[0].rating,
-          reviews: caregivers[0].reviewCount,
-          hourlyRate: caregivers[0].hourlyRate,
-          rate: caregivers[0].hourlyRate ? `₱${caregivers[0].hourlyRate}/hr` : undefined,
-        } : DEFAULT_CAREGIVER;
-        
-        setSelectedCaregiver(caregiver);
+        setSelectedCaregiver(createCaregiverObject());
         toggleModal('booking', true);
       }
     },
@@ -190,7 +195,7 @@ const ParentDashboard = () => {
       title: 'Add Child',
       onPress: () => openAddChild()
     }
-  ], [caregivers, setActiveTab, toggleModal]);
+  ], [setActiveTab, createCaregiverObject, toggleModal]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -681,19 +686,7 @@ const ParentDashboard = () => {
             onViewBookingDetails={(bookingId) => navigation.navigate('BookingDetails', { bookingId })}
             onWriteReview={(bookingId, caregiverId) => navigation.navigate('Review', { bookingId, caregiverId })}
             onCreateBooking={() => {
-              const caregiver = caregivers?.length > 0 ? {
-                _id: caregivers[0]._id || caregivers[0].id,
-                id: caregivers[0].id || caregivers[0]._id,
-                userId: caregivers[0].userId || null,
-                name: caregivers[0].name,
-                avatar: caregivers[0].avatar || caregivers[0].profileImage,
-                rating: caregivers[0].rating,
-                reviews: caregivers[0].reviewCount,
-                hourlyRate: caregivers[0].hourlyRate,
-                rate: caregivers[0].hourlyRate ? `₱${caregivers[0].hourlyRate}/hr` : undefined,
-              } : DEFAULT_CAREGIVER;
-              
-              setSelectedCaregiver(caregiver);
+              setSelectedCaregiver(createCaregiverObject());
               toggleModal('booking', true);
             }}
             onMessageCaregiver={handleMessageCaregiver}
@@ -710,7 +703,13 @@ const ParentDashboard = () => {
         );
       case 'jobs':
         return (
-          <JobsTab
+          <PostJobsTab
+            onJobPosted={handleJobPosted}
+          />
+        );
+      case 'job-management':
+        return (
+          <MyJobsTab
             jobs={jobs}
             refreshing={refreshing}
             onRefresh={onRefresh}

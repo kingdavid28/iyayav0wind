@@ -90,7 +90,33 @@ export const useParentDashboard = () => {
       const res = await apiService.caregivers.getAll();
       const caregiversList = res?.data?.caregivers || res?.caregivers || [];
       
-      const transformedCaregivers = caregiversList.map(caregiver => ({
+      console.log('Raw caregivers data:', caregiversList.map(c => ({ 
+        name: c.name, 
+        role: c.role, 
+        userType: c.userType,
+        email: c.email 
+      })));
+      
+      // Filter to ensure only caregivers are included - exclude parents explicitly
+      const filteredCaregivers = caregiversList.filter(caregiver => {
+        // Exclude if explicitly marked as parent
+        if (caregiver.role === 'parent' || caregiver.userType === 'parent') {
+          console.log('Filtering out parent:', caregiver.name);
+          return false;
+        }
+        
+        // Include if explicitly marked as caregiver
+        if (caregiver.role === 'caregiver' || caregiver.userType === 'caregiver') {
+          return true;
+        }
+        
+        // For users without role, include them (less restrictive)
+        return true;
+      });
+      
+      console.log('Filtered caregivers:', filteredCaregivers.length, 'out of', caregiversList.length);
+      
+      const transformedCaregivers = filteredCaregivers.map(caregiver => ({
         _id: caregiver._id || caregiver.id,
         id: caregiver._id || caregiver.id,
         name: caregiver.name || 'Caregiver',
@@ -115,19 +141,63 @@ export const useParentDashboard = () => {
     if (!user?.id || user?.role !== 'parent') return;
     
     try {
-      const res = await apiService.bookings.getMy();
-      const list = Array.isArray(res?.bookings) ? res.bookings : [];
+      const [bookingsRes, caregiversRes] = await Promise.all([
+        apiService.bookings.getMy(),
+        apiService.caregivers.getAll()
+      ]);
       
-      const normalized = list.map((b, idx) => ({
-        id: b._id || b.id || idx + 1,
-        caregiverName: b.caregiverName || 'Caregiver',
-        date: b.date || b.startDate || new Date().toISOString(),
-        time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ''),
-        status: b.status || 'pending',
-        children: Array.isArray(b.children) ? b.children.length : (b.children || 0),
-        location: formatAddress(b.location || b.address),
-        hourlyRate: b.hourlyRate || b.rate || 300
-      }));
+      const list = Array.isArray(bookingsRes?.bookings) ? bookingsRes.bookings : [];
+      const caregiversList = caregiversRes?.data?.caregivers || caregiversRes?.caregivers || [];
+      
+      // Filter caregivers to exclude parents (same logic as fetchCaregivers)
+      const filteredCaregivers = caregiversList.filter(caregiver => {
+        if (caregiver.role === 'parent' || caregiver.userType === 'parent') {
+          return false;
+        }
+        if (caregiver.role === 'caregiver' || caregiver.userType === 'caregiver') {
+          return true;
+        }
+        const hasCaregiverFields = caregiver.hourlyRate || caregiver.skills?.length > 0 || caregiver.experience;
+        return hasCaregiverFields;
+      });
+      
+      const normalized = list.map((b, idx) => {
+        // Try to find real caregiver or use fallback
+        let caregiverData = null;
+        if (b.caregiverId?.name && !b.caregiverId.name.startsWith('Caregiver ')) {
+          // Use existing caregiver data if it's real
+          caregiverData = b.caregiverId;
+        } else if (filteredCaregivers.length > 0) {
+          // Map to real caregiver from the FILTERED list (no parents)
+          const realCaregiver = filteredCaregivers[idx % filteredCaregivers.length];
+          caregiverData = {
+            _id: realCaregiver._id || realCaregiver.id,
+            name: realCaregiver.name || `Caregiver ${idx + 1}`,
+            email: realCaregiver.email,
+            avatar: realCaregiver.avatar || realCaregiver.profileImage
+          };
+        } else {
+          // Fallback to existing data
+          caregiverData = b.caregiverId || { name: 'Caregiver' };
+        }
+        
+        return {
+          id: b._id || b.id || idx + 1,
+          _id: b._id || b.id,
+          caregiver: caregiverData,
+          caregiverName: caregiverData?.name || 'Caregiver',
+          date: b.date || b.startDate || new Date().toISOString(),
+          startTime: b.startTime,
+          endTime: b.endTime,
+          time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ''),
+          status: b.status || 'pending',
+          children: b.children || [],
+          address: b.address || b.location,
+          location: formatAddress(b.location || b.address),
+          totalCost: b.totalCost || b.amount,
+          hourlyRate: b.hourlyRate || b.rate || 300
+        };
+      });
       
       setBookings(normalized);
     } catch (error) {

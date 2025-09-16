@@ -47,7 +47,9 @@ const getBaseHost = () => {
       if (platform === "ios") {
         return { mode: "ios-simulator", url: "http://localhost:5000" };
       }
-    } catch (_) {}
+    } catch (_) {
+      // Ignore require errors for react-native in web environments
+    }
 
     // 3) Web fallback
     if (typeof window !== "undefined") {

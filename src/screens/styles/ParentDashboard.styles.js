@@ -1333,6 +1333,8 @@ jobsList: {
 jobCard: {
   backgroundColor: colors.surface,
   borderRadius: 12,
+  minHeight: 200,
+  maxHeight: 280,
   padding: spacing.md,
   marginBottom: spacing.md,
   shadowColor: '#000',
@@ -1340,12 +1342,19 @@ jobCard: {
   shadowOpacity: 0.1,
   shadowRadius: 4,
   elevation: 3,
+  overflow: 'hidden',
 },
 jobHeader: {
   flexDirection: 'row',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
   marginBottom: spacing.md,
+  minHeight: 40,
+},
+jobTitleContainer: {
+  flex: 1,
+  marginRight: spacing.sm,
+  minWidth: 0,
 },
 jobTitle: {
   ...typography.subtitle1,
@@ -1373,14 +1382,43 @@ jobDetailRow: {
   alignItems: 'center',
   gap: spacing.sm,
 },
+jobDetailRowInline: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: spacing.md,
+},
+jobDetailItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: spacing.xs,
+  flex: 1,
+},
 jobDetailText: {
   ...typography.body2,
   color: colors.textSecondary,
 },
 jobActions: {
+  marginTop: 'auto',
+  paddingTop: spacing.sm,
+  borderTopWidth: 1,
+  borderTopColor: colors.borderLight,
+},
+jobActionsRow1: {
+  flexDirection: 'row',
+  justifyContent: 'flex-start',
+  marginBottom: spacing.xs,
+},
+jobActionsRow2: {
   flexDirection: 'row',
   justifyContent: 'flex-end',
-  gap: spacing.sm,
+  gap: spacing.xs,
+},
+jobActionButtons: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  gap: spacing.xs,
+  flexWrap: 'wrap',
 },
 jobActionButton: {
   paddingHorizontal: spacing.md,
@@ -1389,6 +1427,9 @@ jobActionButton: {
   borderWidth: 1,
   borderColor: colors.border,
   backgroundColor: colors.surface,
+  minWidth: 70,
+  alignItems: 'center',
+  justifyContent: 'center',
 },
 completeButton: {
   borderColor: colors.success,
@@ -1590,12 +1631,7 @@ filterTabCount: {
   fontSize: 12,
   fontWeight: '400',
 },
-statusBadge: {
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 12,
-  alignSelf: 'flex-start',
-},
+
 statusBadgeText: {
   fontSize: 12,
   fontWeight: '600',
@@ -1626,11 +1662,7 @@ callButtonText: {
   fontWeight: '600',
   fontSize: 14,
 },
-messageButtonText: {
-  color: colors.success,
-  fontWeight: '600',
-  fontSize: 14,
-},
+
 emptyIcon: {
   marginBottom: 16,
 },
@@ -1653,6 +1685,108 @@ emptyActionButton: {
 },
 emptyActionButtonText: {
   color: colors.textInverse,
+  fontWeight: '600',
+  fontSize: 16,
+},
+
+// Application Management Styles
+viewApplicationsButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: colors.primaryLight,
+  paddingHorizontal: spacing.md,
+  paddingVertical: spacing.sm,
+  borderRadius: 8,
+  gap: spacing.xs,
+  alignSelf: 'flex-start',
+},
+viewApplicationsText: {
+  ...typography.body2,
+  color: colors.primary,
+  fontWeight: '600',
+},
+applicationCard: {
+  backgroundColor: colors.surface,
+  borderRadius: 12,
+  padding: spacing.md,
+  marginBottom: spacing.md,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.1,
+  shadowRadius: 2,
+  elevation: 2,
+},
+applicationHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: spacing.sm,
+},
+applicationMessage: {
+  ...typography.body2,
+  color: colors.textSecondary,
+  fontStyle: 'italic',
+  marginBottom: spacing.md,
+},
+applicationActions: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  gap: spacing.sm,
+},
+acceptButton: {
+  backgroundColor: colors.success,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: spacing.xs,
+},
+rejectButton: {
+  backgroundColor: colors.surface,
+  borderWidth: 1,
+  borderColor: colors.error,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: spacing.xs,
+},
+acceptButtonText: {
+  color: colors.textInverse,
+  fontWeight: '600',
+  fontSize: 14,
+},
+rejectButtonText: {
+  color: colors.error,
+  fontWeight: '600',
+  fontSize: 14,
+},
+applicationsList: {
+  paddingHorizontal: spacing.md,
+},
+backButton: {
+  ...typography.body1,
+  color: colors.primary,
+  fontWeight: '600',
+},
+headerTitle: {
+  ...typography.h3,
+  color: colors.text,
+},
+emptyText: {
+  ...typography.body1,
+  color: colors.textSecondary,
+  textAlign: 'center',
+  marginTop: spacing.xl,
+},
+createFirstJobButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: colors.primaryLight,
+  paddingHorizontal: spacing.lg,
+  paddingVertical: spacing.md,
+  borderRadius: 8,
+  gap: spacing.sm,
+  marginTop: spacing.md,
+},
+createFirstJobText: {
+  color: colors.primary,
   fontWeight: '600',
   fontSize: 16,
 },

@@ -61,10 +61,11 @@ export const getCaregiverDisplayName = (caregiver) => {
                caregiver?.fullName || 
                caregiver?.displayName ||
                caregiver?.user?.name ||
-               caregiver?.user?.firstName;
+               caregiver?.user?.firstName ||
+               caregiver?.userId?.name;
                
   console.log('Extracted name:', name);
-  return name || 'No caregiver assigned';
+  return name || 'Unknown Caregiver';
 };
 
 export const normalizeStatus = (status) => {

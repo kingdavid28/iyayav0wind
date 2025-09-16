@@ -54,17 +54,10 @@ export default function JobsTab({
           </View>
         ) : jobs && jobs.length > 0 ? (
           <View style={[styles.jobsGrid, columns === 1 && { flexDirection: 'column' }]}>
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                showActions={true}
-                onApply={onJobApply}
-                onLearnMore={onJobView}
-                hasApplied={(id) => applications.some((a) => a.jobId === id)}
-                jobCardStyle={columns === 1 ? { width: '100%', ...(gridCardHeight ? { height: gridCardHeight } : {}) } : { width: gridCardWidth, height: gridCardHeight }}
-                gridMode
-              />
+            {jobs.map((job, index) => (
+              <View key={job.id || `job-${index}`} style={styles.jobCard}>
+                <Text>Job: {job.title}</Text>
+              </View>
             ))}
           </View>
         ) : (

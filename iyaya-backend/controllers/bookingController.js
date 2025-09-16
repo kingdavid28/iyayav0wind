@@ -1,12 +1,12 @@
 const Booking = require('../models/Booking');
 const User = require('../models/User');
+const Caregiver = require('../models/Caregiver');
 
 // Get user's bookings
 exports.getMyBookings = async (req, res) => {
   try {
     console.log(`getMyBookings called for user: ${req.user.id}, role: ${req.user.role}`);
     
-    const Caregiver = require('../models/Caregiver');
     let caregiverProfileId = null;
     
     if (req.user.role === 'caregiver') {
@@ -30,10 +30,42 @@ exports.getMyBookings = async (req, res) => {
     
     const bookings = await Booking.find(searchCriteria)
     .populate('clientId', 'name email')
-    .populate('caregiverId', 'name email')
     .sort({ createdAt: -1 });
 
     console.log(`Found ${bookings.length} bookings for user: ${req.user.id}`);
+    
+    // Enhance bookings with caregiver data
+    for (let booking of bookings) {
+      if (booking.caregiverId) {
+        // Try to find caregiver by profile ID first
+        let caregiver = await Caregiver.findById(booking.caregiverId).populate('userId', 'name email');
+        
+        if (caregiver) {
+          booking.caregiverId = {
+            _id: caregiver._id,
+            name: caregiver.name || caregiver.userId?.name || 'Unknown Caregiver',
+            email: caregiver.userId?.email || 'no-email@example.com',
+            profileImage: caregiver.profileImage,
+            avatar: caregiver.profileImage,
+            hourlyRate: caregiver.hourlyRate
+          };
+        } else {
+          // Try to find by user ID if profile ID lookup failed
+          const user = await User.findById(booking.caregiverId);
+          if (user) {
+            const caregiverProfile = await Caregiver.findOne({ userId: user._id });
+            booking.caregiverId = {
+              _id: user._id,
+              name: caregiverProfile?.name || user.name || 'Unknown Caregiver',
+              email: user.email || 'no-email@example.com',
+              profileImage: caregiverProfile?.profileImage,
+              avatar: caregiverProfile?.profileImage,
+              hourlyRate: caregiverProfile?.hourlyRate
+            };
+          }
+        }
+      }
+    }
     
     res.json({
       success: true,
@@ -58,6 +90,21 @@ exports.createBooking = async (req, res) => {
     });
     
     await newBooking.save();
+    
+    // Populate caregiver data for response
+    if (newBooking.caregiverId) {
+      const caregiver = await Caregiver.findById(newBooking.caregiverId).populate('userId', 'name email');
+      if (caregiver) {
+        newBooking.caregiverId = {
+          _id: caregiver._id,
+          name: caregiver.name || caregiver.userId?.name || 'Unknown Caregiver',
+          email: caregiver.userId?.email || 'no-email@example.com',
+          profileImage: caregiver.profileImage,
+          avatar: caregiver.profileImage,
+          hourlyRate: caregiver.hourlyRate
+        };
+      }
+    }
     
     console.log(`Booking created by user: ${req.user.id}`);
     
@@ -159,14 +206,28 @@ exports.getBookingById = async (req, res) => {
         { caregiverId: req.user.id }
       ]
     })
-    .populate('clientId', 'name email')
-    .populate('caregiverId', 'name email');
+    .populate('clientId', 'name email');
     
     if (!booking) {
       return res.status(404).json({
         success: false,
         error: 'Booking not found or not authorized'
       });
+    }
+    
+    // Enhance with caregiver data
+    if (booking.caregiverId) {
+      const caregiver = await Caregiver.findById(booking.caregiverId).populate('userId', 'name email');
+      if (caregiver) {
+        booking.caregiverId = {
+          _id: caregiver._id,
+          name: caregiver.name || caregiver.userId?.name || 'Unknown Caregiver',
+          email: caregiver.userId?.email || 'no-email@example.com',
+          profileImage: caregiver.profileImage,
+          avatar: caregiver.profileImage,
+          hourlyRate: caregiver.hourlyRate
+        };
+      }
     }
     
     res.json({
@@ -190,7 +251,6 @@ exports.updateBookingStatus = async (req, res) => {
     console.log(`🔄 updateBookingStatus called for booking: ${req.params.id}, user: ${req.user.id}, role: ${req.user.role}`);
     const { status, feedback } = req.body;
     
-    const Caregiver = require('../models/Caregiver');
     let caregiverProfileId = null;
     
     if (req.user.role === 'caregiver') {

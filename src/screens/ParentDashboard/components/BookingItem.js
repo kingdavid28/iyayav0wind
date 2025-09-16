@@ -103,7 +103,13 @@ const BookingItem = ({
           <View style={styles.bookingActionsRow}>
             <TouchableOpacity
               style={[styles.bookingActionButton, styles.viewButton]}
-              onPress={() => onViewBookingDetails(item._id || item.id)}
+              onPress={() => {
+                Alert.alert(
+                  'Booking Details',
+                  `Caregiver: ${getCaregiverDisplayName(item.caregiver)}\nDate: ${formatDateFriendly(item.date)}\nTime: ${formatTimeRange(item.startTime, item.endTime)}\nLocation: ${item.address || item.location || 'Not specified'}\nTotal Cost: ₱${(item.totalCost || item.amount || 0).toFixed(0)}`,
+                  [{ text: 'OK' }]
+                );
+              }}
             >
               <Eye size={16} color="#3B82F6" />
               <Text style={styles.viewButtonText}>View Details</Text>
@@ -172,7 +178,13 @@ const BookingItem = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.bookingActionButton, styles.viewButton]}
-              onPress={() => onViewBookingDetails(item._id || item.id)}
+              onPress={() => {
+                Alert.alert(
+                  'Payment Receipt',
+                  `Booking ID: ${item._id || item.id}\nCaregiver: ${getCaregiverDisplayName(item.caregiver)}\nAmount Paid: ₱${(item.totalCost || item.amount || 0).toFixed(0)}\nStatus: Paid`,
+                  [{ text: 'OK' }]
+                );
+              }}
             >
               <Eye size={16} color="#3B82F6" />
               <Text style={styles.viewButtonText}>View Receipt</Text>
@@ -185,22 +197,47 @@ const BookingItem = ({
     }
   };
 
+  // Debug logging for caregiver data
+  console.log('📋 BookingItem - Full item:', item);
+  console.log('📋 BookingItem - Caregiver data:', item.caregiverId);
+  console.log('📋 BookingItem - Caregiver avatar sources:', {
+    caregiverAvatar: item.caregiverAvatar,
+    caregiverIdAvatar: item.caregiverId?.avatar,
+    caregiverIdProfileImage: item.caregiverId?.profileImage,
+    caregiverAvatar2: item.caregiver?.avatar,
+    caregiverProfileImage2: item.caregiver?.profileImage
+  });
+
+  const getFullImageURL = (imagePath) => {
+    if (!imagePath) return 'https://via.placeholder.com/50x50/E5E7EB/6B7280?text=CG';
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('/uploads/')) {
+      return `http://192.168.1.4:3000${imagePath}`;
+    }
+    return imagePath;
+  };
+
+  const caregiverImageUri = getFullImageURL(
+    item.caregiverId?.profileImage || 
+    item.caregiverId?.avatar || 
+    item.caregiverAvatar || 
+    item.caregiver?.avatar || 
+    item.caregiver?.profileImage
+  );
+
+  console.log('📋 BookingItem - Final image URI:', caregiverImageUri);
+
   return (
     <View style={styles.bookingItemCard}>
       <View style={styles.bookingItemHeader}>
         <View style={styles.bookingCaregiverInfo}>
           <Image
-            source={{ 
-              uri: item.caregiverAvatar || 
-                   item.caregiver?.avatar || 
-                   item.caregiver?.profileImage || 
-                   'https://via.placeholder.com/50x50/E5E7EB/6B7280?text=CG'
-            }}
+            source={{ uri: caregiverImageUri }}
             style={styles.bookingAvatar}
           />
           <View style={styles.bookingCaregiverDetails}>
             <Text style={styles.bookingCaregiverName}>
-              {getCaregiverDisplayName(item.caregiver)}
+              {getCaregiverDisplayName(item.caregiverId || item.caregiver)}
             </Text>
             {renderStatusBadge()}
           </View>

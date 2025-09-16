@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { EmptyState } from '../../shared/ui';
+import ApplicationCard from '../../shared/ui/cards/ApplicationCard';
 import { styles } from '../styles/CaregiverDashboard.styles';
 
 export default function ApplicationsTab({ 
@@ -15,10 +16,10 @@ export default function ApplicationsTab({
         {applications.length > 0 ? (
           applications.map((application) => (
             <ApplicationCard 
-              key={application.id} 
+              key={application.id || application._id} 
               application={application}
-              onViewDetails={onApplicationView}
-              onMessage={onMessageFamily}
+              onPress={onApplicationView}
+              onWithdraw={() => {}}
             />
           ))
         ) : (

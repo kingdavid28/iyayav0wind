@@ -31,6 +31,9 @@ router.get('/my-applications', applications.getMyApplications);
 // GET /api/applications/my - caregiver's applications (legacy)
 router.get('/my', applications.getMyApplications);
 
+// GET /api/applications/debug - debug caregiver info
+router.get('/debug', applications.debugCaregiverInfo);
+
 // GET /api/applications/:id - get single application
 router.get('/:id', applications.getApplicationById);
 

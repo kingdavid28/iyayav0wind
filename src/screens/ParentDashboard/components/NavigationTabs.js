@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { Home, Search, Calendar, User, MessageCircle, Plus } from 'lucide-react-native';
+import { Home, Search, Calendar, User, MessageCircle, Plus, Briefcase } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import { useMessaging } from '../../../contexts/MessagingContext';
 
@@ -41,6 +41,16 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         <Calendar size={20} color={activeTab === 'bookings' ? colors.secondary : colors.textTertiary} />
         <Text style={[styles.navText, activeTab === 'bookings' && styles.activeNavText]}>
           Bookings
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.navItem, activeTab === 'job-management' && styles.activeNavItem]}
+        onPress={() => setActiveTab('job-management')}
+      >
+        <Briefcase size={20} color={activeTab === 'job-management' ? colors.secondary : colors.textTertiary} />
+        <Text style={[styles.navText, activeTab === 'job-management' && styles.activeNavText]}>
+          My Jobs
         </Text>
       </TouchableOpacity>
 

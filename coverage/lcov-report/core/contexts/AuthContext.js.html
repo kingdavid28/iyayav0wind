@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/131</span>
+                <span class='fraction'>0/132</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/48</span>
+                <span class='fraction'>0/46</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/130</span>
+                <span class='fraction'>0/131</span>
             </div>
         
             
@@ -366,6 +366,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -652,7 +653,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -662,6 +662,7 @@ import { authAPI } from "../../config/api";
 import { STORAGE_KEYS } from "../../config/constants";
 import { firebaseAuthService } from "../../services/firebaseAuthService";
 &nbsp;
+const API_URL = <span class="cstat-no" title="statement not covered" >process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';</span>
 &nbsp;
 export const AuthContext = <span class="cstat-no" title="statement not covered" >createContext();</span>
 &nbsp;
@@ -684,11 +685,11 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
       const currentUser = <span class="cstat-no" title="statement not covered" >firebaseAuthService.getCurrentUser();</span>
 <span class="cstat-no" title="statement not covered" >      if (currentUser &amp;&amp; currentUser.emailVerified) {</span>
         const token = <span class="cstat-no" title="statement not covered" >await currentUser.getIdToken();</span>
-<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem('@auth_token', token);</span>
+<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);</span>
         
         // Get user profile from MongoDB
 <span class="cstat-no" title="statement not covered" >        try {</span>
-          const response = <span class="cstat-no" title="statement not covered" >await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {</span>
+          const response = <span class="cstat-no" title="statement not covered" >await fetch(`${API_URL}/api/auth/firebase-profile`, {</span>
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -744,11 +745,11 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
     const unsubscribe = <span class="cstat-no" title="statement not covered" >firebaseAuthService.onAuthStateChanged(<span class="fstat-no" title="function not covered" >as</span>ync (user) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >      if (user &amp;&amp; user.emailVerified) {</span>
         const token = <span class="cstat-no" title="statement not covered" >await user.getIdToken();</span>
-<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem('@auth_token', token);</span>
+<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);</span>
         
         // Get user profile from MongoDB
 <span class="cstat-no" title="statement not covered" >        try {</span>
-          const response = <span class="cstat-no" title="statement not covered" >await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {</span>
+          const response = <span class="cstat-no" title="statement not covered" >await fetch(`${API_URL}/api/auth/firebase-profile`, {</span>
             headers: {
               'Authorization': `Bearer ${token}`
             }
@@ -790,7 +791,7 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
         }
       } else {
 <span class="cstat-no" title="statement not covered" >        setUser(null);</span>
-<span class="cstat-no" title="statement not covered" >        await AsyncStorage.removeItem('@auth_token');</span>
+<span class="cstat-no" title="statement not covered" >        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);</span>
       }
 <span class="cstat-no" title="statement not covered" >      setIsLoading(false);</span>
     });
@@ -809,7 +810,7 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
 <span class="cstat-no" title="statement not covered" >      console.log('✅ Firebase login successful:', res);</span>
       
 <span class="cstat-no" title="statement not covered" >      if (res?.token) {</span>
-<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem('@auth_token', res.token);</span>
+<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);</span>
 <span class="cstat-no" title="statement not covered" >        console.log('💾 Token stored successfully');</span>
       }
       
@@ -853,7 +854,7 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
 <span class="cstat-no" title="statement not covered" >      setIsLoading(true);</span>
       
 <span class="cstat-no" title="statement not covered" >      await firebaseAuthService.signOut();</span>
-<span class="cstat-no" title="statement not covered" >      await AsyncStorage.removeItem('@auth_token');</span>
+<span class="cstat-no" title="statement not covered" >      await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);</span>
       
 <span class="cstat-no" title="statement not covered" >      setUser(null);</span>
 <span class="cstat-no" title="statement not covered" >      setError(null);</span>
@@ -877,7 +878,7 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
       
 <span class="cstat-no" title="statement not covered" >      if (result.success &amp;&amp; result.token) {</span>
         // Store the new token
-<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem('@auth_token', result.token);</span>
+<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);</span>
 <span class="cstat-no" title="statement not covered" >        console.log('💾 Token stored successfully');</span>
         
         // Use user data from verification response if available
@@ -950,15 +951,14 @@ export const useAuth = <span class="cstat-no" title="statement not covered" ><sp
 <span class="cstat-no" title="statement not covered" >  return context;</span>
 };
 &nbsp;
-export default AuthContext;
-&nbsp;</pre></td></tr></table></pre>
+export default AuthContext;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T16:00:36.461Z
+                at 2025-09-14T16:58:41.890Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

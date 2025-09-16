@@ -342,14 +342,12 @@ const ParentProfile = ({ navigation }) => {
           >
             Edit Profile
           </Button>
-          <Button 
-            mode="outlined" 
+          <TouchableOpacity 
             onPress={() => navigation.goBack()}
-            style={styles.closeButtonAction}
-            icon="close"
+            style={styles.closeIconButton}
           >
-            Close
-          </Button>
+            <Ionicons name="close" size={24} color="#db2777" />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -724,9 +722,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  closeButtonAction: {
-    flex: 1,
+  closeIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
     borderColor: '#db2777',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
 });
 

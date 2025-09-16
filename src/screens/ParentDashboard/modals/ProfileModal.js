@@ -81,7 +81,7 @@ const ProfileModal = ({
       return;
     }
 
-    if (profileContact && profileContact.trim() && !/^[\d\s\-\+\(\)]+$/.test(profileContact.trim())) {
+    if (profileContact && profileContact.trim() && !/^[\d\s\-+()]+$/.test(profileContact.trim())) {
       Alert.alert("Error", "Please enter a valid contact number");
       return;
     }

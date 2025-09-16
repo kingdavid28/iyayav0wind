@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/23</span>
+                <span class='fraction'>0/24</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/22</span>
+                <span class='fraction'>0/23</span>
             </div>
         
             
@@ -127,15 +127,8 @@
 <a name='L62'></a><a href='#L62'>62</a>
 <a name='L63'></a><a href='#L63'>63</a>
 <a name='L64'></a><a href='#L64'>64</a>
-<a name='L65'></a><a href='#L65'>65</a>
-<a name='L66'></a><a href='#L66'>66</a>
-<a name='L67'></a><a href='#L67'>67</a>
-<a name='L68'></a><a href='#L68'>68</a>
-<a name='L69'></a><a href='#L69'>69</a>
-<a name='L70'></a><a href='#L70'>70</a>
-<a name='L71'></a><a href='#L71'>71</a>
-<a name='L72'></a><a href='#L72'>72</a>
-<a name='L73'></a><a href='#L73'>73</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L65'></a><a href='#L65'>65</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -159,21 +152,16 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -183,11 +171,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -208,23 +192,34 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View } from 'react-native';
 import { Plus, Calendar, MessageCircle, Search } from 'lucide-react-native';
-import { styles, colors } from '../../styles/ParentDashboard.styles';
+import QuickAction from './QuickAction';
+import { colors } from '../../styles/ParentDashboard.styles';
 &nbsp;
 const QuickActions = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >({</span> actions }) =&gt; {</span>
   const styleFor = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(i</span>d) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    switch (id) {</span>
       case 'find':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#FFF1F7', border: '#FBCFE8', icon: '#EC4899' };</span>
+<span class="cstat-no" title="statement not covered" >        return { color: '#EC4899', bgColor: '#FFF1F7' };</span>
       case 'book':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#EFF6FF', border: '#BFDBFE', icon: '#3B82F6' };</span>
+<span class="cstat-no" title="statement not covered" >        return { color: '#3B82F6', bgColor: '#EFF6FF' };</span>
       case 'messages':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#F5F3FF', border: '#DDD6FE', icon: '#8B5CF6' };</span>
+<span class="cstat-no" title="statement not covered" >        return { color: '#8B5CF6', bgColor: '#F5F3FF' };</span>
       case 'add-child':
-<span class="cstat-no" title="statement not covered" >        return { bg: '#ECFDF5', border: '#BBF7D0', icon: '#10B981' };</span>
+<span class="cstat-no" title="statement not covered" >        return { color: '#10B981', bgColor: '#ECFDF5' };</span>
       default:
-<span class="cstat-no" title="statement not covered" >        return { bg: colors.surface, border: colors.border, icon: colors.primary };</span>
+<span class="cstat-no" title="statement not covered" >        return { color: colors.primary, bgColor: colors.surface };</span>
+    }
+  };
+&nbsp;
+  const renderIcon = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(i</span>conName) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    switch (iconName) {</span>
+      case 'plus': <span class="cstat-no" title="statement not covered" >return Plus;</span>
+      case 'calendar': <span class="cstat-no" title="statement not covered" >return Calendar;</span>
+      case 'message-circle': <span class="cstat-no" title="statement not covered" >return MessageCircle;</span>
+      case 'search': <span class="cstat-no" title="statement not covered" >return Search;</span>
+      default: <span class="cstat-no" title="statement not covered" >return Plus;</span>
     }
   };
 &nbsp;
@@ -233,45 +228,26 @@ const QuickActions = <span class="cstat-no" title="statement not covered" ><span
 <span class="cstat-no" title="statement not covered" >    rows.push(actions.slice(i, i + 2));</span>
   }
 &nbsp;
-  const renderIcon = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(i</span>conName, color) =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    switch (iconName) {</span>
-      case 'plus':
-<span class="cstat-no" title="statement not covered" >        return &lt;Plus size={28} color={color} /&gt;;</span>
-      case 'calendar':
-<span class="cstat-no" title="statement not covered" >        return &lt;Calendar size={28} color={color} /&gt;;</span>
-      case 'message-circle':
-<span class="cstat-no" title="statement not covered" >        return &lt;MessageCircle size={28} color={color} /&gt;;</span>
-      case 'search':
-<span class="cstat-no" title="statement not covered" >        return &lt;Search size={28} color={color} /&gt;;</span>
-      default:
-<span class="cstat-no" title="statement not covered" >        return null;</span>
-    }
-  };
-&nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;View style={{ paddingTop: 4 }}&gt;
       {rows.map(<span class="fstat-no" title="function not covered" >(r</span>ow, idx) =&gt; (
 <span class="cstat-no" title="statement not covered" >        &lt;View key={`qa-row-${idx}`} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}&gt;</span>
           {row.map(<span class="fstat-no" title="function not covered" >(a</span>ction) =&gt; {
-            const s = <span class="cstat-no" title="statement not covered" >styleFor(action.id);</span>
+            const style = <span class="cstat-no" title="statement not covered" >styleFor(action.id);</span>
+            const IconComponent = <span class="cstat-no" title="statement not covered" >renderIcon(action.icon);</span>
 <span class="cstat-no" title="statement not covered" >            return (</span>
-              &lt;TouchableOpacity
+              &lt;QuickAction
                 key={action.id}
-                style={[
-                  styles.quickAction,
-                  { borderColor: s.border, backgroundColor: s.bg, borderWidth: 1, borderRadius: 16, paddingVertical: 20 },
-                ]}
+                icon={IconComponent}
+                label={action.title}
+                color={style.color}
+                bgColor={style.bgColor}
                 onPress={action.onPress}
-                activeOpacity={0.85}
-              &gt;
-                {renderIcon(action.icon, s.icon)}
-                &lt;Text style={[styles.quickActionText, { color: '#111827' }]}&gt;{action.title}&lt;/Text&gt;
-              &lt;/TouchableOpacity&gt;
+                testID={`quick-action-${action.id}`}
+              /&gt;
             );
           })}
-          {row.length === 1 &amp;&amp; (
-            &lt;View style={[styles.quickAction, { opacity: 0 }]} /&gt;
-          )}
+          {row.length === 1 &amp;&amp; &lt;View style={{ flex: 1 }} /&gt;}
         &lt;/View&gt;
       ))}
     &lt;/View&gt;
@@ -286,7 +262,7 @@ export default QuickActions;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T16:00:36.461Z
+                at 2025-09-14T16:58:41.890Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

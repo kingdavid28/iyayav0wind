@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/59</span>
+                <span class='fraction'>0/56</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/187</span>
+                <span class='fraction'>0/190</span>
             </div>
         
             
@@ -651,7 +651,10 @@
 <a name='L586'></a><a href='#L586'>586</a>
 <a name='L587'></a><a href='#L587'>587</a>
 <a name='L588'></a><a href='#L588'>588</a>
-<a name='L589'></a><a href='#L589'>589</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L589'></a><a href='#L589'>589</a>
+<a name='L590'></a><a href='#L590'>590</a>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -743,6 +746,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -879,6 +883,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -896,6 +901,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1328,9 +1334,10 @@ export const authAPI = <span class="cstat-no" title="statement not covered" >{</
   },
 &nbsp;
 <span class="fstat-no" title="function not covered" >  as</span>ync getProfile() {
-    const token = <span class="cstat-no" title="statement not covered" >await import('@react-native-async-storage/async-storage').then(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.default.getItem('@auth_token'))</span>;</span>
+    const { tokenManager } = <span class="cstat-no" title="statement not covered" >await import('../utils/tokenManager');</span>
+    const token = <span class="cstat-no" title="statement not covered" >await tokenManager.getToken();</span>
 <span class="cstat-no" title="statement not covered" >    if (!token) {</span>
-<span class="cstat-no" title="statement not covered" >      throw new Error('No auth token found');</span>
+<span class="cstat-no" title="statement not covered" >      throw new Error('No authentication token available');</span>
     }
     
     const response = <span class="cstat-no" title="statement not covered" >await fetch(`${API_BASE_URL}/auth/firebase-profile`, {</span>
@@ -1464,9 +1471,10 @@ export const caregiversAPI = <span class="cstat-no" title="statement not covered
   },
 &nbsp;
 <span class="fstat-no" title="function not covered" >  as</span>ync getMyProfile() {
-    const token = <span class="cstat-no" title="statement not covered" >await import('@react-native-async-storage/async-storage').then(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.default.getItem('@auth_token'))</span>;</span>
+    const { tokenManager } = <span class="cstat-no" title="statement not covered" >await import('../utils/tokenManager');</span>
+    const token = <span class="cstat-no" title="statement not covered" >await tokenManager.getToken();</span>
 <span class="cstat-no" title="statement not covered" >    if (!token) {</span>
-<span class="cstat-no" title="statement not covered" >      throw new Error('No auth token found');</span>
+<span class="cstat-no" title="statement not covered" >      throw new Error('No authentication token available');</span>
     }
     
     const response = <span class="cstat-no" title="statement not covered" >await fetch(`${API_BASE_URL}/caregivers/profile`, {</span>
@@ -1484,9 +1492,10 @@ export const caregiversAPI = <span class="cstat-no" title="statement not covered
   },
 &nbsp;
 <span class="fstat-no" title="function not covered" >  as</span>ync updateMyProfile(profileData) {
-    const token = <span class="cstat-no" title="statement not covered" >await import('@react-native-async-storage/async-storage').then(<span class="fstat-no" title="function not covered" >m </span>=&gt; <span class="cstat-no" title="statement not covered" >m.default.getItem('@auth_token'))</span>;</span>
+    const { tokenManager } = <span class="cstat-no" title="statement not covered" >await import('../utils/tokenManager');</span>
+    const token = <span class="cstat-no" title="statement not covered" >await tokenManager.getToken();</span>
 <span class="cstat-no" title="statement not covered" >    if (!token) {</span>
-<span class="cstat-no" title="statement not covered" >      throw new Error('No auth token found');</span>
+<span class="cstat-no" title="statement not covered" >      throw new Error('No authentication token available');</span>
     }
     
     const csrf = <span class="cstat-no" title="statement not covered" >await getCSRFToken();</span>
@@ -1834,7 +1843,7 @@ export const privacyAPI = <span class="cstat-no" title="statement not covered" >
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-12T16:00:36.461Z
+                at 2025-09-14T16:58:41.890Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

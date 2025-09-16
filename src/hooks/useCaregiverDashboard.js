@@ -121,19 +121,27 @@ export const useCaregiverDashboard = () => {
     if (!user?.id || user?.role !== 'caregiver') return;
     
     try {
+      console.log('📋 Fetching applications for caregiver:', user?.id);
       const res = await apiService.applications.getMy();
+      console.log('📋 Applications API response:', res);
+      
       const list = res?.data?.applications || res?.applications || [];
+      console.log('📋 Applications count:', list.length);
       
       const normalized = list.map(a => ({
         id: a._id || a.id || Date.now(),
         jobId: a.jobId?._id || a.jobId,
-        jobTitle: a.jobId?.title || 'Job Application',
-        family: a.jobId?.parentId?.name || 'Family',
+        jobTitle: a.jobId?.title || a.jobId?.name || 'Childcare Position',
+        employerName: a.jobId?.clientName || 'Family',
         status: a.status || 'pending',
         appliedDate: a.createdAt || new Date().toISOString(),
-        hourlyRate: a.proposedRate || a.jobId?.rate || undefined
+        hourlyRate: a.proposedRate || a.jobId?.hourlyRate || 200,
+        location: a.jobId?.location || 'Location not specified',
+        jobDate: a.jobId?.date || new Date().toISOString(),
+        message: a.message || a.coverLetter || ''
       }));
       
+      console.log('📋 Normalized applications:', normalized);
       setApplications(normalized);
     } catch (error) {
       console.error('Error fetching applications:', {
@@ -173,6 +181,7 @@ export const useCaregiverDashboard = () => {
       const normalized = list.map((b, idx) => ({
         id: b._id || b.id || idx + 1,
         family: b.clientId?.name || b.family || b.customerName || 'Family',
+        caregiver: b.caregiver?.name || b.caregiverId?.name || 'Caregiver',
         date: b.date || b.startDate || new Date().toISOString(),
         time: b.time || (b.startTime && b.endTime ? `${b.startTime} - ${b.endTime}` : ''),
         status: b.status || 'pending',
@@ -200,12 +209,15 @@ export const useCaregiverDashboard = () => {
     }
   }, [user?.id, dataLoaded]);
 
-  // Refresh bookings when bookings tab is active
+  // Refresh data when tabs become active
   useEffect(() => {
     if (activeTab === 'bookings' && user?.id) {
       fetchBookings();
     }
-  }, [activeTab, fetchBookings, user?.id]);
+    if (activeTab === 'applications' && user?.id) {
+      fetchApplications();
+    }
+  }, [activeTab, fetchBookings, fetchApplications, user?.id]);
 
   return {
     activeTab,
@@ -214,6 +226,7 @@ export const useCaregiverDashboard = () => {
     setProfile,
     jobs,
     applications,
+    setApplications,
     bookings,
     jobsLoading,
     loadProfile,

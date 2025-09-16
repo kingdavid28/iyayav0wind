@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Button, Card } from 'react-native-paper';
-import { ToggleSwitch } from '../../index';
+import { ToggleSwitch } from '../../ui/inputs/ToggleSwitch';
 
 export function NotificationSettings({ user, userType, data, onSave, isLoading, isSaving, colors }) {
   const [localData, setLocalData] = useState({

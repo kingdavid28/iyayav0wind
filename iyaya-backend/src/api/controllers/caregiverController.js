@@ -12,6 +12,30 @@ const resolveMongoId = (user) => {
   return mongoose.isValidObjectId(id) ? id : null;
 };
 
+// Helper: check if user is admin
+function isAdmin(user) {
+  return user && (user.role === 'admin' || user.userType === 'admin');
+}
+
+// Helper: check if user has contract with parent (client)
+async function hasActiveContract(requesterId, parentId) {
+  if (!requesterId || !parentId) return false;
+  try {
+    const Contract = require('../models/Contract');
+    const contract = await Contract.findOne({
+      $or: [
+        { clientId: parentId, providerId: requesterId },
+        { clientId: requesterId, providerId: parentId }
+      ],
+      status: { $in: ['active', 'completed'] }
+    });
+    return !!contract;
+  } catch (error) {
+    console.error('Error checking contract:', error);
+    return false;
+  }
+}
+
 // Empty profile template for new caregivers
 const getDefaultProfileTemplate = () => ({
   name: "",
@@ -200,23 +224,41 @@ exports.searchCaregivers = async (req, res) => {
     console.log('📋 MongoDB query:', JSON.stringify(query, null, 2));
     
     // Optimized query with lean() and minimal fields
+    // CRITICAL: Filter by User role to exclude parents who have caregiver profiles
     const caregivers = await Caregiver.find(query)
-      .populate('userId', 'name profileImage')
+      .populate({
+        path: 'userId',
+        select: 'name profileImage role userType',
+        match: { 
+          $or: [
+            { role: 'caregiver' },
+            { userType: 'caregiver' }
+          ]
+        }
+      })
       .select('name skills experience hourlyRate availability rating ageCareRanges profileImage address location')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ rating: -1, 'verification.trustScore': -1 })
       .lean();
-      
-    const count = await Caregiver.countDocuments(query);
     
-    console.log('📊 Search results:', { count, caregivers: caregivers.length });
-    console.log('👥 Found caregivers:', caregivers.map(c => ({ id: c._id, name: c.name })));
+    // Filter out caregivers where userId is null (means User role doesn't match)
+    const validCaregivers = caregivers.filter(c => c.userId !== null);
+      
+    const count = validCaregivers.length;
+    
+    console.log('📊 Search results:', { total: caregivers.length, valid: validCaregivers.length });
+    console.log('👥 Valid caregivers:', validCaregivers.map(c => ({ 
+      id: c._id, 
+      name: c.name, 
+      userRole: c.userId?.role,
+      userType: c.userId?.userType 
+    })));
     
     await logActivity('PROVIDER_SEARCH', { searchParams: req.query, results: count });
     
     // Map caregivers to public info only
-    const publicCaregivers = caregivers.map(p => ({
+    const publicCaregivers = validCaregivers.map(p => ({
       _id: p._id,
       id: p._id, // Add id field for frontend compatibility
       user: p.userId,
@@ -255,7 +297,6 @@ exports.searchCaregivers = async (req, res) => {
 };
 
 // Get caregiver details
-// Get caregiver details (public info + conditional contact info)
 exports.getCaregiverDetails = async (req, res) => {
   try {
     const { id } = req.params;
@@ -279,9 +320,17 @@ exports.getCaregiverDetails = async (req, res) => {
     const caregiver = await Caregiver.findById(id)
       .populate('userId', 'name profileImage email phone role userType')
       .populate('reviews.userId', 'name profileImage');
+    
     if (!caregiver) {
       return res.status(404).json({ success: false, error: 'Caregiver not found' });
     }
+    
+    // Check if the associated user is actually a caregiver
+    const user = caregiver.userId;
+    if (!user || (user.role !== 'caregiver' && user.userType !== 'caregiver')) {
+      return res.status(404).json({ success: false, error: 'Caregiver profile not available' });
+    }
+    
     // By default, only public info
     let result = {
       _id: caregiver._id,

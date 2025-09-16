@@ -74,7 +74,12 @@ const BookingsTab = ({
     
     return bookings.reduce((stats, booking) => {
       stats.total += 1;
-      stats.totalSpent += (booking.totalCost || booking.amount || 0);
+      
+      // Only count money as "spent" if booking is paid or completed with payment
+      if (booking.status === BOOKING_STATUSES.PAID || 
+          (booking.status === BOOKING_STATUSES.COMPLETED && booking.paymentProof)) {
+        stats.totalSpent += (booking.totalCost || booking.amount || 0);
+      }
       
       switch (booking.status) {
         case BOOKING_STATUSES.PENDING:

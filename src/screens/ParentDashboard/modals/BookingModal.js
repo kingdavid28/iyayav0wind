@@ -36,6 +36,19 @@ import TimePicker from '../../../shared/ui/inputs/TimePicker';
 import { formatAddress } from '../../../utils/addressUtils';
 
 const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visible }) => {
+  console.log('📋 BookingModal - Caregiver prop:', caregiver);
+  console.log('📋 BookingModal - Caregiver avatar:', caregiver?.avatar);
+  console.log('📋 BookingModal - Caregiver profileImage:', caregiver?.profileImage);
+  
+  const getFullImageURL = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('/uploads/')) {
+      return `http://192.168.1.4:3000${imagePath}`;
+    }
+    return imagePath;
+  };
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [bookingData, setBookingData] = useState({
     date: null,
@@ -358,10 +371,16 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
       {/* Caregiver Info */}
       <View style={styles.caregiverSummary}>
         <View style={styles.caregiverHeader}>
-          <Image 
-            source={{ uri: caregiver.avatar }} 
-            style={styles.avatar}
-          />
+          {(caregiver?.avatar || caregiver?.profileImage) ? (
+            <Image 
+              source={{ uri: getFullImageURL(caregiver.avatar || caregiver.profileImage) }} 
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }]}>
+              <User size={32} color="#6b7280" />
+            </View>
+          )}
           <View style={styles.caregiverInfo}>
             <Text style={styles.caregiverName}>{caregiver.name}</Text>
             <Text style={styles.rateText}>₱{resolveHourlyRate()}/hr</Text>
@@ -391,8 +410,11 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <View style={styles.caregiverAvatar}>
-                {caregiver?.avatar ? (
-                  <Image source={{ uri: caregiver.avatar }} style={styles.avatarImage} />
+                {(caregiver?.avatar || caregiver?.profileImage) ? (
+                  <Image 
+                    source={{ uri: getFullImageURL(caregiver.avatar || caregiver.profileImage) }} 
+                    style={styles.avatarImage} 
+                  />
                 ) : (
                   <User size={20} color="#6b7280" />
                 )}
