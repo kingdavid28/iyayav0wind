@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const caregiverController = require('../controllers/caregiverController');
-const { authenticate, authorize, checkUserType } = require('../utils/auth');
+const { authenticate, authorize, checkUserType } = require('../middleware/auth');
 const { 
   searchCaregiversValidator,
   caregiverIdValidator,

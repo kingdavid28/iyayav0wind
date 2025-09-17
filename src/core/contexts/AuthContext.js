@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
       // Check Firebase auth state
       const currentUser = firebaseAuthService.getCurrentUser();
       if (currentUser && currentUser.emailVerified) {
-        const token = await currentUser.getIdToken();
+        const token = await currentUser.getIdToken(true); // Force refresh
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
         
         // Get user profile from MongoDB
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }) => {
     // Set up Firebase auth state listener
     const unsubscribe = firebaseAuthService.onAuthStateChanged(async (user) => {
       if (user && user.emailVerified) {
-        const token = await user.getIdToken();
+        const token = await user.getIdToken(true); // Force refresh
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
         
         // Get user profile from MongoDB
@@ -260,6 +260,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshToken = async () => {
+    try {
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (currentUser) {
+        const token = await currentUser.getIdToken(true); // Force refresh
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+        return token;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Token refresh failed:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     loading: isLoading,
@@ -270,6 +285,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     checkAuthStatus,
     verifyEmailToken,
+    refreshToken,
   };
 
   return (

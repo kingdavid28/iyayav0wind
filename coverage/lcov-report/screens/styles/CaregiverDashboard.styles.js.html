@@ -1297,10 +1297,38 @@
 <a name='L1232'></a><a href='#L1232'>1232</a>
 <a name='L1233'></a><a href='#L1233'>1233</a>
 <a name='L1234'></a><a href='#L1234'>1234</a>
-<a name='L1235'></a><a href='#L1235'>1235</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L1235'></a><a href='#L1235'>1235</a>
+<a name='L1236'></a><a href='#L1236'>1236</a>
+<a name='L1237'></a><a href='#L1237'>1237</a>
+<a name='L1238'></a><a href='#L1238'>1238</a>
+<a name='L1239'></a><a href='#L1239'>1239</a>
+<a name='L1240'></a><a href='#L1240'>1240</a>
+<a name='L1241'></a><a href='#L1241'>1241</a>
+<a name='L1242'></a><a href='#L1242'>1242</a>
+<a name='L1243'></a><a href='#L1243'>1243</a>
+<a name='L1244'></a><a href='#L1244'>1244</a>
+<a name='L1245'></a><a href='#L1245'>1245</a>
+<a name='L1246'></a><a href='#L1246'>1246</a>
+<a name='L1247'></a><a href='#L1247'>1247</a>
+<a name='L1248'></a><a href='#L1248'>1248</a>
+<a name='L1249'></a><a href='#L1249'>1249</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2901,8 +2929,9 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     color: '#6B7280',
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 10,
     paddingHorizontal: 16,
+    paddingTop: 16,
   },
   promotionCard: {
     borderRadius: 16,
@@ -2970,21 +2999,25 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
   },
   horizontalScroll: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingLeft: 0,
+    paddingRight: 0,
   },
   jobCard: {
-    width: '50%',
-    marginRight: 0,
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    ...shadows.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    marginVertical: 4,
   },
   jobCardHorizontal: {
     width: 300,
     marginRight: 16,
-    marginBottom: 5,
-    height: 300,
-    //maxHeight: 280,
+    marginBottom: 4,
+    minHeight: 280,
+    padding: 0,
   },
   jobCardTablet: {
     width: '31%',
@@ -2992,18 +3025,21 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
   jobHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
   jobTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    color: '#1F2937',
+    marginBottom: 8,
+    lineHeight: 24,
   },
   jobMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+    marginBottom: 4,
   },
   jobMetaText: {
     fontSize: 12,
@@ -3028,12 +3064,13 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     fontWeight: '600',
   },
   jobDetails: {
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 8,
   },
   jobDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   jobDetailText: {
     fontSize: 13,
@@ -3043,19 +3080,21 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
   requirementsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: 16,
+    gap: 6,
   },
   requirementTag: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 8,
-    marginBottom: 8,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
   requirementText: {
     fontSize: 12,
-    color: '#4B5563',
+    color: '#2563EB',
+    fontWeight: '500',
   },
   moreRequirementsText: {
     fontSize: 12,
@@ -3064,9 +3103,10 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
   },
   jobFooter: {
     flexDirection: 'column',
-    paddingTop: 12,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
+    gap: 12,
   },
   postedDate: {
     fontSize: 12,
@@ -3074,14 +3114,14 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
   },
   jobActionButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   secondaryButton: {
-    marginRight: 8,
+    flex: 1,
     borderColor: '#D1D5DB',
-    paddingHorizontal: 10,
-    flexShrink: 1,
+    borderRadius: 8,
+    height: 40,
   },
   secondaryButtonText: {
     color: '#374151',
@@ -3089,8 +3129,10 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
     fontWeight: '500',
   },
   primaryButton: {
+    flex: 1,
     backgroundColor: '#2563EB',
-    flexShrink: 1,
+    borderRadius: 8,
+    height: 40,
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -3772,7 +3814,7 @@ export const styles = <span class="cstat-no" title="statement not covered" >Styl
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-14T16:58:41.890Z
+                at 2025-09-16T06:26:36.158Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

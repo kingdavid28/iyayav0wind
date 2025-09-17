@@ -90,7 +90,13 @@ exports.getCaregiverProfile = async (req, res) => {
             ? String(req.user.name).trim()
             : 'Caregiver');
 
+      // Generate unique caregiverId
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substr(2, 5);
+      const caregiverId = `CG${timestamp}${random}`.toUpperCase();
+      
       const newCaregiver = await Caregiver.create({ 
+        caregiverId,
         userId: userMongoId,
         name: derivedName,
         bio: '',
@@ -173,73 +179,116 @@ exports.getCaregiverProfile = async (req, res) => {
   }
 };
 
-// Search caregivers with filters
-// Search caregivers with filters (public info only) - Optimized
+// Search caregivers with filters - Updated to populate from Users collection
+// Search caregivers - Populate from Users collection where role: "caregiver"
 exports.searchCaregivers = async (req, res) => {
   try {
     const { skills, minRate, maxRate, daysAvailable, search, page = 1, limit = 50 } = req.query;
     console.log('🔍 Caregiver search request:', { skills, minRate, maxRate, daysAvailable, search, page, limit });
     
-    // First check if we have any caregivers at all
-    const totalCaregivers = await Caregiver.countDocuments();
-    console.log('📊 Total caregivers in database:', totalCaregivers);
+    // Build user query for caregivers
+    let userQuery = {
+      $and: [
+        { $or: [{ role: 'caregiver' }, { userType: 'caregiver' }] },
+        { role: { $ne: 'parent' } },
+        { userType: { $ne: 'parent' } },
+        { status: 'active' }
+      ]
+    };
     
-    // If no caregivers exist, return empty array
-    if (totalCaregivers === 0) {
-      console.log('❌ No caregivers found in database, returning empty array');
-      return res.json({
-        success: true,
-        count: 0,
-        totalPages: 0,
-        currentPage: 1,
-        caregivers: []
+    // Add search filter for user fields
+    if (search && typeof search === 'string') {
+      const sanitizedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      userQuery.$and.push({
+        $or: [
+          { name: { $regex: sanitizedSearch, $options: 'i' } },
+          { email: { $regex: sanitizedSearch, $options: 'i' } }
+        ]
       });
     }
     
-    let query = {};
+    console.log('📋 User query:', JSON.stringify(userQuery, null, 2));
     
-    // Build query efficiently with input sanitization
-    if (search && typeof search === 'string') {
-      const sanitizedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      query.$or = [
-        { name: { $regex: sanitizedSearch, $options: 'i' } },
-        { skills: { $regex: sanitizedSearch, $options: 'i' } }
-      ];
-    }
-    if (skills) {
-      query.skills = { $in: skills.split(',') };
-    }
-    if (minRate || maxRate) {
-      query.hourlyRate = {};
-      if (minRate) query.hourlyRate.$gte = Number(minRate);
-      if (maxRate) query.hourlyRate.$lte = Number(maxRate);
-    }
-    if (daysAvailable) {
-      query['availability.days'] = { $in: daysAvailable.split(',') };
-    }
-    
-    console.log('📋 MongoDB query:', JSON.stringify(query, null, 2));
-    
-    // Optimized query with lean() and minimal fields
-    const caregivers = await Caregiver.find(query)
-      .populate('userId', 'name profileImage')
-      .select('name skills experience hourlyRate availability rating ageCareRanges profileImage address location')
+    // Get caregiver users from Users collection
+    const caregiverUsers = await User.find(userQuery)
+      .select('name email phone profileImage role userType createdAt address')
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .sort({ rating: -1, 'verification.trustScore': -1 })
+      .sort({ createdAt: -1 })
       .lean();
+    
+    console.log('👥 Found caregiver users:', caregiverUsers.length);
+    
+    // Get their caregiver profiles if they exist
+    const userIds = caregiverUsers.map(u => u._id);
+    const caregiverProfiles = await Caregiver.find({ userId: { $in: userIds } })
+      .select('userId name skills experience hourlyRate availability rating ageCareRanges profileImage address location bio')
+      .lean();
+    
+    // Create a map for quick lookup
+    const profileMap = new Map();
+    caregiverProfiles.forEach(profile => {
+      profileMap.set(profile.userId.toString(), profile);
+    });
+    
+    // Merge user data with caregiver profiles
+    let filteredCaregivers = caregiverUsers.map(user => {
+      const profile = profileMap.get(user._id.toString());
       
-    const count = await Caregiver.countDocuments(query);
+      return {
+        _id: profile?._id || user._id,
+        userId: user,
+        name: profile?.name || user.name,
+        skills: profile?.skills || [],
+        experience: profile?.experience || 0,
+        hourlyRate: profile?.hourlyRate || 300,
+        availability: profile?.availability || { days: [], flexible: true },
+        rating: profile?.rating || 0,
+        ageCareRanges: profile?.ageCareRanges || [],
+        profileImage: profile?.profileImage || user.profileImage,
+        address: profile?.address || user.address || '',
+        location: profile?.location || user.address || '',
+        bio: profile?.bio || '',
+        createdAt: user.createdAt,
+        hasProfile: !!profile
+      };
+    });
     
-    console.log('📊 Search results:', { count, caregivers: caregivers.length });
-    console.log('👥 Found caregivers:', caregivers.map(c => ({ id: c._id, name: c.name })));
+    // Apply caregiver-specific filters
+    if (skills) {
+      const skillsArray = skills.split(',');
+      filteredCaregivers = filteredCaregivers.filter(c => 
+        c.skills.some(skill => skillsArray.includes(skill))
+      );
+    }
     
-    await logActivity('PROVIDER_SEARCH', { searchParams: req.query, results: count });
+    if (minRate || maxRate) {
+      filteredCaregivers = filteredCaregivers.filter(c => {
+        const rate = c.hourlyRate;
+        if (minRate && rate < Number(minRate)) return false;
+        if (maxRate && rate > Number(maxRate)) return false;
+        return true;
+      });
+    }
+    
+    if (daysAvailable) {
+      const daysArray = daysAvailable.split(',');
+      filteredCaregivers = filteredCaregivers.filter(c => 
+        c.availability.days.some(day => daysArray.includes(day))
+      );
+    }
+    
+    const count = filteredCaregivers.length;
+    
+    console.log('📊 Search results:', { count, caregivers: filteredCaregivers.length });
+    console.log('👥 Found caregivers:', filteredCaregivers.map(c => ({ id: c._id, name: c.name, hasProfile: c.hasProfile })));
+    
+    await logActivity('PROVIDER_SEARCH', { searchParams: req.query, results: filteredCaregivers.length });
     
     // Map caregivers to public info only
-    const publicCaregivers = caregivers.map(p => ({
+    const publicCaregivers = filteredCaregivers.map(p => ({
       _id: p._id,
-      id: p._id, // Add id field for frontend compatibility
+      id: p._id,
       user: p.userId,
       name: p.name,
       skills: p.skills,
@@ -248,18 +297,20 @@ exports.searchCaregivers = async (req, res) => {
       availability: p.availability,
       rating: p.rating,
       ageCareRanges: p.ageCareRanges,
-      // Prefer user profile image; fall back to caregiver.profileImage
-      avatar: p.userId?.profileImage || p.profileImage || null,
-      // Provide both location and address for clients
-      location: p.location || p.address || undefined,
-      address: p.address || p.location || undefined
+      avatar: p.profileImage,
+      location: p.location,
+      address: p.address,
+      bio: p.bio,
+      createdAt: p.createdAt,
+      registeredAt: p.createdAt,
+      hasProfile: p.hasProfile
     }));
     
     console.log('✅ Sending response with', publicCaregivers.length, 'caregivers');
     
     res.json({
       success: true,
-      count,
+      count: filteredCaregivers.length,
       totalPages: Math.ceil(count / limit),
       currentPage: Number(page),
       caregivers: publicCaregivers
@@ -600,10 +651,22 @@ exports.updateCaregiverProfile = async (req, res) => {
     if (!caregiver) {
       // Auto-create with default template then merge with user data
       const defaultTemplate = getDefaultProfileTemplate();
-      const mergedData = { ...defaultTemplate, ...updateData, userId: userMongoId };
+      
+      // Generate unique caregiverId
+      const timestamp = Date.now().toString(36);
+      const random = Math.random().toString(36).substr(2, 5);
+      const caregiverId = `CG${timestamp}${random}`.toUpperCase();
+      
+      const mergedData = { 
+        caregiverId,
+        ...defaultTemplate, 
+        ...updateData, 
+        userId: userMongoId 
+      };
       
       console.log('🎯 Creating new caregiver profile with template:', {
         userId: userMongoId,
+        caregiverId,
         templateFields: Object.keys(defaultTemplate),
         userFields: Object.keys(updateData)
       });

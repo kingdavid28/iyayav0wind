@@ -190,7 +190,30 @@ const authorize = (roles = []) => {
   };
 };
 
+const checkUserType = (requiredType) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Not authenticated'
+      });
+    }
+
+    const userType = req.user.userType || req.user.role;
+    if (userType !== requiredType) {
+      return res.status(403).json({
+        success: false,
+        error: `Access denied. Required user type: ${requiredType}`,
+        yourType: userType
+      });
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   authenticate,
-  authorize
+  authorize,
+  checkUserType
 };

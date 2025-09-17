@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/283</span>
+                <span class='fraction'>0/285</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/142</span>
+                <span class='fraction'>0/144</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/90</span>
+                <span class='fraction'>0/91</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/278</span>
+                <span class='fraction'>0/280</span>
             </div>
         
             
@@ -863,7 +863,15 @@
 <a name='L798'></a><a href='#L798'>798</a>
 <a name='L799'></a><a href='#L799'>799</a>
 <a name='L800'></a><a href='#L800'>800</a>
-<a name='L801'></a><a href='#L801'>801</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L801'></a><a href='#L801'>801</a>
+<a name='L802'></a><a href='#L802'>802</a>
+<a name='L803'></a><a href='#L803'>803</a>
+<a name='L804'></a><a href='#L804'>804</a>
+<a name='L805'></a><a href='#L805'>805</a>
+<a name='L806'></a><a href='#L806'>806</a>
+<a name='L807'></a><a href='#L807'>807</a>
+<a name='L808'></a><a href='#L808'>808</a>
+<a name='L809'></a><a href='#L809'>809</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1111,6 +1119,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1183,6 +1192,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1192,8 +1202,10 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1305,6 +1317,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1704,7 +1720,7 @@ class EnhancedAPIService {
       retries = <span class="branch-0 cbranch-no" title="branch not covered" >2,</span>
       cache = <span class="branch-0 cbranch-no" title="branch not covered" >false,</span>
       cacheKey = <span class="branch-0 cbranch-no" title="branch not covered" >null,</span>
-      timeout = <span class="branch-0 cbranch-no" title="branch not covered" >30000,</span>
+      timeout = <span class="branch-0 cbranch-no" title="branch not covered" >8000,</span>
       validateToken = <span class="branch-0 cbranch-no" title="branch not covered" >true</span>
     } = <span class="cstat-no" title="statement not covered" >options;</span>
 &nbsp;
@@ -1907,7 +1923,8 @@ class EnhancedAPIService {
     getProfile: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >this.request('/auth/firebase-profile', {</span>
       cache: true,
       cacheKey: 'user-profile',
-      timeout: 8000
+      timeout: 5000,
+      retries: 1
     }),
 &nbsp;
     updateProfile: <span class="fstat-no" title="function not covered" >(d</span>ata) =&gt; {
@@ -1989,9 +2006,11 @@ class EnhancedAPIService {
     }),
 &nbsp;
     getAll: <span class="fstat-no" title="function not covered" >(f</span>ilters = <span class="branch-0 cbranch-no" title="branch not covered" >{})</span> =&gt; {
-      const cacheKey = <span class="cstat-no" title="statement not covered" >`caregivers:${JSON.stringify(filters)}`;</span>
-      const queryParams = <span class="cstat-no" title="statement not covered" >new URLSearchParams(filters).toString();</span>
-      const endpoint = <span class="cstat-no" title="statement not covered" >queryParams ? `/caregivers?${queryParams}` : '/caregivers';</span>
+      // Ensure we only get users with caregiver role
+      const caregiverFilters = <span class="cstat-no" title="statement not covered" >{ ...filters, role: 'caregiver' };</span>
+      const cacheKey = <span class="cstat-no" title="statement not covered" >`caregivers:${JSON.stringify(caregiverFilters)}`;</span>
+      const queryParams = <span class="cstat-no" title="statement not covered" >new URLSearchParams(caregiverFilters).toString();</span>
+      const endpoint = <span class="cstat-no" title="statement not covered" >queryParams ? `/caregivers?${queryParams}` : '/caregivers?role=caregiver';</span>
       
 <span class="cstat-no" title="statement not covered" >      return this.request(endpoint, {</span>
         cache: true,
@@ -2000,7 +2019,8 @@ class EnhancedAPIService {
     },
 &nbsp;
     search: <span class="fstat-no" title="function not covered" >(f</span>ilters = <span class="branch-0 cbranch-no" title="branch not covered" >{},</span> page = <span class="branch-0 cbranch-no" title="branch not covered" >1,</span> limit = <span class="branch-0 cbranch-no" title="branch not covered" >10)</span> =&gt; {
-      const searchParams = <span class="cstat-no" title="statement not covered" >{ ...filters, page, limit };</span>
+      // Ensure we only search users with caregiver role
+      const searchParams = <span class="cstat-no" title="statement not covered" >{ ...filters, page, limit, role: 'caregiver' };</span>
       const cacheKey = <span class="cstat-no" title="statement not covered" >`caregivers-search:${JSON.stringify(searchParams)}`;</span>
       const queryParams = <span class="cstat-no" title="statement not covered" >new URLSearchParams(searchParams).toString();</span>
       
@@ -2105,6 +2125,10 @@ class EnhancedAPIService {
         method: 'PATCH',
         body: { status }
       });
+    },
+&nbsp;
+    getForJob: <span class="fstat-no" title="function not covered" >(j</span>obId, page = <span class="branch-0 cbranch-no" title="branch not covered" >1,</span> limit = <span class="branch-0 cbranch-no" title="branch not covered" >10)</span> =&gt; {
+<span class="cstat-no" title="statement not covered" >      return this.request(`/applications/job/${jobId}?page=${page}&amp;limit=${limit}`);</span>
     }
   };
 &nbsp;
@@ -2470,7 +2494,7 @@ export default apiService;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-14T16:58:41.890Z
+                at 2025-09-16T06:26:36.158Z
             </div>
         <script src="../prettify.js"></script>
         <script>

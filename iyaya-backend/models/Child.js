@@ -29,4 +29,7 @@ const childSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Indexes for better query performance
+childSchema.index({ parentId: 1 });
+
 module.exports = mongoose.model('Child', childSchema);

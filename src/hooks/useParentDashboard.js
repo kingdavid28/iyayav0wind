@@ -90,33 +90,19 @@ export const useParentDashboard = () => {
       const res = await apiService.caregivers.getAll();
       const caregiversList = res?.data?.caregivers || res?.caregivers || [];
       
-      console.log('Raw caregivers data:', caregiversList.map(c => ({ 
-        name: c.name, 
-        role: c.role, 
-        userType: c.userType,
-        email: c.email 
-      })));
-      
-      // Filter to ensure only caregivers are included - exclude parents explicitly
-      const filteredCaregivers = caregiversList.filter(caregiver => {
-        // Exclude if explicitly marked as parent
-        if (caregiver.role === 'parent' || caregiver.userType === 'parent') {
-          console.log('Filtering out parent:', caregiver.name);
-          return false;
-        }
-        
-        // Include if explicitly marked as caregiver
-        if (caregiver.role === 'caregiver' || caregiver.userType === 'caregiver') {
-          return true;
-        }
-        
-        // For users without role, include them (less restrictive)
-        return true;
+      console.log('🔍 Raw caregivers response:', {
+        total: caregiversList.length,
+        sample: caregiversList.slice(0, 2).map(c => ({ 
+          name: c.name, 
+          role: c.role || c.user?.role, 
+          userType: c.userType || c.user?.userType,
+          hasProfile: c.hasProfile,
+          user: c.user ? { role: c.user.role, userType: c.user.userType } : null
+        }))
       });
       
-      console.log('Filtered caregivers:', filteredCaregivers.length, 'out of', caregiversList.length);
-      
-      const transformedCaregivers = filteredCaregivers.map(caregiver => ({
+      // Backend already filters for caregivers, so we can use all results
+      const transformedCaregivers = caregiversList.map(caregiver => ({
         _id: caregiver._id || caregiver.id,
         id: caregiver._id || caregiver.id,
         name: caregiver.name || 'Caregiver',
@@ -125,13 +111,27 @@ export const useParentDashboard = () => {
         experience: caregiver.experience || '',
         skills: caregiver.skills || [],
         location: caregiver.location || caregiver.address || '',
-        avatar: caregiver.avatar || caregiver.profileImage || caregiver.imageUrl,
-        ageCareRanges: caregiver.ageCareRanges || []
+        avatar: caregiver.avatar || caregiver.profileImage,
+        ageCareRanges: caregiver.ageCareRanges || [],
+        bio: caregiver.bio || '',
+        hasProfile: caregiver.hasProfile || false,
+        createdAt: caregiver.createdAt || caregiver.registeredAt || new Date().toISOString(),
+        registeredAt: caregiver.registeredAt || caregiver.createdAt || new Date().toISOString()
       }));
       
+      console.log('🎯 Transformed caregivers:', {
+        total: transformedCaregivers.length,
+        featured: transformedCaregivers.slice(0, 3).map(c => ({ 
+          name: c.name, 
+          createdAt: c.createdAt,
+          hasProfile: c.hasProfile 
+        }))
+      });
+      
       setCaregivers(transformedCaregivers);
+      console.log('📊 Total caregivers set for HomeTab:', transformedCaregivers.length);
     } catch (error) {
-      console.error('Error fetching caregivers:', error);
+      console.error('❌ Error fetching caregivers:', error?.message || error);
       setCaregivers([]);
     }
   }, [user?.id]);
@@ -149,16 +149,12 @@ export const useParentDashboard = () => {
       const list = Array.isArray(bookingsRes?.bookings) ? bookingsRes.bookings : [];
       const caregiversList = caregiversRes?.data?.caregivers || caregiversRes?.caregivers || [];
       
-      // Filter caregivers to exclude parents (same logic as fetchCaregivers)
+      // Filter caregivers to include only actual caregivers, not parents
       const filteredCaregivers = caregiversList.filter(caregiver => {
-        if (caregiver.role === 'parent' || caregiver.userType === 'parent') {
-          return false;
-        }
-        if (caregiver.role === 'caregiver' || caregiver.userType === 'caregiver') {
-          return true;
-        }
-        const hasCaregiverFields = caregiver.hourlyRate || caregiver.skills?.length > 0 || caregiver.experience;
-        return hasCaregiverFields;
+        const isCaregiver = caregiver.role === 'caregiver' || caregiver.userType === 'caregiver';
+        const isNotParent = caregiver.role !== 'parent' && caregiver.userType !== 'parent';
+        
+        return isCaregiver && isNotParent;
       });
       
       const normalized = list.map((b, idx) => {

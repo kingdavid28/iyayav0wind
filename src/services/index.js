@@ -292,12 +292,16 @@ class EnhancedAPIService {
   caregivers = {
     getProfile: () => this.request('/caregivers/profile', {
       cache: true,
-      cacheKey: 'caregiver-profile'
+      cacheKey: 'caregiver-profile',
+      retries: 1,
+      timeout: 10000
     }),
 
     getMyProfile: () => this.request('/caregivers/profile', {
       cache: true,
-      cacheKey: 'caregiver-profile'
+      cacheKey: 'caregiver-profile',
+      retries: 1,
+      timeout: 10000
     }),
 
     updateProfile: (data) => {

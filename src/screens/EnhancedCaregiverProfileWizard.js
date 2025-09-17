@@ -28,6 +28,7 @@ import {
   IconButton,
   Switch,
   List,
+  Menu,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -1386,18 +1387,61 @@ const handleProfileImageUpload = async () => {
         </HelperText>
       </View>
 
-      <TextInput
-        label="Experience Description *"
-        value={formData.experience.description}
-        onChangeText={(text) => updateFormData('experience.description', text)}
-        mode="outlined"
-        style={styles.input}
-        multiline
-        numberOfLines={4}
-        placeholder="Describe your childcare experience in detail (minimum 50 characters)..."
-        error={!!errors.experienceDescription}
-        left={<TextInput.Icon icon="briefcase" />}
-      />
+      <View>
+        <Menu
+          visible={tempInputs.experienceMenuVisible || false}
+          onDismiss={() => setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }))}
+          anchor={
+            <Button
+              mode="outlined"
+              onPress={() => setTempInputs(prev => ({ ...prev, experienceMenuVisible: true }))}
+              style={[styles.input, { marginBottom: 8 }]}
+              contentStyle={{ justifyContent: 'flex-start' }}
+              icon="format-list-bulleted"
+            >
+              Choose template or write custom
+            </Button>
+          }
+        >
+          <Menu.Item
+            onPress={() => {
+              updateFormData('experience.description', "I have 2+ years of professional childcare experience working with children aged 6 months to 12 years. I'm skilled in creating engaging activities, managing daily routines, and ensuring child safety at all times.");
+              setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }));
+            }}
+            title="2+ Years Professional Experience"
+            titleStyle={{ fontSize: 14 }}
+          />
+          <Menu.Item
+            onPress={() => {
+              updateFormData('experience.description', "With 5+ years of experience as a nanny and babysitter, I specialize in infant care, meal preparation, and educational activities. I hold CPR certification and have excellent references from previous families.");
+              setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }));
+            }}
+            title="5+ Years Nanny & Babysitter"
+            titleStyle={{ fontSize: 14 }}
+          />
+          <Menu.Item
+            onPress={() => {
+              updateFormData('experience.description', "I'm an experienced childcare provider with 3+ years working in daycare centers and private homes. I excel at managing multiple children, homework assistance, and maintaining structured schedules while keeping kids happy and engaged.");
+              setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }));
+            }}
+            title="3+ Years Daycare & Private Homes"
+            titleStyle={{ fontSize: 14 }}
+          />
+        </Menu>
+        
+        <TextInput
+          label="Experience Description *"
+          value={formData.experience.description}
+          onChangeText={(text) => updateFormData('experience.description', text)}
+          mode="outlined"
+          style={styles.input}
+          multiline
+          numberOfLines={4}
+          placeholder="Describe your childcare experience in detail (minimum 50 characters)..."
+          error={!!errors.experienceDescription}
+          left={<TextInput.Icon icon="briefcase" />}
+        />
+      </View>
       <HelperText type="error" visible={!!errors.experienceDescription}>
         {errors.experienceDescription}
       </HelperText>

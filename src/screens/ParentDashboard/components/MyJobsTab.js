@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl, Image } from 'react-native';
 import { Calendar, Users, Eye, CheckCircle, XCircle, Plus, MapPin, Clock } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import { apiService } from '../../../services';
@@ -172,40 +172,98 @@ const MyJobsTab = ({
     </View>
   );
 
-  const renderApplicationItem = ({ item }) => (
-    <View style={styles.applicationCard}>
-      <View style={styles.applicationHeader}>
-        <Text style={styles.caregiverName}>{item.caregiverId?.name || 'Caregiver'}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getApplicationStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+  const renderApplicationItem = ({ item }) => {
+    // Debug logging to see actual data structure
+    console.log('🔍 Application item data:', JSON.stringify(item, null, 2));
+    console.log('🔍 Caregiver data:', item.caregiverId);
+    console.log('🔍 Profile image URL:', item.caregiverId?.profileImage);
+    console.log('🔍 Caregiver name:', item.caregiverId?.name);
+    
+    const getStatusInfo = (status) => {
+      switch (status?.toLowerCase()) {
+        case 'accepted':
+          return { color: '#10B981', bgColor: '#ECFDF5', label: 'Accepted' };
+        case 'rejected':
+          return { color: '#EF4444', bgColor: '#FEF2F2', label: 'Rejected' };
+        default:
+          return { color: '#3B82F6', bgColor: '#EEF2FF', label: 'New' };
+      }
+    };
+
+    const statusInfo = getStatusInfo(item.status);
+
+    return (
+      <View style={styles.modernApplicationCard}>
+        <View style={styles.applicationHeader}>
+          <View style={styles.caregiverInfo}>
+            <View style={styles.caregiverAvatar}>
+              {item.caregiverId?.profileImage ? (
+                <Image 
+                  source={{ 
+                    uri: item.caregiverId.profileImage.startsWith('http') 
+                      ? item.caregiverId.profileImage 
+                      : `http://192.168.1.10:5000/${item.caregiverId.profileImage}`
+                  }} 
+                  style={styles.caregiverAvatarImage}
+                  onError={(error) => console.log('🚨 Image load error:', error.nativeEvent.error)}
+                  onLoad={() => console.log('✅ Image loaded successfully:', item.caregiverId.profileImage)}
+                />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarInitials}>
+                    {item.caregiverId?.name ? item.caregiverId.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'CG'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.caregiverDetails}>
+              <Text style={styles.modernCaregiverName}>
+                {item.caregiverId?.name || 'Caregiver'}
+              </Text>
+              <Text style={styles.applicationDate}>
+                Applied recently
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.modernStatusBadge, { backgroundColor: statusInfo.bgColor }]}>
+            <Text style={[styles.modernStatusText, { color: statusInfo.color }]}>
+              {statusInfo.label}
+            </Text>
+          </View>
         </View>
+
+        {item.message && (
+          <View style={styles.messageContainer}>
+            <Text style={styles.modernApplicationMessage} numberOfLines={3}>
+              "{item.message}"
+            </Text>
+          </View>
+        )}
+
+        {item.status === 'pending' && (
+          <View style={styles.modernApplicationActions}>
+            <TouchableOpacity
+              style={styles.modernAcceptButton}
+              onPress={() => handleApplicationAction(item._id, 'accepted')}
+              activeOpacity={0.8}
+            >
+              <CheckCircle size={16} color="#FFFFFF" />
+              <Text style={styles.modernAcceptButtonText}>Accept</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modernRejectButton}
+              onPress={() => handleApplicationAction(item._id, 'rejected')}
+              activeOpacity={0.8}
+            >
+              <XCircle size={16} color="#EF4444" />
+              <Text style={styles.modernRejectButtonText}>Reject</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-
-      {item.message && (
-        <Text style={styles.applicationMessage}>"{item.message}"</Text>
-      )}
-
-      {item.status === 'pending' && (
-        <View style={styles.applicationActions}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.acceptButton]}
-            onPress={() => handleApplicationAction(item._id, 'accepted')}
-          >
-            <CheckCircle size={16} color="#FFFFFF" />
-            <Text style={styles.acceptButtonText}>Accept</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.rejectButton]}
-            onPress={() => handleApplicationAction(item._id, 'rejected')}
-          >
-            <XCircle size={16} color="#EF4444" />
-            <Text style={styles.rejectButtonText}>Reject</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.tabContent}>

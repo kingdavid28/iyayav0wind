@@ -5,11 +5,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 // Core imports
 import { useAuth } from '../../core/contexts/AuthContext';
-import { useApp } from '../../contexts/AppContext';
 import { useParentDashboard } from '../../hooks/useParentDashboard';
 
 // API imports
-import { childrenAPI, bookingsAPI, jobsAPI, authAPI } from '../../config/api';
+import { childrenAPI, authAPI } from '../../config/api';
 import { apiService } from '../../services/index';
 
 // Utility imports
@@ -62,7 +61,6 @@ const DEFAULT_CAREGIVER = {
 const ParentDashboard = () => {
   const navigation = useNavigation();
   const { signOut, user } = useAuth();
-  const { state } = useApp();
   
   // Custom hook for dashboard data
   const {
@@ -218,20 +216,7 @@ const ParentDashboard = () => {
 
   // Initial data load handled by hook
 
-  // Refetch bookings when tab becomes active
-  useEffect(() => {
-    if (activeTab === 'bookings') {
-      fetchBookings();
-    }
-  }, [activeTab, fetchBookings]);
 
-  // Refresh profile when returning from navigation
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadProfile();
-    });
-    return unsubscribe;
-  }, [navigation, loadProfile]);
 
   // Child management functions
   const openAddChild = useCallback(() => {
@@ -423,7 +408,7 @@ const ParentDashboard = () => {
   const handleCancelBooking = useCallback(async (bookingId) => {
     try {
       setRefreshing(true);
-      await bookingsAPI.cancel(bookingId);
+      await apiService.bookings.cancel(bookingId);
     } catch (error) {
       console.warn('Failed to cancel booking:', error?.message || error);
     } finally {
@@ -445,7 +430,7 @@ const ParentDashboard = () => {
     if (!paymentData.bookingId || !paymentData.base64) return;
     
     try {
-      await bookingsAPI.uploadPaymentProof(paymentData.bookingId, paymentData.base64, paymentData.mimeType);
+      await apiService.bookings.uploadPaymentProof(paymentData.bookingId, paymentData.base64, paymentData.mimeType);
       toggleModal('payment', false);
       setPaymentData({ bookingId: null, base64: '', mimeType: 'image/jpeg' });
       await fetchBookings();
@@ -507,7 +492,7 @@ const ParentDashboard = () => {
           text: 'Complete',
           onPress: async () => {
             try {
-              await jobsAPI.update(jobId, { status: 'completed' });
+              await apiService.jobs.update(jobId, { status: 'completed' });
               await fetchJobs();
               Alert.alert('Success', 'Job marked as completed');
             } catch (error) {
@@ -531,7 +516,7 @@ const ParentDashboard = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await jobsAPI.delete(jobId);
+              await apiService.jobs.delete(jobId);
               Alert.alert('Success', 'Job deleted successfully');
               await fetchJobs();
             } catch (error) {
@@ -649,8 +634,8 @@ const ParentDashboard = () => {
             greetingName={greetingName}
             profileImage={profileForm.image}
             profileContact={profileForm.contact}
-            profileLocation={profile.location || profile.address || profileForm.location}
-            caregivers={caregivers}
+            profileLocation={profile?.location || profile?.address || profileForm.location}
+            caregivers={caregivers || []}
             onBookCaregiver={handleBookCaregiver}
             onMessageCaregiver={handleMessageCaregiver}
             navigation={navigation}
@@ -658,6 +643,21 @@ const ParentDashboard = () => {
         );
       case 'search':
         return (
+          <SearchTab
+            searchQuery={searchQuery}
+            filteredCaregivers={filteredCaregivers}
+            caregivers={caregivers || []}
+            searchLoading={searchLoading}
+            refreshing={refreshing}
+            activeFilters={activeFilters}
+            onRefresh={onRefresh}
+            onBookCaregiver={handleBookCaregiver}
+            onMessageCaregiver={handleMessageCaregiver}
+            onViewCaregiver={handleViewCaregiver}
+            onSearch={handleSearch}
+            onOpenFilter={() => toggleModal('filter', true)}
+          />
+        );eturn (
           <SearchTab
             searchQuery={searchQuery}
             filteredCaregivers={filteredCaregivers}

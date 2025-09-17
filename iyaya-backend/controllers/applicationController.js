@@ -182,7 +182,7 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 
     // Verify parent owns the job
-    if (application.jobId.clientId.toString() !== parentId.toString()) {
+    if (!application.jobId || !application.jobId.clientId || application.jobId.clientId.toString() !== parentId.toString()) {
       return res.status(403).json({ 
         success: false,
         error: 'Not authorized to modify this application' 
@@ -201,59 +201,65 @@ exports.updateApplicationStatus = async (req, res) => {
     await application.save();
 
     // Update job status based on applications
-    const job = await Job.findById(application.jobId._id);
-    
-    // If this is the first application, change job status to pending
-    const applicationCount = await Application.countDocuments({ 
-      jobId: application.jobId._id,
-      status: { $in: ['pending', 'shortlisted'] }
-    });
-    
-    if (job.status === 'open' && applicationCount > 0) {
-      job.status = 'pending';
-      await job.save();
+    if (application.jobId && application.jobId._id) {
+      const job = await Job.findById(application.jobId._id);
+      
+      if (job) {
+        // If this is the first application, change job status to pending
+        const applicationCount = await Application.countDocuments({ 
+          jobId: application.jobId._id,
+          status: { $in: ['pending', 'shortlisted'] }
+        });
+        
+        if (job.status === 'open' && applicationCount > 0) {
+          job.status = 'pending';
+          await job.save();
+        }
+      }
     }
 
     // Update job status if application is accepted
-    if (status === 'accepted' && previousStatus !== 'accepted') {
+    if (status === 'accepted' && previousStatus !== 'accepted' && application.jobId && application.jobId._id) {
       const job = await Job.findById(application.jobId._id);
-      job.status = 'filled';
-      job.assignedCaregiver = application.caregiverId._id;
-      await job.save();
+      if (job && application.caregiverId && application.caregiverId._id) {
+        job.status = 'filled';
+        job.assignedCaregiver = application.caregiverId._id;
+        await job.save();
 
-      // Create booking from accepted application
-      const Booking = require('../models/Booking');
-      const booking = new Booking({
-        clientId: parentId,
-        caregiverId: application.caregiverId._id,
-        date: job.date,
-        startTime: job.startTime,
-        endTime: job.endTime,
-        address: job.location,
-        hourlyRate: job.hourlyRate,
-        totalCost: calculateTotalCost(job.startTime, job.endTime, job.hourlyRate),
-        status: 'confirmed',
-        jobId: job._id,
-        applicationId: application._id
-      });
-      
-      await booking.save();
-      console.log('✅ Booking created from accepted application:', booking._id);
+        // Create booking from accepted application
+        const Booking = require('../models/Booking');
+        const booking = new Booking({
+          clientId: parentId,
+          caregiverId: application.caregiverId._id,
+          date: job.date,
+          startTime: job.startTime,
+          endTime: job.endTime,
+          address: job.location,
+          hourlyRate: job.hourlyRate,
+          totalCost: calculateTotalCost(job.startTime, job.endTime, job.hourlyRate),
+          status: 'confirmed',
+          jobId: job._id,
+          applicationId: application._id
+        });
+        
+        await booking.save();
+        console.log('✅ Booking created from accepted application:', booking._id);
 
-      // Reject other pending applications for this job
-      await Application.updateMany(
-        { 
-          jobId: application.jobId._id, 
-          _id: { $ne: application._id },
-          status: 'pending'
-        },
-        { 
-          status: 'rejected',
-          feedback: 'Position has been filled',
-          reviewedAt: new Date(),
-          reviewedBy: parentId
-        }
-      );
+        // Reject other pending applications for this job
+        await Application.updateMany(
+          { 
+            jobId: application.jobId._id, 
+            _id: { $ne: application._id },
+            status: 'pending'
+          },
+          { 
+            status: 'rejected',
+            feedback: 'Position has been filled',
+            reviewedAt: new Date(),
+            reviewedBy: parentId
+          }
+        );
+      }
     }
 
     logger.info(`Application ${id} status updated to ${status} by parent ${parentId}`);
@@ -284,7 +290,7 @@ exports.getMyApplications = async (req, res) => {
     });
     
     // Check if user is a caregiver
-    if (req.user?.role !== 'caregiver') {
+    if (req.user?.role !== 'caregiver' && req.user?.userType !== 'caregiver') {
       return res.status(403).json({
         success: false,
         error: 'Access denied. Only caregivers can view applications.'
@@ -413,7 +419,11 @@ exports.getJobApplications = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
-        .populate('caregiverId', 'name avatar rating reviewCount experience hourlyRate bio location')
+        .populate({
+          path: 'caregiverId',
+          model: 'Caregiver',
+          select: 'name profileImage rating experience hourlyRate bio location'
+        })
         .lean(),
       Application.countDocuments(filter)
     ]);

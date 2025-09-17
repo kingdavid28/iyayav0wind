@@ -100,19 +100,21 @@ const JobApplications = ({ jobId, onViewApplicant }) => {
     const getStatusInfo = (status) => {
       switch (status?.toLowerCase()) {
         case 'accepted':
-          return { color: '#10B981', label: 'Accepted', icon: <Check size={16} color="#10B981" /> };
+          return { color: '#10B981', bgColor: '#ECFDF5', label: 'Accepted', icon: <Check size={14} color="#10B981" /> };
         case 'rejected':
-          return { color: '#EF4444', label: 'Rejected', icon: <X size={16} color="#EF4444" /> };
+          return { color: '#EF4444', bgColor: '#FEF2F2', label: 'Rejected', icon: <X size={14} color="#EF4444" /> };
         case 'shortlisted':
-          return { color: '#F59E0B', label: 'Shortlisted', icon: <Star size={16} color="#F59E0B" /> };
+          return { color: '#F59E0B', bgColor: '#FFFBEB', label: 'Shortlisted', icon: <Star size={14} color="#F59E0B" /> };
         default:
-          return { color: '#3B82F6', label: 'New', icon: <AlertCircle size={16} color="#3B82F6" /> };
+          return { color: '#3B82F6', bgColor: '#EEF2FF', label: 'New', icon: <AlertCircle size={14} color="#3B82F6" /> };
       }
     };
 
     const statusInfo = getStatusInfo(item.status);
     const appliedAgo = item.appliedAt 
-      ? formatDistanceToNow(item.appliedAt.toDate(), { addSuffix: true })
+      ? (typeof item.appliedAt.toDate === 'function' 
+          ? formatDistanceToNow(item.appliedAt.toDate(), { addSuffix: true })
+          : formatDistanceToNow(new Date(item.appliedAt), { addSuffix: true }))
       : 'Recently';
 
     return (
@@ -120,26 +122,33 @@ const JobApplications = ({ jobId, onViewApplicant }) => {
         <View style={styles.applicationHeader}>
           <View style={styles.applicantInfo}>
             <View style={styles.avatar}>
-              {item.caregiver?.photoURL ? (
+              {item.caregiver?.photoURL || item.caregiver?.avatar || item.caregiver?.profileImage ? (
                 <Image 
-                  source={{ uri: item.caregiver.photoURL }} 
+                  source={{ uri: item.caregiver.photoURL || item.caregiver.avatar || item.caregiver.profileImage }} 
                   style={styles.avatarImage}
+                  defaultSource={require('../../../assets/default-avatar.png')}
                 />
               ) : (
-                <User size={24} color="#6B7280" />
+                <User size={20} color="#9CA3AF" />
               )}
             </View>
             <View style={styles.applicantDetails}>
               <Text style={styles.applicantName}>
-                {item.caregiver?.displayName || 'Anonymous Caregiver'}
+                {item.caregiver?.displayName || item.caregiver?.name || 'Anonymous Caregiver'}
               </Text>
               <Text style={styles.appliedDate}>
                 Applied {appliedAgo}
               </Text>
+              {item.caregiver?.rating && (
+                <View style={styles.ratingContainer}>
+                  <Star size={12} color="#F59E0B" fill="#F59E0B" />
+                  <Text style={styles.ratingText}>{item.caregiver.rating.toFixed(1)}</Text>
+                </View>
+              )}
             </View>
           </View>
           
-          <View style={[styles.statusBadge, { backgroundColor: `${statusInfo.color}20` }]}>
+          <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
             {statusInfo.icon}
             <Text style={[styles.statusText, { color: statusInfo.color }]}>
               {statusInfo.label}
@@ -148,130 +157,110 @@ const JobApplications = ({ jobId, onViewApplicant }) => {
         </View>
         
         {item.message && (
-          <Text style={styles.applicationMessage} numberOfLines={2}>
-            "{item.message}"
-          </Text>
+          <View style={styles.messageContainer}>
+            <Text style={styles.applicationMessage} numberOfLines={3}>
+              "{item.message}"
+            </Text>
+          </View>
         )}
         
         <View style={styles.applicationActions}>
           <TouchableOpacity 
-            style={styles.actionButton}
+            style={styles.viewProfileButton}
             onPress={() => onViewApplicant(item.caregiverId)}
+            activeOpacity={0.7}
           >
-            <Text style={styles.viewProfileText}>View Profile</Text>
+            <Text style={styles.viewProfileText}>View Full Profile</Text>
             <ChevronRight size={16} color="#4F46E5" />
           </TouchableOpacity>
           
           {item.status === 'pending' && (
-            <View style={styles.decisionButtons}>
+            <View style={styles.actionButtonsContainer}>
               <TouchableOpacity 
-                style={[styles.decisionButton, styles.acceptButton]}
+                style={[styles.actionBtn, styles.acceptBtn]}
                 onPress={() => updateApplicationStatus(item.id, 'accepted')}
+                activeOpacity={0.8}
               >
-                <Check size={16} color="#10B981" />
-                <Text style={[styles.decisionButtonText, { color: '#10B981' }]}>
-                  Accept
-                </Text>
+                <Check size={16} color="#FFFFFF" />
+                <Text style={styles.acceptBtnText}>Accept</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.decisionButton, styles.shortlistButton]}
+                style={[styles.actionBtn, styles.shortlistBtn]}
                 onPress={() => updateApplicationStatus(item.id, 'shortlisted')}
+                activeOpacity={0.8}
               >
                 <Star size={16} color="#F59E0B" />
-                <Text style={[styles.decisionButtonText, { color: '#F59E0B' }]}>
-                  Shortlist
-                </Text>
+                <Text style={styles.shortlistBtnText}>Shortlist</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.decisionButton, styles.rejectButton]}
+                style={[styles.actionBtn, styles.rejectBtn]}
                 onPress={() => updateApplicationStatus(item.id, 'rejected')}
+                activeOpacity={0.8}
               >
                 <X size={16} color="#EF4444" />
-                <Text style={[styles.decisionButtonText, { color: '#EF4444' }]}>
-                  Reject
-                </Text>
+                <Text style={styles.rejectBtnText}>Reject</Text>
               </TouchableOpacity>
             </View>
           )}
           
           {item.status === 'shortlisted' && (
-            <View style={styles.decisionButtons}>
+            <View style={styles.actionButtonsContainer}>
               <TouchableOpacity 
-                style={[styles.decisionButton, styles.acceptButton]}
+                style={[styles.actionBtn, styles.acceptBtn]}
                 onPress={() => updateApplicationStatus(item.id, 'accepted')}
+                activeOpacity={0.8}
               >
-                <Check size={16} color="#10B981" />
-                <Text style={[styles.decisionButtonText, { color: '#10B981' }]}>
-                  Accept
-                </Text>
+                <Check size={16} color="#FFFFFF" />
+                <Text style={styles.acceptBtnText}>Accept</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.decisionButton, styles.rejectButton]}
-                onPress={() => updateApplicationStatus(item.id, 'rejected')}
-              >
-                <X size={16} color="#EF4444" />
-                <Text style={[styles.decisionButtonText, { color: '#EF4444' }]}>
-                  Reject
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.decisionButton, styles.messageButton]}
+                style={[styles.actionBtn, styles.messageBtn]}
                 onPress={() => onViewApplicant(item.caregiverId, true)}
+                activeOpacity={0.8}
               >
                 <MessageCircle size={16} color="#3B82F6" />
-                <Text style={[styles.decisionButtonText, { color: '#3B82F6' }]}>
-                  Message
-                </Text>
+                <Text style={styles.messageBtnText}>Message</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.actionBtn, styles.rejectBtn]}
+                onPress={() => updateApplicationStatus(item.id, 'rejected')}
+                activeOpacity={0.8}
+              >
+                <X size={16} color="#EF4444" />
+                <Text style={styles.rejectBtnText}>Reject</Text>
               </TouchableOpacity>
             </View>
           )}
           
           {(item.status === 'accepted' || item.status === 'rejected') && (
-            <View style={styles.decisionButtons}>
+            <View style={styles.contactButtonsContainer}>
               <TouchableOpacity 
-                style={[styles.decisionButton, styles.messageButton]}
+                style={[styles.contactBtn, styles.messageContactBtn]}
                 onPress={() => onViewApplicant(item.caregiverId, true)}
+                activeOpacity={0.8}
               >
                 <MessageCircle size={16} color="#3B82F6" />
-                <Text style={[styles.decisionButtonText, { color: '#3B82F6' }]}>
-                  Message
-                </Text>
+                <Text style={styles.contactBtnText}>Message</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.decisionButton, styles.callButton]}
+                style={[styles.contactBtn, styles.callContactBtn]}
                 onPress={() => {
-                  if (item.caregiver?.phoneNumber) {
-                    // Implement call functionality
-                    Linking.openURL(`tel:${item.caregiver.phoneNumber}`);
+                  const phone = item.caregiver?.phoneNumber || item.caregiver?.phone;
+                  if (phone) {
+                    Linking.openURL(`tel:${phone}`);
                   } else {
                     Alert.alert('No Phone Number', 'This caregiver has not provided a phone number.');
                   }
                 }}
+                activeOpacity={0.8}
               >
                 <Phone size={16} color="#10B981" />
-                <Text style={[styles.decisionButtonText, { color: '#10B981' }]}>
-                  Call
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.decisionButton, styles.emailButton]}
-                onPress={() => {
-                  if (item.caregiver?.email) {
-                    // Implement email functionality
-                    Linking.openURL(`mailto:${item.caregiver.email}`);
-                  }
-                }}
-              >
-                <Mail size={16} color="#6B7280" />
-                <Text style={[styles.decisionButtonText, { color: '#6B7280' }]}>
-                  Email
-                </Text>
+                <Text style={styles.contactBtnText}>Call</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -463,16 +452,16 @@ const styles = StyleSheet.create({
   },
   applicationCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#F1F5F9',
   },
   applicationHeader: {
     flexDirection: 'row',
@@ -487,14 +476,16 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
   },
   avatarImage: {
     width: '100%',
@@ -504,104 +495,158 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   applicantName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   appliedDate: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
+    marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '500',
+    marginLeft: 4,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
+    marginLeft: 6,
+  },
+  messageContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#E2E8F0',
   },
   applicationMessage: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#475569',
     fontStyle: 'italic',
-    marginBottom: 12,
     lineHeight: 20,
   },
   applicationActions: {
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 12,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 16,
   },
-  actionButton: {
+  viewProfileButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F9FAFB',
-    marginBottom: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   viewProfileText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#4F46E5',
-    marginRight: 4,
+    marginRight: 6,
   },
-  decisionButtons: {
+  actionButtonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    gap: 8,
   },
-  decisionButton: {
+  actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     flex: 1,
-    marginHorizontal: 4,
+    minHeight: 44,
   },
-  acceptButton: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#D1FAE5',
+  acceptBtn: {
+    backgroundColor: '#10B981',
   },
-  shortlistButton: {
+  acceptBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 6,
+  },
+  shortlistBtn: {
     backgroundColor: '#FFFBEB',
     borderWidth: 1,
     borderColor: '#FEF3C7',
   },
-  rejectButton: {
+  shortlistBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F59E0B',
+    marginLeft: 6,
+  },
+  rejectBtn: {
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FEE2E2',
   },
-  messageButton: {
+  rejectBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
+    marginLeft: 6,
+  },
+  messageBtn: {
     backgroundColor: '#EEF2FF',
     borderWidth: 1,
     borderColor: '#E0E7FF',
   },
-  callButton: {
+  messageBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
+    marginLeft: 6,
+  },
+  contactButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  contactBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flex: 1,
+    minHeight: 44,
+  },
+  messageContactBtn: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  callContactBtn: {
     backgroundColor: '#ECFDF5',
     borderWidth: 1,
     borderColor: '#D1FAE5',
   },
-  emailButton: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  decisionButtonText: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginLeft: 4,
+  contactBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
 });
 

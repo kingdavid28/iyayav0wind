@@ -31,6 +31,9 @@ const HomeTab = ({
   const featuredCaregivers = caregivers
     .sort((a, b) => new Date(b.createdAt || b.registeredAt || 0) - new Date(a.createdAt || a.registeredAt || 0))
     .slice(0, 3);
+    
+  console.log('🎯 HomeTab - Caregivers received:', caregivers.length);
+  console.log('🎯 HomeTab - Featured caregivers:', featuredCaregivers.length, featuredCaregivers.map(c => c.name));
 
   return (
     <View style={{ flex: 1 }}>

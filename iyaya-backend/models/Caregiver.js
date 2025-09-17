@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const CaregiverSchema = new mongoose.Schema({
+  caregiverId: {
+    type: String,
+    unique: true,
+    required: true,
+    index: true
+  },
   userId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
@@ -294,7 +300,19 @@ CaregiverSchema.methods.calculateTrustScore = function() {
   return result;
 };
 
+// Pre-save middleware to generate caregiverId
+CaregiverSchema.pre('save', async function(next) {
+  if (!this.caregiverId) {
+    // Generate unique caregiver ID (CG + timestamp + random)
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substr(2, 5);
+    this.caregiverId = `CG${timestamp}${random}`.toUpperCase();
+  }
+  next();
+});
+
 // Indexes for better query performance
+CaregiverSchema.index({ caregiverId: 1 }, { unique: true });
 CaregiverSchema.index({ userId: 1 }, { unique: true });
 CaregiverSchema.index({ 'backgroundCheck.status': 1 });
 CaregiverSchema.index({ skills: 1 });
