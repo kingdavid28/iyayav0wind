@@ -1,112 +1,98 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-// Simple document upload without multer for now
-// Will implement base64 upload instead
-
-// POST /api/uploads/base64
-// Body: { imageBase64: string, mimeType?: string, folder?: string, name?: string }
-router.post('/base64', async (req, res, next) => {
-  try {
-    const { imageBase64, mimeType, folder, name } = req.body || {};
-    if (!imageBase64 || typeof imageBase64 !== 'string') {
-      return res.status(400).json({ success: false, error: 'imageBase64 is required' });
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '..', 'uploads');
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
     }
-    const baseDir = path.join(__dirname, '..', 'uploads', 'user');
-    const targetDir = folder
-      ? path.join(baseDir, String(folder).replace(/[^a-zA-Z0-9/_-]/g, '_'))
-      : baseDir;
-    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-
-    // Determine extension from mimeType or data URL header, default to jpg
-    let ext = 'jpg';
-    if (mimeType) {
-      const mt = mimeType.toLowerCase();
-      if (mt.includes('png')) ext = 'png';
-      else if (mt.includes('webp')) ext = 'webp';
-      else if (mt.includes('gif')) ext = 'gif';
-      else if (mt.includes('jpg') || mt.includes('jpeg')) ext = 'jpg';
-      else if (mt.includes('/')) ext = mt.split('/')[1];
-    }
-    const safeName = (name || `upload-${Date.now()}`).toString().replace(/[^a-zA-Z0-9_.-]/g, '_');
-    const fileName = `${safeName}.${ext}`;
-    const filePath = path.join(targetDir, fileName);
-
-    // Remove data URL prefix if present
-    const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    fs.writeFileSync(filePath, buffer);
-
-    const publicPath = path.relative(path.join(__dirname, '..'), filePath).replace(/\\/g, '/');
-    const url = `/${publicPath}`; // served by app.use('/uploads', express.static(...))
-    console.log(`🖼️  Image uploaded: ${fileName} (${buffer.length} bytes)`);
-    res.json({ success: true, url, size: buffer.length, mimeType: mimeType || 'image/jpeg' });
-  } catch (err) {
-    next(err);
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-// POST /api/uploads/document
-// Handle document uploads using base64 (similar to image uploads)
-router.post('/document', async (req, res, next) => {
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow images and documents
+    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
+
+// POST /api/uploads/single - Upload single file
+router.post('/single', upload.single('file'), (req, res) => {
   try {
-    const { documentBase64, mimeType, documentType, folder, fileName } = req.body || {};
-    
-    if (!documentBase64 || typeof documentBase64 !== 'string') {
-      return res.status(400).json({ success: false, error: 'documentBase64 is required' });
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded'
+      });
     }
 
-    const baseDir = path.join(__dirname, '..', 'uploads', 'user');
-    const targetDir = folder
-      ? path.join(baseDir, String(folder).replace(/[^a-zA-Z0-9/_-]/g, '_'))
-      : path.join(baseDir, 'documents');
-    
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
-
-    // Determine file extension from mimeType
-    let ext = 'bin';
-    if (mimeType) {
-      if (mimeType.includes('pdf')) ext = 'pdf';
-      else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
-      else if (mimeType.includes('png')) ext = 'png';
-      else ext = mimeType.split('/')[1] || 'bin';
-    }
-
-    const docType = documentType || 'document';
-    const timestamp = Date.now();
-    // Sanitize filename to prevent path traversal
-    const safeName = fileName ? 
-      path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, '_').substring(0, 100) : 
-      `${docType}_${timestamp}`;
-    const fullFileName = `${safeName}.${ext}`;
-    const filePath = path.join(targetDir, fullFileName);
-
-    // Handle base64 data (remove data URL prefix if present)
-    const base64Data = documentBase64.replace(/^data:[^;]+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    fs.writeFileSync(filePath, buffer);
-
-    const publicPath = path.relative(path.join(__dirname, '..'), filePath).replace(/\\/g, '/');
-    const url = `/${publicPath}`;
-
-    console.log(`📄 Document uploaded: ${fullFileName} (${buffer.length} bytes)`);
-    
-    res.json({ 
-      success: true, 
-      url,
-      fileName: fullFileName,
-      size: buffer.length,
-      mimeType: mimeType || 'application/octet-stream',
-      documentType: docType
+    res.json({
+      success: true,
+      data: {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        url: `/uploads/${req.file.filename}`
+      }
     });
-  } catch (err) {
-    console.error('Document upload error:', err);
-    next(err);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'File upload failed'
+    });
+  }
+});
+
+// POST /api/uploads/multiple - Upload multiple files
+router.post('/multiple', upload.array('files', 5), (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No files uploaded'
+      });
+    }
+
+    const files = req.files.map(file => ({
+      filename: file.filename,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      url: `/uploads/${file.filename}`
+    }));
+
+    res.json({
+      success: true,
+      data: files
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'File upload failed'
+    });
   }
 });
 

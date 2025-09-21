@@ -14,14 +14,16 @@ export default function JobsTab({
   onJobView,
   gridCardWidth,
   gridCardHeight,
-  columns 
+  columns,
+  refreshing = false,
+  loading = false
 }) {
   return (
     <ScrollView 
       style={styles.content}
       refreshControl={
         <RefreshControl
-          refreshing={jobsLoading}
+          refreshing={refreshing || jobsLoading}
           onRefresh={onRefresh}
           colors={['#3B82F6']}
           tintColor="#3B82F6"
@@ -47,7 +49,7 @@ export default function JobsTab({
           </Chip>
         </View>
 
-        {jobsLoading ? (
+        {(jobsLoading || loading) ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#3B82F6" />
             <Text style={styles.loadingText}>Loading jobs...</Text>

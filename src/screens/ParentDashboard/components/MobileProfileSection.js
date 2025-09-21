@@ -4,7 +4,7 @@ import { X, Edit2 } from 'lucide-react-native';
 import ProfileImage from '../../../components/ui/feedback/ProfileImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCurrentSocketURL } from '../../../config/api';
-import { useAuth } from '../../../core/contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { calculateAge, formatBirthDate } from '../../../utils/dateUtils';
 
 const MobileProfileSection = ({ greetingName, profileImage, profileContact, profileLocation, activeTab, userData, onClose, navigation }) => {

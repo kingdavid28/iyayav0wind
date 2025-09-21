@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { userService } from '../../services/userService';
 import { authAPI } from '../../services';
 import ProfileForm from '../../components/forms/ProfileForm';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { tokenManager } from '../../utils/tokenManager';
 
 const ProfileScreen = () => {

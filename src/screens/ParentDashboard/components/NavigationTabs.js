@@ -1,11 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { Home, Search, Calendar, User, MessageCircle, Plus, Briefcase } from 'lucide-react-native';
+import { Home, Search, Calendar, User, Plus, Briefcase, MessageCircle } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
-import { useMessaging } from '../../../contexts/MessagingContext';
 
 const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation }) => {
-  const { unreadCount } = useMessaging();
   
   return (
     <View style={styles.tabContainer}>
@@ -54,6 +52,18 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         </Text>
       </TouchableOpacity>
 
+
+
+      <TouchableOpacity
+        style={[styles.navItem, activeTab === 'messages' && styles.activeNavItem]}
+        onPress={() => setActiveTab('messages')}
+      >
+        <MessageCircle size={20} color={activeTab === 'messages' ? colors.secondary : colors.textTertiary} />
+        <Text style={[styles.navText, activeTab === 'messages' && styles.activeNavText]}>
+          Messages
+        </Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={[styles.navItem, activeTab === 'jobs' && styles.activeNavItem]}
         onPress={() => setActiveTab('jobs')}
@@ -63,7 +73,6 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
           Post Job
         </Text>
       </TouchableOpacity>
-
 
       </ScrollView>
     </View>

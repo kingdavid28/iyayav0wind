@@ -1,12 +1,8 @@
 import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useThemeContext } from '../contexts/ThemeContext';
 import { PaperProvider } from 'react-native-paper';
 import { AppProvider as CoreAppProvider } from '../../contexts/AppContext';
-import { MessagingProvider } from '../../contexts/MessagingContext';
-import PrivacyProvider from '../../components/features/privacy/PrivacyManager';
-import ProfileDataProvider from '../../components/features/privacy/ProfileDataManager';
 
 // Wrapper component to access theme context
 const ThemeWrapper = ({ children }) => {
@@ -32,17 +28,9 @@ export const AppProvider = ({ children }) => {
   return (
     <ThemeProvider>
       <ThemeWrapper>
-        <AuthProvider>
-          <MessagingProvider>
-            <ProfileDataProvider>
-              <PrivacyProvider>
-                <CoreAppProvider>
-                  {children}
-                </CoreAppProvider>
-              </PrivacyProvider>
-            </ProfileDataProvider>
-          </MessagingProvider>
-        </AuthProvider>
+        <CoreAppProvider>
+          {children}
+        </CoreAppProvider>
       </ThemeWrapper>
     </ThemeProvider>
   );

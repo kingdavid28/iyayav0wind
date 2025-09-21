@@ -1,214 +1,265 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
-import { MessageCircle, User, Clock } from 'lucide-react-native';
-import { messagingService } from '../../../services/messagingService';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Card } from 'react-native-paper';
+import { useAuth } from '../../../contexts/AuthContext';
+import firebaseMessagingService from '../../../services/firebaseMessagingService';
+import { styles } from '../../styles/ParentDashboard.styles';
 
 const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadConversations = async () => {
-    try {
-      setLoading(true);
-      const data = await messagingService.getConversations();
-      const formattedConversations = data.map(conv => ({
-        id: conv.id,
-        recipientId: conv.participantId,
-        recipientName: conv.participantName,
-        lastMessage: conv.lastMessage,
-        timestamp: new Date(conv.lastMessageTime),
-        unreadCount: conv.unreadCount || 0,
-        avatar: conv.participantAvatar,
-      }));
-      setConversations(formattedConversations);
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadConversations();
-  }, []);
+    const userIdToUse = user?.id || user?.uid;
+    if (!userIdToUse) {
+      console.log('❌ MessagesTab: No user ID available:', { user });
+      return;
+    }
 
-  const handleRefresh = async () => {
-    await loadConversations();
-    if (onRefresh) onRefresh();
-  };
+    console.log('🔍 MessagesTab: Fetching conversations for user:', userIdToUse);
+
+    setLoading(true);
+    const unsubscribe = firebaseMessagingService.getConversations(userIdToUse, (conversations) => {
+      console.log('📨 MessagesTab: Received conversations:', conversations);
+      setConversations(conversations);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.id, user?.uid]);
 
   const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
     const now = new Date();
-    const diff = now - timestamp;
+    const diff = now - date;
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days > 0) {
-      return `${days}d ago`;
-    } else if (hours > 0) {
-      return `${hours}h ago`;
-    } else {
-      return 'Just now';
-    }
+    
+    if (hours < 1) return 'Just now';
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
   };
 
-  const openConversation = (conversation) => {
-    navigation.navigate('Messaging', {
-      conversationId: conversation.id,
-      recipientId: conversation.recipientId,
-      recipientName: conversation.recipientName,
+  const handleConversationPress = async (conversation) => {
+    console.log(' MessagesTab: handleConversationPress called with:', {
+      user: user,
+      userId: user?.id || user?.uid,
+      conversation: conversation
+    });
+
+    // Mark messages as read when opening conversation using consistent conversation ID
+    const userIdToUse = user?.id || user?.uid;
+    if (userIdToUse && conversation.caregiverId) {
+      // Create consistent conversation ID
+      const [id1, id2] = [userIdToUse, conversation.caregiverId].sort();
+      const conversationId = `${id1}_${id2}`;
+
+      console.log('👁️ Marking messages as read with conversation ID:', conversationId);
+      await firebaseMessagingService.markMessagesAsRead(userIdToUse, conversation.caregiverId, conversationId);
+    }
+
+    navigation.navigate('Chat', {
+      userId: userIdToUse,
+      userType: 'parent',
+      targetUserId: conversation.caregiverId,
+      targetUserName: conversation.caregiverName,
+      targetUserType: 'caregiver'
     });
   };
 
-  const renderConversation = ({ item }) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => openConversation(item)}
-    >
-      <View style={styles.avatar}>
-        <User size={20} color="#6b7280" />
-      </View>
-      
-      <View style={styles.conversationContent}>
-        <View style={styles.conversationHeader}>
-          <Text style={styles.recipientName}>{item.recipientName}</Text>
-          <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
-        </View>
-        
-        <View style={styles.messageRow}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
-          {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{item.unreadCount}</Text>
+  const renderConversationItem = ({ item }) => (
+    <TouchableOpacity onPress={() => handleConversationPress(item)}>
+      <View style={messageStyles.conversationItem}>
+        <View style={messageStyles.conversationContent}>
+          <View style={messageStyles.avatarContainer}>
+            {item.caregiverAvatar ? (
+              <Image 
+                source={{ uri: item.caregiverAvatar }} 
+                style={messageStyles.avatar}
+              />
+            ) : (
+              <View style={messageStyles.defaultAvatar}>
+                <Ionicons name="person" size={24} color="#db2777" />
+              </View>
+            )}
+            {!item.isRead && <View style={messageStyles.unreadDot} />}
+          </View>
+          
+          <View style={messageStyles.messageInfo}>
+            <View style={messageStyles.messageHeader}>
+              <Text style={messageStyles.caregiverName}>{item.caregiverName}</Text>
+              <Text style={messageStyles.messageTime}>
+                {formatTime(item.lastMessageTime)}
+              </Text>
             </View>
-          )}
+            <Text 
+              style={[
+                messageStyles.lastMessage,
+                !item.isRead && messageStyles.unreadMessage
+              ]} 
+              numberOfLines={1}
+            >
+              {item.lastMessage}
+            </Text>
+          </View>
+          
+          <Ionicons 
+            name="chevron-forward" 
+            size={20} 
+            color="#9CA3AF" 
+          />
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <MessageCircle size={64} color="#d1d5db" />
-      <Text style={styles.emptyTitle}>No Messages Yet</Text>
-      <Text style={styles.emptySubtitle}>
-        Start a conversation with caregivers to coordinate bookings
-      </Text>
-    </View>
-  );
+  if (loading) {
+    return (
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Card style={messageStyles.conversationsCard}>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading messages...</Text>
+          </View>
+        </Card>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={conversations}
-        renderItem={renderConversation}
-        keyExtractor={item => item.id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing || loading} onRefresh={handleRefresh} />
-        }
-        ListEmptyComponent={renderEmptyState}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={conversations.length === 0 ? styles.emptyContainer : null}
-      />
-    </View>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <Card style={messageStyles.conversationsCard}>
+        <FlatList
+          data={conversations}
+          renderItem={renderConversationItem}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#db2777']}
+              tintColor="#db2777"
+            />
+          }
+          ListEmptyComponent={
+            <View style={messageStyles.emptyState}>
+              <Ionicons name="chatbubbles-outline" size={64} color="#D1D5DB" />
+              <Text style={messageStyles.emptyTitle}>No conversations yet</Text>
+              <Text style={messageStyles.emptySubtitle}>
+                Start messaging caregivers to see conversations here
+              </Text>
+            </View>
+          }
+          contentContainerStyle={conversations.length === 0 ? { flex: 1 } : null}
+          showsVerticalScrollIndicator={false}
+        />
+      </Card>
+    </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
+const messageStyles = {
+  conversationsCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    margin: 8,
+    borderRadius: 12,
   },
   conversationItem: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 12,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  conversationContent: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
   },
   avatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
   },
-  conversationContent: {
+  defaultAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#db2777',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  messageInfo: {
     flex: 1,
   },
-  conversationHeader: {
+  messageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  recipientName: {
+  caregiverName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1F2937',
   },
-  timestamp: {
+  messageTime: {
     fontSize: 12,
-    color: '#6b7280',
-  },
-  messageRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    color: '#9CA3AF',
   },
   lastMessage: {
     fontSize: 14,
-    color: '#6b7280',
-    flex: 1,
-    marginRight: 8,
+    color: '#6B7280',
   },
-  unreadBadge: {
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadCount: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
+  unreadMessage: {
+    fontWeight: '500',
+    color: '#374151',
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 32,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#374151',
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: 14,
+    color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 20,
   },
-});
+};
 
 export default MessagesTab;

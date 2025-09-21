@@ -1,64 +1,33 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../utils/auth');
+const privacyController = require('../controllers/privacyController');
+const { authenticate } = require('../middleware/auth');
 
-// Get privacy settings
-router.get('/settings', authenticate, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: {
-        profileVisibility: 'public',
-        showEmail: false,
-        showPhone: true,
-        allowMessages: true
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// All privacy routes require authentication
+router.use(authenticate);
 
-// Update privacy settings
-router.put('/settings', authenticate, async (req, res) => {
-  try {
-    res.json({ success: true, message: 'Privacy settings updated' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// GET /api/privacy/settings - Get user's privacy settings
+router.get('/settings', privacyController.getPrivacySettings);
 
-// Get pending requests
-router.get('/requests/pending', authenticate, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: []
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// PUT /api/privacy/settings - Update user's privacy settings
+router.put('/settings', privacyController.updatePrivacySettings);
 
-// Get notifications
-router.get('/notifications', authenticate, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: []
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// POST /api/privacy/request - Request information from another user
+router.post('/request', privacyController.requestInformation);
 
-// Request information
-router.post('/request', authenticate, async (req, res) => {
-  try {
-    res.json({ success: true, message: 'Information request sent' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// POST /api/privacy/respond - Respond to an information request
+router.post('/respond', privacyController.respondToRequest);
+
+// GET /api/privacy/requests - Get pending information requests
+router.get('/requests', privacyController.getPendingRequests);
+
+// GET /api/privacy/notifications - Get privacy notifications
+router.get('/notifications', privacyController.getPrivacyNotifications);
+
+// PATCH /api/privacy/notifications/:id/read - Mark notification as read
+router.patch('/notifications/:notificationId/read', privacyController.markNotificationAsRead);
+
+// GET /api/privacy/profile/:targetUserId - Get filtered profile data
+router.get('/profile/:targetUserId', privacyController.getFilteredProfileData);
 
 module.exports = router;

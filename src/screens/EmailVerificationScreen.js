@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../config/api';
 import { CommonActions } from '@react-navigation/native';
 

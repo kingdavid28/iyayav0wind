@@ -24,8 +24,9 @@ import {
   ChevronRight
 } from 'lucide-react-native';
 import { jobsAPI, applicationsAPI } from '../../../config/api';
-import { useAuth } from '../../../core/contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
+import { getProfileImageUrl } from '../../../utils/imageUtils';
 
 const JobApplications = ({ jobId, onViewApplicant }) => {
   const { user } = useAuth();
@@ -48,7 +49,7 @@ const JobApplications = ({ jobId, onViewApplicant }) => {
           id: a._id || a.id,
           jobId: a.jobId?._id || a.jobId,
           caregiverId: a.caregiverId?._id || a.caregiverId,
-          caregiver: a.caregiver || a.caregiverId || {},
+          caregiver: a.caregiverId || a.caregiver || {},
           message: a.message,
           status: a.status,
           appliedAt: a.createdAt ? new Date(a.createdAt) : null,
@@ -122,15 +123,29 @@ const JobApplications = ({ jobId, onViewApplicant }) => {
         <View style={styles.applicationHeader}>
           <View style={styles.applicantInfo}>
             <View style={styles.avatar}>
-              {item.caregiver?.photoURL || item.caregiver?.avatar || item.caregiver?.profileImage ? (
-                <Image 
-                  source={{ uri: item.caregiver.photoURL || item.caregiver.avatar || item.caregiver.profileImage }} 
-                  style={styles.avatarImage}
-                  defaultSource={require('../../../assets/default-avatar.png')}
-                />
-              ) : (
-                <User size={20} color="#9CA3AF" />
-              )}
+              {(() => {
+                const imageUrl = getProfileImageUrl(item.caregiver);
+                console.log('🖼️ JobApplications Image Debug:', {
+                  hasCaregiver: !!item.caregiver,
+                  caregiverKeys: Object.keys(item.caregiver || {}),
+                  profileImage: item.caregiver?.profileImage,
+                  imageUrl,
+                  hasImageUrl: !!imageUrl
+                });
+                
+                return imageUrl ? (
+                  <Image 
+                    source={{ uri: imageUrl }} 
+                    style={styles.avatarImage}
+                    onError={(error) => {
+                      console.log('🚨 JobApplications Image load error:', error.nativeEvent.error);
+                      console.log('🔍 Failed URL:', imageUrl);
+                    }}
+                  />
+                ) : (
+                  <User size={20} color="#9CA3AF" />
+                );
+              })()}
             </View>
             <View style={styles.applicantDetails}>
               <Text style={styles.applicantName}>

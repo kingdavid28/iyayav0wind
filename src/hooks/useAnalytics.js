@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { analytics } from '../utils/analytics';
 
 export const useAnalytics = () => {

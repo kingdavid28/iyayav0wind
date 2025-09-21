@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiService } from '../services';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { formatAddress } from '../utils/addressUtils';
 
 export const useParentDashboard = () => {
@@ -87,7 +87,8 @@ export const useParentDashboard = () => {
     if (!user?.id) return;
     
     try {
-      const res = await apiService.caregivers.getAll();
+      // Add cache-busting parameter to ensure fresh data
+      const res = await apiService.caregivers.getAll({ _t: Date.now() });
       const caregiversList = res?.data?.caregivers || res?.caregivers || [];
       
       console.log('🔍 Raw caregivers response:', {
@@ -101,23 +102,26 @@ export const useParentDashboard = () => {
         }))
       });
       
-      // Backend already filters for caregivers, so we can use all results
-      const transformedCaregivers = caregiversList.map(caregiver => ({
-        _id: caregiver._id || caregiver.id,
-        id: caregiver._id || caregiver.id,
-        name: caregiver.name || 'Caregiver',
-        rating: caregiver.rating || 0,
-        hourlyRate: caregiver.hourlyRate || 300,
-        experience: caregiver.experience || '',
-        skills: caregiver.skills || [],
-        location: caregiver.location || caregiver.address || '',
-        avatar: caregiver.avatar || caregiver.profileImage,
-        ageCareRanges: caregiver.ageCareRanges || [],
-        bio: caregiver.bio || '',
-        hasProfile: caregiver.hasProfile || false,
-        createdAt: caregiver.createdAt || caregiver.registeredAt || new Date().toISOString(),
-        registeredAt: caregiver.registeredAt || caregiver.createdAt || new Date().toISOString()
-      }));
+      // Backend returns User IDs for messaging compatibility
+      const transformedCaregivers = caregiversList.map(caregiver => {
+        console.log('🔍 Processing caregiver:', { id: caregiver._id, name: caregiver.name, userId: caregiver.user?._id });
+        return {
+          _id: caregiver._id || caregiver.id, // This is now User ID from backend
+          id: caregiver._id || caregiver.id,  // This is now User ID from backend
+          name: caregiver.name || 'Caregiver',
+          rating: caregiver.rating || 0,
+          hourlyRate: caregiver.hourlyRate || 300,
+          experience: caregiver.experience || '',
+          skills: caregiver.skills || [],
+          location: caregiver.location || caregiver.address || '',
+          avatar: caregiver.avatar || caregiver.profileImage,
+          ageCareRanges: caregiver.ageCareRanges || [],
+          bio: caregiver.bio || '',
+          hasProfile: caregiver.hasProfile || false,
+          createdAt: caregiver.createdAt || caregiver.registeredAt || new Date().toISOString(),
+          registeredAt: caregiver.registeredAt || caregiver.createdAt || new Date().toISOString()
+        };
+      });
       
       console.log('🎯 Transformed caregivers:', {
         total: transformedCaregivers.length,
@@ -143,7 +147,7 @@ export const useParentDashboard = () => {
     try {
       const [bookingsRes, caregiversRes] = await Promise.all([
         apiService.bookings.getMy(),
-        apiService.caregivers.getAll()
+        apiService.caregivers.getAll({ _t: Date.now() }) // Cache-busting
       ]);
       
       const list = Array.isArray(bookingsRes?.bookings) ? bookingsRes.bookings : [];
@@ -160,21 +164,44 @@ export const useParentDashboard = () => {
       const normalized = list.map((b, idx) => {
         // Try to find real caregiver or use fallback
         let caregiverData = null;
-        if (b.caregiverId?.name && !b.caregiverId.name.startsWith('Caregiver ')) {
+        
+        // If caregiverId is just a string (ObjectId), find the actual caregiver
+        if (typeof b.caregiverId === 'string') {
+          // First try filtered caregivers
+          let foundCaregiver = filteredCaregivers.find(c => c._id === b.caregiverId || c.id === b.caregiverId);
+          // If not found, try all caregivers from the original list
+          if (!foundCaregiver) {
+            foundCaregiver = caregiversList.find(c => (c._id === b.caregiverId || c.id === b.caregiverId) && c.name);
+          }
+          if (foundCaregiver) {
+            caregiverData = {
+              _id: foundCaregiver._id || foundCaregiver.id,
+              name: foundCaregiver.name,
+              email: foundCaregiver.email,
+              avatar: foundCaregiver.avatar || foundCaregiver.profileImage,
+              profileImage: foundCaregiver.profileImage || foundCaregiver.avatar
+            };
+          }
+        } else if (b.caregiverId?.name && !b.caregiverId.name.startsWith('Caregiver ')) {
           // Use existing caregiver data if it's real
           caregiverData = b.caregiverId;
-        } else if (filteredCaregivers.length > 0) {
-          // Map to real caregiver from the FILTERED list (no parents)
+        }
+        
+        // If still no caregiver data, use a real caregiver from the list
+        if (!caregiverData && filteredCaregivers.length > 0) {
           const realCaregiver = filteredCaregivers[idx % filteredCaregivers.length];
           caregiverData = {
             _id: realCaregiver._id || realCaregiver.id,
-            name: realCaregiver.name || `Caregiver ${idx + 1}`,
+            name: realCaregiver.name,
             email: realCaregiver.email,
-            avatar: realCaregiver.avatar || realCaregiver.profileImage
+            avatar: realCaregiver.avatar || realCaregiver.profileImage,
+            profileImage: realCaregiver.profileImage || realCaregiver.avatar
           };
-        } else {
-          // Fallback to existing data
-          caregiverData = b.caregiverId || { name: 'Caregiver' };
+        }
+        
+        // Final fallback
+        if (!caregiverData) {
+          caregiverData = { name: 'Unknown Caregiver', _id: b.caregiverId };
         }
         
         return {

@@ -21,35 +21,50 @@ export default function ChatScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const { conversationId, recipientId, recipientName } = route.params || {};
-  const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [recipientData, setRecipientData] = useState({});
   const typingTimeoutRef = useRef(null);
-  const { messages: ctxMessages, getOrCreateConversation, setActiveConversation, activeConversation, sendMessage, markMessagesAsRead } = useMessaging();
+  const { 
+    messages: ctxMessages, 
+    getOrCreateConversation, 
+    setActiveConversation, 
+    activeConversation, 
+    sendMessage, 
+    markMessagesAsRead,
+    fetchMessages 
+  } = useMessaging();
 
   // Initialize conversation via MessagingContext
   useEffect(() => {
     const init = async () => {
       try {
+        setIsLoading(true);
         if (conversationId) {
-          // Set active if exists; otherwise we still proceed as temp
+          // If we have a conversation ID, fetch its messages
+          await fetchMessages(conversationId);
           setActiveConversation({ id: conversationId, participants: [user?.uid, recipientId].filter(Boolean) });
         } else if (recipientId) {
+          // Otherwise, get or create a conversation with the user
           await getOrCreateConversation(recipientId);
         }
+      } catch (error) {
+        console.error('Error initializing conversation:', error);
+        Alert.alert('Error', 'Failed to load conversation');
       } finally {
         setIsLoading(false);
       }
     };
     init();
-  }, [conversationId, recipientId, user?.uid, getOrCreateConversation, setActiveConversation]);
+  }, [conversationId, recipientId, user?.uid, getOrCreateConversation, setActiveConversation, fetchMessages]);
 
   // Map context messages to SimpleChat format
   const chatMessages = useMemo(() => {
-    return (ctxMessages || [])
+    if (!ctxMessages || ctxMessages.length === 0) return [];
+    
+    return ctxMessages
       .slice()
-      .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
+      .sort((a, b) => new Date(a.createdAt || a.created_at) - new Date(b.createdAt || b.created_at))
       .map((m) => ({
         _id: m.id || m._id,
         text: m.content || m.text || '',
@@ -60,10 +75,6 @@ export default function ChatScreen() {
         },
       }));
   }, [ctxMessages]);
-
-  useEffect(() => {
-    setMessages(chatMessages);
-  }, [chatMessages]);
 
   // Mark messages as read (via context, optimistic)
   const handleMarkRead = useCallback((msgs) => {
@@ -94,8 +105,6 @@ export default function ChatScreen() {
     }
   }, [user, sendMessage]);
 
-  // Removed custom render methods - using SimpleChat instead
-
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -116,7 +125,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {recipientData?.displayName || recipientName}
+            {recipientData?.displayName || recipientName || 'Unknown User'}
           </Text>
           {isTyping && (
             <Text style={styles.typingText}>typing...</Text>
@@ -129,7 +138,7 @@ export default function ChatScreen() {
 
       {/* Chat Interface */}
       <SimpleChat
-        messages={messages}
+        messages={chatMessages}
         onSend={onSend}
         user={user ? {
           _id: user.uid,
@@ -180,67 +189,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-  },
-  inputToolbar: {
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    padding: 8,
-    backgroundColor: '#ffffff',
-  },
-  inputPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    marginRight: 8,
-  },
-  textInput: {
-    color: '#111827',
-    fontSize: 15,
-    paddingVertical: 8,
-  },
-  sendContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#3b82f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  actionButton: {
-    padding: 8,
-  },
-  timeContainer: {
-    marginTop: 4,
-  },
-  timeText: {
-    fontSize: 11,
-    color: '#9ca3af',
-  },
-  timeTextRight: {
-    color: '#e0e7ff',
-  },
-  statusIcon: {
-    marginLeft: 4,
-  },
-  sendingIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#9ca3af',
-  },
-  loadingMore: {
-    paddingVertical: 16,
   },
 });

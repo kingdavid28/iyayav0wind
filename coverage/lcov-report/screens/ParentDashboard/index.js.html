@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/268</span>
+                <span class='fraction'>0/260</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/143</span>
+                <span class='fraction'>0/145</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/85</span>
+                <span class='fraction'>0/82</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/251</span>
+                <span class='fraction'>0/243</span>
             </div>
         
             
@@ -871,23 +871,7 @@
 <a name='L806'></a><a href='#L806'>806</a>
 <a name='L807'></a><a href='#L807'>807</a>
 <a name='L808'></a><a href='#L808'>808</a>
-<a name='L809'></a><a href='#L809'>809</a>
-<a name='L810'></a><a href='#L810'>810</a>
-<a name='L811'></a><a href='#L811'>811</a>
-<a name='L812'></a><a href='#L812'>812</a>
-<a name='L813'></a><a href='#L813'>813</a>
-<a name='L814'></a><a href='#L814'>814</a>
-<a name='L815'></a><a href='#L815'>815</a>
-<a name='L816'></a><a href='#L816'>816</a>
-<a name='L817'></a><a href='#L817'>817</a>
-<a name='L818'></a><a href='#L818'>818</a>
-<a name='L819'></a><a href='#L819'>819</a>
-<a name='L820'></a><a href='#L820'>820</a>
-<a name='L821'></a><a href='#L821'>821</a>
-<a name='L822'></a><a href='#L822'>822</a>
-<a name='L823'></a><a href='#L823'>823</a>
-<a name='L824'></a><a href='#L824'>824</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L809'></a><a href='#L809'>809</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -947,7 +931,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1106,19 +1089,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1716,11 +1686,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 &nbsp;
 // Core imports
 import { useAuth } from '../../core/contexts/AuthContext';
-import { useApp } from '../../contexts/AppContext';
 import { useParentDashboard } from '../../hooks/useParentDashboard';
 &nbsp;
 // API imports
-import { childrenAPI, bookingsAPI, jobsAPI, authAPI } from '../../config/api';
+import { childrenAPI, authAPI } from '../../config/api';
 import { apiService } from '../../services/index';
 &nbsp;
 // Utility imports
@@ -1773,7 +1742,6 @@ const DEFAULT_CAREGIVER = <span class="cstat-no" title="statement not covered" >
 const ParentDashboard = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
   const navigation = <span class="cstat-no" title="statement not covered" >useNavigation();</span>
   const { signOut, user } = <span class="cstat-no" title="statement not covered" >useAuth();</span>
-  const { state } = <span class="cstat-no" title="statement not covered" >useApp();</span>
   
   // Custom hook for dashboard data
   const {
@@ -1929,20 +1897,7 @@ const ParentDashboard = <span class="cstat-no" title="statement not covered" ><s
 &nbsp;
   // Initial data load handled by hook
 &nbsp;
-  // Refetch bookings when tab becomes active
-<span class="cstat-no" title="statement not covered" >  useEffect(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    if (activeTab === 'bookings') {</span>
-<span class="cstat-no" title="statement not covered" >      fetchBookings();</span>
-    }
-  }, [activeTab, fetchBookings]);
 &nbsp;
-  // Refresh profile when returning from navigation
-<span class="cstat-no" title="statement not covered" >  useEffect(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-    const unsubscribe = <span class="cstat-no" title="statement not covered" >navigation.addListener('focus', <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      loadProfile();</span>
-    });
-<span class="cstat-no" title="statement not covered" >    return unsubscribe;</span>
-  }, [navigation, loadProfile]);
 &nbsp;
   // Child management functions
   const openAddChild = <span class="cstat-no" title="statement not covered" >useCallback(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
@@ -2134,7 +2089,7 @@ const ParentDashboard = <span class="cstat-no" title="statement not covered" ><s
   const handleCancelBooking = <span class="cstat-no" title="statement not covered" >useCallback(<span class="fstat-no" title="function not covered" >as</span>ync (bookingId) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
 <span class="cstat-no" title="statement not covered" >      setRefreshing(true);</span>
-<span class="cstat-no" title="statement not covered" >      await bookingsAPI.cancel(bookingId);</span>
+<span class="cstat-no" title="statement not covered" >      await apiService.bookings.cancel(bookingId);</span>
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      console.warn('Failed to cancel booking:', error?.message || error);</span>
     } finally {
@@ -2156,7 +2111,7 @@ const ParentDashboard = <span class="cstat-no" title="statement not covered" ><s
 <span class="cstat-no" title="statement not covered" >    if (!paymentData.bookingId || !paymentData.base64) <span class="cstat-no" title="statement not covered" >return;</span></span>
     
 <span class="cstat-no" title="statement not covered" >    try {</span>
-<span class="cstat-no" title="statement not covered" >      await bookingsAPI.uploadPaymentProof(paymentData.bookingId, paymentData.base64, paymentData.mimeType);</span>
+<span class="cstat-no" title="statement not covered" >      await apiService.bookings.uploadPaymentProof(paymentData.bookingId, paymentData.base64, paymentData.mimeType);</span>
 <span class="cstat-no" title="statement not covered" >      toggleModal('payment', false);</span>
 <span class="cstat-no" title="statement not covered" >      setPaymentData({ bookingId: null, base64: '', mimeType: 'image/jpeg' });</span>
 <span class="cstat-no" title="statement not covered" >      await fetchBookings();</span>
@@ -2218,7 +2173,7 @@ const ParentDashboard = <span class="cstat-no" title="statement not covered" ><s
           text: 'Complete',
           onPress: <span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {
 <span class="cstat-no" title="statement not covered" >            try {</span>
-<span class="cstat-no" title="statement not covered" >              await jobsAPI.update(jobId, { status: 'completed' });</span>
+<span class="cstat-no" title="statement not covered" >              await apiService.jobs.update(jobId, { status: 'completed' });</span>
 <span class="cstat-no" title="statement not covered" >              await fetchJobs();</span>
 <span class="cstat-no" title="statement not covered" >              Alert.alert('Success', 'Job marked as completed');</span>
             } catch (error) {
@@ -2242,7 +2197,7 @@ const ParentDashboard = <span class="cstat-no" title="statement not covered" ><s
           style: 'destructive',
           onPress: <span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {
 <span class="cstat-no" title="statement not covered" >            try {</span>
-<span class="cstat-no" title="statement not covered" >              await jobsAPI.delete(jobId);</span>
+<span class="cstat-no" title="statement not covered" >              await apiService.jobs.delete(jobId);</span>
 <span class="cstat-no" title="statement not covered" >              Alert.alert('Success', 'Job deleted successfully');</span>
 <span class="cstat-no" title="statement not covered" >              await fetchJobs();</span>
             } catch (error) {
@@ -2360,8 +2315,8 @@ const ParentDashboard = <span class="cstat-no" title="statement not covered" ><s
             greetingName={greetingName}
             profileImage={profileForm.image}
             profileContact={profileForm.contact}
-            profileLocation={profile.location || profile.address || profileForm.location}
-            caregivers={caregivers}
+            profileLocation={profile?.location || profile?.address || profileForm.location}
+            caregivers={caregivers || []}
             onBookCaregiver={handleBookCaregiver}
             onMessageCaregiver={handleMessageCaregiver}
             navigation={navigation}
@@ -2372,7 +2327,7 @@ const ParentDashboard = <span class="cstat-no" title="statement not covered" ><s
           &lt;SearchTab
             searchQuery={searchQuery}
             filteredCaregivers={filteredCaregivers}
-            caregivers={caregivers}
+            caregivers={caregivers || []}
             searchLoading={searchLoading}
             refreshing={refreshing}
             activeFilters={activeFilters}
@@ -2539,7 +2494,7 @@ export default ParentDashboard;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-16T06:26:36.158Z
+                at 2025-09-17T00:05:20.360Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -1,3 +1,9 @@
+// Use environment configuration
+import { Config } from '../../core/config/environment';
+let API_BASE_URL = Config.API_BASE_URL;
+
+console.log('🔗 API URL set to:', API_BASE_URL);
+
 // CSRF Token Management
 let csrfToken = null;
 const getCSRFToken = async () => {
@@ -19,12 +25,12 @@ const getCSRFToken = async () => {
 // Auto-detect API URL based on network
 const detectAPIURL = async () => {
   const commonIPs = ['192.168.1.26', '192.168.1.10', '192.168.0.10', '10.0.0.10', '172.16.0.10'];
-  
+
   for (const ip of commonIPs) {
     try {
-      const response = await fetch(`http://${ip}:5000/api/health`, { 
+      const response = await fetch(`http://${ip}:5000/api/health`, {
         method: 'GET',
-        timeout: 2000 
+        timeout: 2000
       });
       if (response.ok) {
         console.log(`✅ Found backend at ${ip}:5000`);
@@ -34,16 +40,10 @@ const detectAPIURL = async () => {
       // Continue to next IP
     }
   }
-  
+
   // Fallback to default
   return 'http://192.168.1.26:5000/api';
 };
-
-// Use environment configuration
-import ENV from '../../config/environment';
-let API_BASE_URL = ENV.API_URL;
-
-console.log('🔗 API URL set to:', API_BASE_URL);
 
 export const getCurrentAPIURL = () => API_BASE_URL;
 export const getCurrentSocketURL = () => API_BASE_URL.replace('/api', '');

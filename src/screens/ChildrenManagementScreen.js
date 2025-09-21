@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import profileService from '../services/profileService';
 import { useApi } from '../hooks/useApi';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { styles } from './styles/ChildrenManagementScreen.styles';
 import { validateForm, VALIDATION_RULES } from '../utils/validation';
 import { logger } from '../utils/logger';

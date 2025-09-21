@@ -8,6 +8,7 @@ import { getCaregiverDisplayName, normalizeStatus, getStatusColor } from '../../
 import { BOOKING_STATUSES, STATUS_LABELS } from '../../../constants/bookingStatuses';
 import { getPaymentActions, calculateDeposit, calculateRemainingPayment } from '../../../utils/paymentUtils';
 import { formatAddress } from '../../../utils/addressUtils';
+import { getProfileImageUrl } from '../../../utils/imageUtils';
 
 const BookingItem = ({ 
   item, 
@@ -197,35 +198,14 @@ const BookingItem = ({
     }
   };
 
-  // Debug logging for caregiver data
-  console.log('📋 BookingItem - Full item:', item);
-  console.log('📋 BookingItem - Caregiver data:', item.caregiverId);
-  console.log('📋 BookingItem - Caregiver avatar sources:', {
-    caregiverAvatar: item.caregiverAvatar,
-    caregiverIdAvatar: item.caregiverId?.avatar,
-    caregiverIdProfileImage: item.caregiverId?.profileImage,
-    caregiverAvatar2: item.caregiver?.avatar,
-    caregiverProfileImage2: item.caregiver?.profileImage
-  });
-
-  const getFullImageURL = (imagePath) => {
-    if (!imagePath) return 'https://via.placeholder.com/50x50/E5E7EB/6B7280?text=CG';
-    if (imagePath.startsWith('http')) return imagePath;
-    if (imagePath.startsWith('/uploads/')) {
-      return `http://192.168.1.4:3000${imagePath}`;
+  const caregiverImageUri = getProfileImageUrl(
+    item.caregiver || item.caregiverId || {
+      avatar: item.caregiverAvatar,
+      profileImage: item.caregiver?.profileImage || item.caregiverId?.profileImage
     }
-    return imagePath;
-  };
-
-  const caregiverImageUri = getFullImageURL(
-    item.caregiverId?.profileImage || 
-    item.caregiverId?.avatar || 
-    item.caregiverAvatar || 
-    item.caregiver?.avatar || 
-    item.caregiver?.profileImage
   );
 
-  console.log('📋 BookingItem - Final image URI:', caregiverImageUri);
+
 
   return (
     <View style={styles.bookingItemCard}>
@@ -234,10 +214,11 @@ const BookingItem = ({
           <Image
             source={{ uri: caregiverImageUri }}
             style={styles.bookingAvatar}
+            onError={() => console.warn('Failed to load caregiver image')}
           />
           <View style={styles.bookingCaregiverDetails}>
             <Text style={styles.bookingCaregiverName}>
-              {getCaregiverDisplayName(item.caregiverId || item.caregiver)}
+              {getCaregiverDisplayName(item.caregiver || item.caregiverId)}
             </Text>
             {renderStatusBadge()}
           </View>

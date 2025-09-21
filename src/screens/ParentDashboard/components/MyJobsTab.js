@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl, Image, ActivityIndicator } from 'react-native';
 import { Calendar, Users, Eye, CheckCircle, XCircle, Plus, MapPin, Clock } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import { apiService } from '../../../services';
@@ -12,7 +12,8 @@ const MyJobsTab = ({
   onCreateJob,
   onEditJob,
   onDeleteJob,
-  onCompleteJob 
+  onCompleteJob,
+  loading = false
 }) => {
   const [filter, setFilter] = useState('all');
   const [selectedJob, setSelectedJob] = useState(null);
@@ -264,6 +265,15 @@ const MyJobsTab = ({
       </View>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#db2777" />
+        <Text style={styles.loadingText}>Loading jobs...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.tabContent}>

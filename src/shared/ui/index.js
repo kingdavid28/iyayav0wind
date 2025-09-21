@@ -7,6 +7,7 @@ export { default as Button } from './Button';
 export { default as ErrorBoundary } from './feedback/ErrorBoundary';
 export { LoadingSpinner } from './feedback/LoadingSpinner';
 export { QuickStat, QuickAction } from './QuickComponents';
+export { default as NotificationBadge } from './NotificationBadge';
 
 // Form Components
 

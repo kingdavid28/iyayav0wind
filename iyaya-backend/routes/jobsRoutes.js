@@ -1,30 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
 const jobController = require('../controllers/jobController');
+const { authenticate } = require('../middleware/auth');
 
-// Get user's posted jobs
-router.get('/my', authenticate, jobController.getMyJobs);
+// GET /api/jobs - Get all jobs (public for caregivers to browse)
+router.get('/', jobController.getAllJobs);
 
-// Get all available jobs (for caregivers to browse)
-router.get('/', authenticate, jobController.getAllJobs);
+// Protected routes (require authentication)
+router.use(authenticate);
 
-// Create new job
-router.post('/', authenticate, jobController.createJob);
+// GET /api/jobs/my - Get current user's jobs (must be before /:id)
+router.get('/my', jobController.getMyJobs);
 
-// Update job
-router.put('/:id', authenticate, jobController.updateJob);
+// POST /api/jobs - Create new job (parents only)
+router.post('/', jobController.createJob);
 
-// Get job by ID
-router.get('/:id', authenticate, jobController.getJobById);
+// GET /api/jobs/:id - Get job by ID
+router.get('/:id', jobController.getJobById);
 
-// Apply to job (caregiver) - handled by applications routes
-// router.post('/:id/apply', authenticate, applicationController.createApplication);
+// PUT /api/jobs/:id - Update job
+router.put('/:id', jobController.updateJob);
 
-// Delete job
-router.delete('/:id', authenticate, jobController.deleteJob);
+// DELETE /api/jobs/:id - Delete job
+router.delete('/:id', jobController.deleteJob);
 
-// Get applications for a job (parent only)
-router.get('/:id/applications', authenticate, jobController.getApplicationsForJob);
+// GET /api/jobs/:id/applications - Get applications for a job
+router.get('/:id/applications', jobController.getApplicationsForJob);
 
 module.exports = router;

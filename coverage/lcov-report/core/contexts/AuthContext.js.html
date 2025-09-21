@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/132</span>
+                <span class='fraction'>0/142</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/46</span>
+                <span class='fraction'>0/48</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/11</span>
+                <span class='fraction'>0/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/131</span>
+                <span class='fraction'>0/141</span>
             </div>
         
             
@@ -359,7 +359,23 @@
 <a name='L294'></a><a href='#L294'>294</a>
 <a name='L295'></a><a href='#L295'>295</a>
 <a name='L296'></a><a href='#L296'>296</a>
-<a name='L297'></a><a href='#L297'>297</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -622,6 +638,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -684,7 +716,7 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
       // Check Firebase auth state
       const currentUser = <span class="cstat-no" title="statement not covered" >firebaseAuthService.getCurrentUser();</span>
 <span class="cstat-no" title="statement not covered" >      if (currentUser &amp;&amp; currentUser.emailVerified) {</span>
-        const token = <span class="cstat-no" title="statement not covered" >await currentUser.getIdToken();</span>
+        const token = <span class="cstat-no" title="statement not covered" >await currentUser.getIdToken(true);</span> // Force refresh
 <span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);</span>
         
         // Get user profile from MongoDB
@@ -744,7 +776,7 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
     // Set up Firebase auth state listener
     const unsubscribe = <span class="cstat-no" title="statement not covered" >firebaseAuthService.onAuthStateChanged(<span class="fstat-no" title="function not covered" >as</span>ync (user) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >      if (user &amp;&amp; user.emailVerified) {</span>
-        const token = <span class="cstat-no" title="statement not covered" >await user.getIdToken();</span>
+        const token = <span class="cstat-no" title="statement not covered" >await user.getIdToken(true);</span> // Force refresh
 <span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);</span>
         
         // Get user profile from MongoDB
@@ -917,6 +949,21 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
     }
   };
 &nbsp;
+  const refreshToken = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >as</span>ync () =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+      const currentUser = <span class="cstat-no" title="statement not covered" >firebaseAuthService.getCurrentUser();</span>
+<span class="cstat-no" title="statement not covered" >      if (currentUser) {</span>
+        const token = <span class="cstat-no" title="statement not covered" >await currentUser.getIdToken(true);</span> // Force refresh
+<span class="cstat-no" title="statement not covered" >        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);</span>
+<span class="cstat-no" title="statement not covered" >        return token;</span>
+      }
+<span class="cstat-no" title="statement not covered" >      return null;</span>
+    } catch (error) {
+<span class="cstat-no" title="statement not covered" >      console.error('❌ Token refresh failed:', error);</span>
+<span class="cstat-no" title="statement not covered" >      throw error;</span>
+    }
+  };
+&nbsp;
   const value = <span class="cstat-no" title="statement not covered" >{</span>
     user,
     loading: isLoading,
@@ -927,6 +974,7 @@ export const AuthProvider = <span class="cstat-no" title="statement not covered"
     resetPassword,
     checkAuthStatus,
     verifyEmailToken,
+    refreshToken,
   };
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
@@ -958,7 +1006,7 @@ export default AuthContext;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-09-16T06:26:36.158Z
+                at 2025-09-17T00:05:20.360Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

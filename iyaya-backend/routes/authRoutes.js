@@ -302,6 +302,13 @@ router.post('/upload-profile-image',
   authController.uploadProfileImageBase64
 );
 
+// Get user profile by Firebase UID (for messaging)
+router.get('/user/:firebaseUid',
+  profileLimiter,
+  authenticate,
+  authController.getUserByFirebaseUid
+);
+
 // CSRF token endpoint (for compatibility)
 router.get('/csrf-token', (req, res) => {
   res.json({ 

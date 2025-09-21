@@ -31,6 +31,13 @@ exports.getMyBookings = async (req, res) => {
     const bookings = await Booking.find(searchCriteria)
     .populate('clientId', 'name email')
     .sort({ createdAt: -1 });
+    
+    // Add parentId for messaging purposes
+    bookings.forEach(booking => {
+      if (booking.clientId) {
+        booking.parentId = booking.clientId._id || booking.clientId;
+      }
+    });
 
     console.log(`Found ${bookings.length} bookings for user: ${req.user.id}`);
     
@@ -288,6 +295,20 @@ exports.updateBookingStatus = async (req, res) => {
     }
     
     console.log(`✅ Booking status updated to ${status} by user: ${req.user.id}`);
+    
+    // Update caregiver's hasCompletedJobs flag when booking is completed
+    if (status === 'completed' && booking.caregiverId) {
+      try {
+        await Caregiver.findByIdAndUpdate(
+          booking.caregiverId,
+          { hasCompletedJobs: true },
+          { new: true }
+        );
+        console.log(`✅ Updated hasCompletedJobs for caregiver: ${booking.caregiverId}`);
+      } catch (error) {
+        console.error('❌ Error updating caregiver hasCompletedJobs:', error);
+      }
+    }
     
     res.json({
       success: true,

@@ -9,20 +9,17 @@ import { Button, Card, Chip, Searchbar } from "react-native-paper"
 import Toast from "../components/ui/feedback/Toast"
 import { apiService } from "../services/index"
 import { getCurrentSocketURL } from '../config/api'
-import { useAuth } from "../core/contexts/AuthContext"
-import { useMessaging } from "../contexts/MessagingContext"
-import { usePrivacy } from "../components/features/privacy/PrivacyManager"
-import PrivacyNotificationModal from "../components/features/privacy/PrivacyNotificationModal"
+import { useAuth } from "../contexts/AuthContext"
+
+import { usePrivacy } from '../components/features/privacy/PrivacyManager';
 import { SettingsModal } from "../components/ui/modals/SettingsModal"
 import { RequestInfoModal } from "../components/ui/modals/RequestInfoModal"
-import MessagesTab from "../components/features/messaging/MessagesTab"
+
 
 import { formatAddress } from "../utils/addressUtils"
 import { calculateAge } from "../utils/dateUtils"
 import { __DEV__ } from "../config/constants"
-import { styles } from "./styles/CaregiverDashboard.styles"
-import CaregiverProfileSection from "./CaregiverDashboard/components/CaregiverProfileSection"
-import { useCaregiverDashboard } from '../hooks/useCaregiverDashboard'
+import MessagesTab from './CaregiverDashboard/components/MessagesTab';
 
 import { 
   EmptyState, 
@@ -34,18 +31,22 @@ import {
   QuickStat, 
   QuickAction,
   formatDate,
-  useDebounce 
+  useDebounce
 } from '../shared/ui';
 
-const { width } = Dimensions.get("window")
+import { styles } from './styles/CaregiverDashboard.styles';
+import { useCaregiverDashboard } from '../hooks/useCaregiverDashboard';
+import CaregiverProfileSection from './CaregiverDashboard/components/CaregiverProfileSection';
+import { PrivacyNotificationModal } from '../components/ui/modals/PrivacyNotificationModal';
+import firebaseMessagingService from '../services/firebaseMessagingService';
+import MessageItemLocal from '../components/messaging/MessageItemLocal';
+import ReviewItemLocal from '../components/messaging/ReviewItemLocal';
 
-// Component definitions
 function JobCard({ job, showActions = true, onApply, hasApplied, onLearnMore, jobCardStyle, gridMode = false }) {
   const applied = typeof hasApplied === 'function' ? hasApplied(job.id) : false
   const maxRequirementChips = gridMode ? 2 : 3
   return (
     <Card style={[styles.jobCard, jobCardStyle]}>
-      <View style={{ overflow: 'hidden' }}>
       <Card.Content style={{ padding: 16 }}>
         <View style={styles.jobHeader}>
           <View>
@@ -125,7 +126,6 @@ function JobCard({ job, showActions = true, onApply, hasApplied, onLearnMore, jo
           </View>
         )}
       </Card.Content>
-      </View>
     </Card>
   )
 }
@@ -133,7 +133,6 @@ function JobCard({ job, showActions = true, onApply, hasApplied, onLearnMore, jo
 function ApplicationCard({ application, onViewDetails, onMessage }) {
   return (
     <Card style={styles.applicationCard}>
-      <View style={{ overflow: 'hidden' }}>
       <Card.Content style={styles.applicationContent}>
         <View style={styles.applicationHeader}>
           <View>
@@ -179,19 +178,11 @@ function ApplicationCard({ application, onViewDetails, onMessage }) {
           )}
         </View>
       </Card.Content>
-      </View>
     </Card>
   )
 }
 
 function BookingCard({ booking, onMessage, onViewDetails, onConfirmAttendance }) {
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
 
   const handleLocationPress = () => {
     if (booking.location) {
@@ -285,6 +276,7 @@ function BookingCard({ booking, onMessage, onViewDetails, onConfirmAttendance })
 export default function CaregiverDashboard({ onLogout, route }) {
   const navigation = useNavigation()
   const { user, signOut } = useAuth()
+  const { width } = Dimensions.get("window");
   const isTablet = width >= 768
   const isAndroid = Platform.OS === 'android'
   const sectionHorizontalPadding = 16
@@ -295,12 +287,14 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const gridCardHeight = isAndroid ? undefined : 280
   
   const {
-    activeTab, setActiveTab,
+    activeTab, setActiveTab: setActiveTabHook,
     profile, setProfile,
     jobs, applications, setApplications, bookings,
     jobsLoading,
     loadProfile, fetchJobs, fetchApplications, fetchBookings
   } = useCaregiverDashboard();
+  
+  const setActiveTab = setActiveTabHook;
   
   const [searchQuery, setSearchQuery] = useState("")
   const debouncedSearch = useDebounce(searchQuery, 300)
@@ -317,9 +311,107 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const [showApplicationDetails, setShowApplicationDetails] = useState(false)
   const [applicationSubmitting, setApplicationSubmitting] = useState(false)
   const [applicationForm, setApplicationForm] = useState({ coverLetter: '', proposedRate: '' })
+  
+  // Add these new state variables for messaging and reviews
+  const [parents, setParents] = useState([]);
+  const [selectedParent, setSelectedParent] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [reviews, setReviews] = useState([]);
+  const [chatActive, setChatActive] = useState(false);
+
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
   const showToast = (message, type = 'success') => setToast({ visible: true, message, type })
+  const [refreshing, setRefreshing] = useState(false)
+  
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadProfile(),
+        fetchJobs(),
+        fetchApplications(),
+        fetchBookings()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadProfile, fetchJobs, fetchApplications, fetchBookings]);
+
+  // Fetch conversations using unified Firebase service
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsubscribe = firebaseMessagingService.getConversations(user.id, (conversations) => {
+      console.log('📨 Caregiver received conversations:', conversations.length);
+      setParents(conversations.map(conv => ({
+        id: conv.parentId || conv.id,
+        name: conv.parentName || conv.caregiverName || 'Parent',
+        profileImage: conv.parentAvatar || conv.caregiverAvatar || null
+      })));
+    }, 'caregiver');
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  // Fetch messages for selected parent
+  useEffect(() => {
+    if (!selectedParent || !user?.id) return;
+
+    // Create consistent conversation ID: always use smaller ID first
+    const [id1, id2] = [user.id, selectedParent.id].sort();
+    const conversationId = `${id1}_${id2}`;
+
+    console.log('📨 Fetching messages for conversation:', {
+      caregiverId: selectedParent.id,
+      userId: user.id,
+      conversationId
+    });
+
+    const unsubscribe = firebaseMessagingService.getMessages(user.id, selectedParent.id, (messagesData) => {
+      console.log('📨 Received messages:', messagesData.length);
+      setMessages(messagesData.reverse()); // Reverse to show latest at bottom
+    }, conversationId);
+
+    return () => unsubscribe();
+  }, [selectedParent, user?.id]);
+
+  // Fetch reviews with runtime Firebase check
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Check if Firebase is available
+    const checkFirebaseAvailability = () => {
+      const { database: db, firebaseRef: ref, firebaseOnValue: onValue, firebaseQuery: query, firebaseOrderByChild: orderByChild } = require('../config/firebaseConfig');
+      return !!(db && onValue && ref && query && orderByChild);
+    };
+
+    if (!checkFirebaseAvailability()) {
+      console.warn('⚠️ Firebase not available, skipping reviews fetch');
+      return;
+    }
+
+    const { database: db, firebaseRef: ref, firebaseOnValue: onValue, firebaseQuery: query, firebaseOrderByChild: orderByChild } = require('../config/firebaseConfig');
+
+    const reviewsRef = ref(db, `reviews/${user.id}`);
+    const reviewsQuery = query(reviewsRef, orderByChild('timestamp'));
+
+    const unsubscribe = onValue(reviewsQuery, (snapshot) => {
+      const reviewsData = [];
+      snapshot.forEach((childSnapshot) => {
+        reviewsData.push({
+          id: childSnapshot.key,
+          ...childSnapshot.val()
+        });
+      });
+      setReviews(reviewsData.reverse());
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
   
   const { pendingRequests, notifications } = usePrivacy();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -375,10 +467,47 @@ export default function CaregiverDashboard({ onLogout, route }) {
     setShowApplicationDetails(true)
   }
 
-  const handleMessageFamily = (application) => {
-    setShowApplicationDetails(false)
-    try { navigation.navigate('Messages') } catch (error) {
-      console.warn('Navigation error:', error);
+
+  
+  const handleMessageFamily = async (application) => {
+    Alert.alert('Feature Unavailable', 'Messaging feature has been removed.');
+    setShowApplicationDetails(false);
+  }
+
+  const handleBookingMessage = async (booking) => {
+    try {
+      // Navigate to messages tab first
+      setActiveTab('messages');
+
+      // Extract parent/family name from booking
+      const parentName = booking.family || booking.parentName;
+
+      if (!parentName) {
+        showToast('Unable to identify parent for this booking', 'error');
+        return;
+      }
+
+      // Look for existing conversation with this parent
+      const existingParent = parents.find(parent =>
+        parent.name?.toLowerCase() === parentName.toLowerCase()
+      );
+
+      if (existingParent) {
+        // Found existing conversation - set as selected and open chat
+        setSelectedParent(existingParent);
+        setChatActive(true);
+        // Mark messages as read when opening chat
+        await firebaseMessagingService.markMessagesAsRead(user.id, existingParent.id);
+        showToast(`Opened conversation with ${existingParent.name}`, 'success');
+      } else {
+        // No existing conversation found
+        showToast(`No conversation found with ${parentName}. Please ensure they have contacted you first.`, 'info');
+        // Still navigate to messages tab so user can see available conversations
+      }
+
+    } catch (error) {
+      console.error('Error opening booking message:', error);
+      showToast('Failed to open message', 'error');
     }
   }
 
@@ -402,26 +531,82 @@ export default function CaregiverDashboard({ onLogout, route }) {
     }
   }
 
+  // Send messages using unified Firebase service
+  const sendMessage = async () => {
+    if (!newMessage?.trim() || !selectedParent || !user?.id) {
+      console.warn('❌ Missing data:', {
+        hasMessage: !!newMessage?.trim(),
+        hasParent: !!selectedParent,
+        hasUserId: !!user?.id
+      });
+      return;
+    }
+
+    try {
+      // Create connection if it doesn't exist
+      try {
+        console.log('🔗 Ensuring Firebase connection exists:', { caregiverId: user.id, parentId: selectedParent.id });
+        await firebaseMessagingService.createConnection(user.id, selectedParent.id);
+        console.log('✅ Firebase connection ensured');
+      } catch (connectionError) {
+        console.warn('⚠️ Failed to ensure Firebase connection:', connectionError.message);
+        // Continue with sending message even if connection creation fails
+      }
+
+      // Create consistent conversation ID: always use smaller ID first
+      const [id1, id2] = [user.id, selectedParent.id].sort();
+      const conversationId = `${id1}_${id2}`;
+
+      console.log('📨 Caregiver sending message:', {
+        senderId: user.id,
+        receiverId: selectedParent.id, // Parent ID
+        conversationId,
+        message: newMessage.trim()
+      });
+
+      await firebaseMessagingService.sendMessage(user.id, selectedParent.id, newMessage, 'text', null, conversationId);
+      setNewMessage('');
+      console.log('✅ Caregiver message sent successfully');
+    } catch (error) {
+      console.error('❌ Error sending caregiver message:', error);
+      showToast('Failed to send message: ' + error.message, 'error');
+    }
+  };
+
   const handleApplicationSubmit = async ({ jobId, jobTitle, family, coverLetter, proposedRate }) => {
     if (applications.some(app => app.jobId === jobId)) {
       showToast('You have already applied to this job', 'error');
       return;
     }
-    
+
     const matchedJob = jobs.find((j) => j.id === jobId)
-    
+
     try {
       setApplicationSubmitting(true)
-      
+
       console.log('Submitting application with jobId:', jobId);
-      const response = await apiService.applications.apply({ 
-        jobId: jobId, 
+      const response = await apiService.applications.apply({
+        jobId: jobId,
         coverLetter: coverLetter || '',
         proposedRate: proposedRate ? Number(proposedRate) : undefined,
         message: coverLetter || ''
       })
-      
+
       if (response.success) {
+        // Create Firebase connection between caregiver and job poster (parent)
+        const parentId = matchedJob?.parentId || matchedJob?.userId || matchedJob?.createdBy;
+
+        if (parentId && parentId !== user?.id) {
+          try {
+            console.log('🔗 Creating Firebase connection for application:', { caregiverId: user.id, parentId });
+            await firebaseMessagingService.createConnection(user.id, parentId);
+            console.log('✅ Firebase connection created successfully');
+          } catch (connectionError) {
+            console.warn('⚠️ Failed to create Firebase connection:', connectionError.message);
+            // Don't fail the application if connection creation fails
+          }
+        }
+
         const newApplication = {
           id: response.data._id || Date.now(),
           jobId,
@@ -431,17 +616,15 @@ export default function CaregiverDashboard({ onLogout, route }) {
           appliedDate: new Date().toISOString(),
           hourlyRate: proposedRate || (matchedJob ? matchedJob.hourlyRate : undefined)
         }
-        
+
         // Add to local state immediately for instant UI update
         setApplications(prev => [newApplication, ...prev]);
-        
+
         // Refresh from server to get latest data
         setTimeout(() => {
           fetchApplications();
         }, 500);
-        
 
-        
         showToast('Application submitted successfully!', 'success')
         setShowJobApplication(false)
         setSelectedJob(null)
@@ -453,13 +636,13 @@ export default function CaregiverDashboard({ onLogout, route }) {
     } catch (error) {
       console.error('Application submission failed:', error)
       let errorMessage = 'Failed to submit application. Please try again.';
-      
+
       if (error.message?.includes('Validation failed')) {
         errorMessage = 'Invalid job ID. Please try refreshing the jobs list.';
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       showToast(errorMessage, 'error')
     } finally {
       setApplicationSubmitting(false)
@@ -560,9 +743,9 @@ export default function CaregiverDashboard({ onLogout, route }) {
     />
   )
 
+
+  
   const renderHeader = () => {
-    const { unreadCount } = useMessaging();
-    
     const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
     const pendingRequestsCount = pendingRequests?.length || 0;
     const totalPrivacyNotifications = unreadNotifications + pendingRequestsCount;
@@ -584,35 +767,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
               </View>
             </View>
             <View style={styles.headerActions}>
-              <Pressable 
-                style={[styles.headerButton, { position: 'relative' }]} 
-                onPress={() => setActiveTab('messages')}
-              >
-                <Ionicons name="chatbubble-ellipses-outline" size={22} color="#FFFFFF" />
-                {unreadCount > 0 && (
-                  <View style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -4,
-                    backgroundColor: '#ef4444',
-                    borderRadius: 10,
-                    minWidth: 20,
-                    height: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 2,
-                    borderColor: '#fff',
-                  }}>
-                    <Text style={{
-                      color: '#fff',
-                      fontSize: 10,
-                      fontWeight: '600',
-                    }}>
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
+
               
               <Pressable 
                 style={[styles.headerButton, { position: 'relative' }]} 
@@ -710,7 +865,9 @@ export default function CaregiverDashboard({ onLogout, route }) {
           { id: 'jobs', label: 'Jobs', icon: 'briefcase' },
           { id: 'applications', label: 'Applications', icon: 'document-text' },
           { id: 'bookings', label: 'Bookings', icon: 'calendar' },
-          { id: 'messages', label: 'Messages', icon: 'chatbubble-ellipses' },
+          { id: 'messages', label: 'Messages', icon: 'chatbubbles' },
+          { id: 'reviews', label: 'Reviews', icon: 'star' },
+          { id: 'notifications', label: 'Notifications', icon: 'notifications' },
         ].map((tab) => {
           const active = activeTab === tab.id
           const onPress = () => {
@@ -735,6 +892,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
               <Text style={[styles.navTabText, active ? styles.navTabTextActive : null]}>
                 {tab.label}
               </Text>
+
             </Pressable>
           )
         })}
@@ -742,13 +900,124 @@ export default function CaregiverDashboard({ onLogout, route }) {
     </View>
   );
 
+  const renderMessagesTab = () => (
+    <View style={styles.messagesContainer}>
+      {!chatActive ? (
+        <>
+          <Text style={styles.sectionTitle}>Connected Families</Text>
+          {parents.length > 0 ? (
+            <FlatList
+              data={parents}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.parentItem}
+                  onPress={async () => {
+                    setSelectedParent(item);
+                    setChatActive(true);
+                    // Mark messages as read when opening chat
+                    await firebaseMessagingService.markMessagesAsRead(user.id, item.id);
+                  }}
+                >
+                  <Ionicons name="person-circle" size={40} color="#3B82F6" />
+                  <View style={styles.parentInfo}>
+                    <Text style={styles.parentName}>{item.name}</Text>
+                    <Text style={styles.parentStatus}>Last seen recently</Text>
+                  </View>
+                </Pressable>
+              )}
+              keyExtractor={(item) => item.id}
+              style={styles.parentsList}
+            />
+          ) : (
+            <EmptyState 
+              icon="people"
+              title="No conversations yet"
+              subtitle="Parents who contact you will appear here. You can start messaging once they reach out first."
+            />
+          )}
+        </>
+      ) : (
+        <View style={styles.chatContainer}>
+          <Card style={styles.chatHeaderCard}>
+            <View style={styles.chatHeader}>
+              <Text style={styles.chatTitle}>{selectedParent.name}</Text>
+            </View>
+          </Card>
+
+          <Card style={styles.messagesCard}>
+            <FlatList
+              data={messages}
+              renderItem={({ item }) => (
+                <MessageItemLocal
+                  message={item}
+                  isCurrentUser={item.senderId === user?.id}
+                />
+              )}
+              keyExtractor={(item) => item.id}
+              style={styles.messagesList}
+              contentContainerStyle={styles.messagesContent}
+              inverted
+              showsVerticalScrollIndicator={false}
+            />
+          </Card>
+
+          <Card style={styles.inputCard}>
+            <View style={styles.messageInputContainer}>
+              <TextInput
+                style={styles.messageInput}
+                value={newMessage}
+                onChangeText={setNewMessage}
+                placeholder="Type your message..."
+                multiline
+                maxLength={500}
+              />
+              <Pressable
+                style={[styles.sendButton, { opacity: newMessage?.trim() ? 1 : 0.5 }]}
+                onPress={sendMessage}
+                disabled={!newMessage?.trim()}
+              >
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color="#FFFFFF"
+                />
+              </Pressable>
+            </View>
+          </Card>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderReviewsTab = () => (
+    <View style={styles.reviewsContainer}>
+      <Text style={styles.sectionTitle}>Your Reviews</Text>
+      {reviews.length > 0 ? (
+        <FlatList
+          data={reviews}
+          renderItem={({ item }) => <ReviewItemLocal review={item} />}
+          keyExtractor={(item) => item.id}
+          style={styles.reviewsList}
+          contentContainerStyle={styles.reviewsContent}
+        />
+      ) : (
+        <EmptyState 
+          icon="star-outline" 
+          title="No reviews yet"
+          subtitle="Reviews from families will appear here"
+        />
+      )}
+    </View>
+  );
+
   return (
-    <View style={styles.container}>
+      <View style={styles.container}>
       {renderHeader()}
       {renderTopNav()}
       
       <View style={{ flex: 1 }}>
-        {activeTab !== "messages" && (
+        {/* Only show search bar on specific tabs, not messages */}
+        {(activeTab === 'jobs' || activeTab === 'search' || activeTab === 'applications' || activeTab === 'bookings') && (
           <Searchbar
             placeholder="Search jobs, families..."
             onChangeText={setSearchQuery}
@@ -759,14 +1028,30 @@ export default function CaregiverDashboard({ onLogout, route }) {
             inputStyle={styles.searchInput}
           />
         )}
-        
+
         {__DEV__ && debouncedSearch && (
           <Text style={{ padding: 8, fontSize: 12, color: '#666' }}>Searching: {debouncedSearch}</Text>
         )}
 
         {activeTab === "dashboard" && (
-          <ScrollView style={styles.content}>
-            <CaregiverProfileSection profile={profile} activeTab={activeTab} />
+          jobsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={styles.loadingText}>Loading dashboard...</Text>
+            </View>
+          ) : (
+            <ScrollView 
+              style={styles.content}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={['#3B82F6']}
+                  tintColor="#3B82F6"
+                />
+              }
+            >
+              <CaregiverProfileSection profile={profile} activeTab={activeTab} />
 
             <View style={styles.statsGrid}>
               <QuickStat
@@ -821,13 +1106,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 onPress={() => setActiveTab('bookings')}
                 styles={styles}
               />
-              <QuickAction
-                icon="chatbubble-ellipses"
-                label="Messages"
-                gradientColors={["#A78BFA", "#8B5CF6"]}
-                onPress={() => setActiveTab('messages')}
-                styles={styles}
-              />
+
               <QuickAction
                 icon="document-text"
                 label="Applications"
@@ -835,11 +1114,20 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 onPress={() => setActiveTab('applications')}
                 styles={styles}
               />
+              <QuickAction
+                icon="chatbubbles"
+                label="Messages"
+                gradientColors={["#8B5CF6", "#7C3AED"]}
+                onPress={() => setActiveTab('messages')}
+                styles={styles}
+              />
             </View>
+
+
 
             <View style={styles.section}>
               <Card style={[styles.promotionCard, { backgroundColor: '#f0f9ff', borderColor: '#3b82f6' }]}>
-                <Card.Content>
+                <Card.Content style={styles.promotionCardContent}>
                   <View style={styles.promotionHeader}>
                     <View style={styles.promotionIcon}>
                       <Ionicons name="star" size={20} color="#3b82f6" />
@@ -912,6 +1200,23 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recent Applications</Text>
+                <Pressable onPress={() => setActiveTab("applications")}>
+                  <Text style={styles.seeAllText}>View All</Text>
+                </Pressable>
+              </View>
+              {(applications || []).slice(0, 2).map((application, index) => (
+                <ApplicationCard 
+                  key={application.id || index} 
+                  application={application}
+                  onViewDetails={handleViewApplication}
+                  onMessage={handleMessageFamily}
+                />
+              ))}
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Upcoming Bookings</Text>
                 <Pressable onPress={() => setActiveTab('bookings')}>
                   <Text style={styles.seeAllText}>See All</Text>
@@ -921,7 +1226,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 <BookingCard
                   key={booking.id || index}
                   booking={booking}
-                  onMessage={() => setActiveTab("messages")}
+                  onMessage={() => handleBookingMessage(booking)}
                   onViewDetails={() => {
                     setSelectedBooking(booking)
                     setShowBookingDetails(true)
@@ -930,7 +1235,8 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 />
               ))}
             </View>
-          </ScrollView>
+            </ScrollView>
+          )
         )}
 
         {activeTab === "jobs" && (
@@ -938,8 +1244,8 @@ export default function CaregiverDashboard({ onLogout, route }) {
             style={styles.content}
             refreshControl={
               <RefreshControl
-                refreshing={jobsLoading}
-                onRefresh={fetchJobs}
+                refreshing={refreshing || jobsLoading}
+                onRefresh={onRefresh}
                 colors={['#3B82F6']}
                 tintColor="#3B82F6"
               />
@@ -1009,32 +1315,46 @@ export default function CaregiverDashboard({ onLogout, route }) {
         )}
 
         {activeTab === "applications" && (
-          <ScrollView style={styles.content}>
-            <View style={styles.section}>
-
-              {applications.length > 0 ? (
-                (applications || []).map((application, index) => (
-                  <ApplicationCard 
-                    key={application.id || index} 
-                    application={application}
-                    onViewDetails={handleViewApplication}
-                    onMessage={handleMessageFamily}
-                  />
-                ))
-              ) : (
-                <EmptyState 
-                  icon="document-text" 
-                  title="No applications yet"
-                  subtitle="Apply to jobs to see them here"
-                />
-              )}
+          jobsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={styles.loadingText}>Loading applications...</Text>
             </View>
-          </ScrollView>
+          ) : (
+            <ScrollView 
+              style={styles.content}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={['#3B82F6']}
+                  tintColor="#3B82F6"
+                />
+              }
+            >
+              <View style={styles.section}>
+                {applications.length > 0 ? (
+                  (applications || []).map((application, index) => (
+                    <ApplicationCard 
+                      key={application.id || index} 
+                      application={application}
+                      onViewDetails={handleViewApplication}
+                      onMessage={handleMessageFamily}
+                    />
+                  ))
+                ) : (
+                  <EmptyState 
+                    icon="document-text" 
+                    title="No applications yet"
+                    subtitle="Apply to jobs to see them here"
+                  />
+                )}
+              </View>
+            </ScrollView>
+          )
         )}
 
-        {activeTab === "messages" && (
-          <MessagesTab navigation={navigation} />
-        )}
+
 
         {activeTab === "bookings" && (
           <ScrollView style={styles.content}>
@@ -1065,7 +1385,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
                   <BookingCard
                     key={booking.id || index}
                     booking={booking}
-                    onMessage={() => setActiveTab("messages")}
+                    onMessage={() => handleBookingMessage(booking)}
                     onViewDetails={() => {
                       setSelectedBooking(booking)
                       setShowBookingDetails(true)
@@ -1080,6 +1400,74 @@ export default function CaregiverDashboard({ onLogout, route }) {
                   subtitle="Your upcoming bookings will appear here"
                 />
               )}
+            </View>
+          </ScrollView>
+        )}
+
+        {activeTab === "messages" && (
+          <MessagesTab
+            navigation={navigation}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        )}
+        {activeTab === "reviews" && renderReviewsTab()}
+
+        {activeTab === "notifications" && (
+          <ScrollView style={styles.content}>
+            <View style={styles.section}>
+              {(() => {
+                const allNotifications = [
+                  ...(notifications || []),
+                  ...(pendingRequests || []).map(req => ({
+                    id: req.id,
+                    type: 'privacy_request',
+                    title: 'Privacy Request',
+                    message: `${req.requesterName} requested access to your information`,
+                    timestamp: req.createdAt,
+                    read: false
+                  }))
+                ];
+                
+                return allNotifications.length > 0 ? (
+                  allNotifications.map((notification, index) => (
+                    <Card key={notification.id || index} style={styles.notificationCard}>
+                      <Card.Content style={styles.notificationContent}>
+                        <View style={styles.notificationHeader}>
+                          <View style={styles.notificationIcon}>
+                            <Ionicons 
+                              name={notification.type === 'privacy_request' ? 'shield' : 'notifications'} 
+                              size={20} 
+                              color={notification.read ? '#6B7280' : '#3B82F6'} 
+                            />
+                          </View>
+                          <View style={styles.notificationText}>
+                            <Text style={[styles.notificationTitle, !notification.read && styles.unreadTitle]}>
+                              {notification.title}
+                            </Text>
+                            <Text style={styles.notificationMessage}>
+                              {notification.message}
+                            </Text>
+                            <Text style={styles.notificationTime}>
+                              {formatDate(notification.timestamp)}
+                            </Text>
+                          </View>
+                          {!notification.read && (
+                            <View style={styles.unreadDot} />
+                          )}
+                        </View>
+                      </Card.Content>
+                    </Card>
+                  ))
+                ) : (
+                  <EmptyState 
+                    icon="notifications" 
+                    title="No notifications"
+                    subtitle="You're all caught up!"
+                  />
+                );
+              })()
+              }
             </View>
           </ScrollView>
         )}
@@ -1158,6 +1546,33 @@ export default function CaregiverDashboard({ onLogout, route }) {
                   
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Cover Letter (Optional)</Text>
+                    
+                    <View style={styles.suggestedCoverLettersContainer}>
+                      {[
+                        'I am passionate about childcare and have experience working with children of all ages. I would love to help your family.',
+                        'As a certified caregiver with first aid training, I prioritize safety while creating a fun and nurturing environment for children.',
+                        'I have flexible availability and excellent references. I am committed to providing reliable and professional childcare services.'
+                      ].map((suggestion, index) => {
+                        const isSelected = applicationForm.coverLetter === suggestion;
+                        return (
+                          <Pressable
+                            key={index}
+                            style={[styles.coverLetterChip, isSelected && styles.coverLetterChipSelected]}
+                            onPress={() => {
+                              setApplicationForm(prev => ({
+                                ...prev,
+                                coverLetter: isSelected ? '' : suggestion
+                              }));
+                            }}
+                          >
+                            <Text style={[styles.coverLetterChipText, isSelected && styles.coverLetterChipTextSelected]}>
+                              {suggestion.length > 50 ? `${suggestion.substring(0, 50)}...` : suggestion}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    
                     <TextInput
                       style={[styles.applicationInput, styles.applicationTextArea]}
                       placeholder="Tell the family why you're the perfect fit for this job..."
@@ -1216,38 +1631,75 @@ export default function CaregiverDashboard({ onLogout, route }) {
           animationType="slide"
         >
           <View style={styles.modalOverlay}>
-            <Card style={styles.editProfileModal}>
-              <Card.Content>
-                <Text style={styles.editProfileTitle}>{selectedApplication.jobTitle}</Text>
-                <Text style={styles.profileSectionText}>{selectedApplication.family}</Text>
-                <View style={{ marginTop: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="calendar" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>Applied: {new Date(selectedApplication.appliedDate).toLocaleDateString()}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>${selectedApplication.hourlyRate}/hr</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="information-circle" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>Status: {selectedApplication.status}</Text>
-                  </View>
+            <View style={styles.applicationModal}>
+              <View style={styles.applicationModalHeader}>
+                <Text style={styles.applicationModalTitle}>Application Details</Text>
+                <Pressable 
+                  onPress={() => setShowApplicationDetails(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </Pressable>
+              </View>
+              
+              <ScrollView style={styles.applicationFormContainer}>
+                <View style={styles.jobSummary}>
+                  <Text style={styles.jobSummaryTitle}>{selectedApplication.jobTitle}</Text>
+                  <Text style={styles.jobSummaryFamily}>{selectedApplication.family}</Text>
+                  <StatusBadge status={selectedApplication.status} />
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <Button mode="text" onPress={() => setShowApplicationDetails(false)}>Close</Button>
-                  {selectedApplication.status === 'accepted' && (
-                    <Button 
-                      mode="contained" 
-                      style={{ marginLeft: 8 }}
-                      onPress={() => handleMessageFamily(selectedApplication)}
-                    >
-                      Message Family
-                    </Button>
+                
+                <View style={styles.applicationDetails}>
+                  <View style={styles.applicationDetailRow}>
+                    <Ionicons name="calendar" size={18} color="#6B7280" />
+                    <Text style={styles.applicationDetailText}>
+                      Applied: {new Date(selectedApplication.appliedDate).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={styles.applicationDetailRow}>
+                    <Ionicons name="cash" size={18} color="#6B7280" />
+                    <Text style={styles.applicationDetailText}>
+                      ₱{selectedApplication.hourlyRate}/hr
+                    </Text>
+                  </View>
+                  {selectedApplication.proposedRate && (
+                    <View style={styles.applicationDetailRow}>
+                      <Ionicons name="trending-up" size={18} color="#6B7280" />
+                      <Text style={styles.applicationDetailText}>
+                        Proposed Rate: ₱{selectedApplication.proposedRate}/hr
+                      </Text>
+                    </View>
+                  )}
+                  {selectedApplication.coverLetter && (
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={styles.inputLabel}>Cover Letter</Text>
+                      <View style={styles.coverLetterDisplay}>
+                        <Text style={styles.coverLetterText}>{selectedApplication.coverLetter}</Text>
+                      </View>
+                    </View>
                   )}
                 </View>
-              </Card.Content>
-            </Card>
+              </ScrollView>
+              
+              <View style={styles.applicationModalActions}>
+                <Button 
+                  mode="outlined" 
+                  onPress={() => setShowApplicationDetails(false)}
+                  style={styles.cancelButton}
+                >
+                  Close
+                </Button>
+                {selectedApplication.status === 'accepted' && (
+                  <Button 
+                    mode="contained" 
+                    style={styles.submitButton}
+                    onPress={() => handleMessageFamily(selectedApplication)}
+                  >
+                    Message Family
+                  </Button>
+                )}
+              </View>
+            </View>
           </View>
         </Modal>
       )}
@@ -1263,53 +1715,76 @@ export default function CaregiverDashboard({ onLogout, route }) {
           animationType="slide"
         >
           <View style={styles.modalOverlay}>
-            <Card style={styles.editProfileModal}>
-              <Card.Content>
-                <Text style={styles.editProfileTitle}>{selectedJob.title}</Text>
-                <View style={{ marginTop: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="home" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>{selectedJob.family}</Text>
+            <View style={styles.jobDetailsModal}>
+              <View style={styles.jobDetailsContent}>
+                <Text style={styles.jobDetailsTitle}>{selectedJob.title}</Text>
+                <Text style={styles.jobDetailsFamily}>{selectedJob.family}</Text>
+                
+                <View style={styles.jobDetailsInfo}>
+                  <View style={styles.jobDetailsRow}>
+                    <Ionicons name="location" size={16} color="#6B7280" />
+                    <Text style={styles.jobDetailsText}>{selectedJob.location}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="location" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>{selectedJob.location} • {selectedJob.distance}</Text>
+                  <View style={styles.jobDetailsRow}>
+                    <Ionicons name="time" size={16} color="#6B7280" />
+                    <Text style={styles.jobDetailsText}>{selectedJob.schedule}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="time" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>{selectedJob.schedule}</Text>
+                  <View style={styles.jobDetailsRow}>
+                    <Ionicons name="cash" size={16} color="#059669" />
+                    <Text style={[styles.jobDetailsText, { color: '#059669', fontWeight: '600' }]}>₱{selectedJob.hourlyRate}/hr</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <Ionicons name="cash" size={16} color="#6B7280" style={{ marginRight: 6 }} />
-                    <Text style={styles.profileSectionText}>${selectedJob.hourlyRate}/hr</Text>
-                  </View>
-                  {Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
-                    <View style={{ marginTop: 8 }}>
-                      <Text style={[styles.sectionSubtitle, { marginBottom: 6 }]}>Requirements</Text>
-                      {selectedJob.requirements.map((req, idx) => (
-                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                          <Ionicons name="checkmark-circle" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                          <Text style={styles.profileSectionText}>{req}</Text>
-                        </View>
-                      ))}
+                  {selectedJob.distance && (
+                    <View style={styles.jobDetailsRow}>
+                      <Ionicons name="navigate" size={16} color="#6B7280" />
+                      <Text style={styles.jobDetailsText}>{selectedJob.distance}</Text>
                     </View>
                   )}
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <Button mode="text" onPress={() => { setShowJobDetails(false); setSelectedJob(null) }}>Close</Button>
-                  <Button
-                    mode="contained"
-                    style={{ marginLeft: 8 }}
-                    onPress={() => {
-                      setShowJobDetails(false)
-                      handleJobApplication(selectedJob)
-                    }}
+                
+                {Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
+                  <View style={styles.jobDetailsRequirements}>
+                    <Text style={styles.jobDetailsRequirementsTitle}>Requirements</Text>
+                    {selectedJob.requirements.map((req, idx) => (
+                      <View key={idx} style={styles.jobDetailsRequirementRow}>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text style={styles.jobDetailsRequirementText}>{req}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                
+                <View style={styles.jobDetailsActions}>
+                  <Button 
+                    mode="text" 
+                    onPress={() => { setShowJobDetails(false); setSelectedJob(null) }}
+                    style={styles.jobDetailsCloseButton}
+                    labelStyle={{ fontSize: 14 }}
                   >
-                    Apply Now
+                    Close
                   </Button>
+                  {applications.some((a) => a.jobId === selectedJob.id) ? (
+                    <View style={[styles.appliedBadge, { flex: 1, alignItems: 'center' }]}>
+                      <View style={styles.appliedBadgeContent}>
+                        <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginRight: 6 }} />
+                        <Text style={styles.appliedBadgeText}>Applied</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    <Button
+                      mode="contained"
+                      style={styles.jobDetailsApplyButton}
+                      labelStyle={{ fontSize: 14 }}
+                      onPress={() => {
+                        setShowJobDetails(false)
+                        handleJobApplication(selectedJob)
+                      }}
+                    >
+                      Apply
+                    </Button>
+                  )}
                 </View>
-              </Card.Content>
-            </Card>
+              </View>
+            </View>
           </View>
         </Modal>
       )}
@@ -1336,6 +1811,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
         targetUser={{ id: 'sample', name: 'Parent' }}
         colors={{ primary: '#3B82F6' }}
       />
-    </View>
+      </View>
   )
 }

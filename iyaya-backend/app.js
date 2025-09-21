@@ -1,4 +1,3 @@
-
 require('dotenv').config({ path: './.env' });
 const express = require('express');
 const cors = require('cors');
@@ -11,6 +10,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
 const { authenticate, authorize } = require('./middleware/auth');
 const config = require('./config/env');
+const socketService = require('./services/socketService');
 
 const app = express();
 
@@ -28,20 +28,7 @@ const limiter = rateLimit({
   // Use default IP-based key generation
 });
 
-// Dedicated limiter for messages endpoints: higher cap and key per authenticated user
-const messagesLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 2000, // allow frequent polling without tripping limits
-  message: { success: false, error: 'Too many message requests, please slow down temporarily' },
-  standardHeaders: true,
-  keyGenerator: (req, res) => {
-    // Use user ID if authenticated, otherwise fall back to IP
-    if (req.user?.id) return req.user.id;
-    return req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown';
-  },
-  legacyHeaders: false,
-  skip: (req) => process.env.NODE_ENV === 'development', // Skip rate limiting in development
-});
+
 
 app.use('/api', limiter);
 
@@ -198,34 +185,48 @@ app.use('/uploads', (req, res, next) => {
 // Routes
 // ============================================
 const mountRoutes = () => {
-  const apiRouter = express.Router();
+  try {
+    const apiRouter = express.Router();
 
-  // Public Routes
-  apiRouter.use('/auth', require('./routes/authRoutes'));
+    // Public Routes
+    apiRouter.use('/auth', require('./routes/authRoutes'));
 
-  // Protected Routes
-  // Caregivers: public search/details + authenticated profile endpoints are enforced inside the router
-  apiRouter.use('/caregivers', require('./routes/caregiverRoutes'));
+    // User routes with error handling
+    try {
+      apiRouter.use('/users', authenticate, require('./routes/userRoutes'));
+    } catch (error) {
+      console.warn('User routes not available:', error.message);
+      apiRouter.use('/users', (req, res) => {
+        res.status(501).json({ 
+          success: false, 
+          error: 'User routes not implemented' 
+        });
+      });
+    }
 
-  apiRouter.use('/profile', require('./routes/profileRoutes'));
-  apiRouter.use('/contracts', authenticate, require('./routes/contractRoutes'));
-  apiRouter.use('/bookings', authenticate, require('./routes/bookingRoutes'));
-  apiRouter.use('/jobs', require('./routes/jobsRoutes'));
-  apiRouter.use('/applications', require('./routes/applicationsRoutes'));
-  apiRouter.use('/children', require('./routes/childrenRoutes'));
-  apiRouter.use('/uploads', authenticate, require('./routes/uploadsRoutes'));
-  // Apply authenticate BEFORE messagesLimiter so keyGenerator can use req.user
-  apiRouter.use('/messages', authenticate, messagesLimiter, require('./routes/messagesRoutes'));
-  apiRouter.use('/privacy', require('./routes/privacy'));
-  apiRouter.use('/notifications', require('./routes/notificationRoutes'));
-  apiRouter.use('/payments', require('./routes/paymentRoutes'));
-  apiRouter.use('/data', require('./routes/dataRoutes'));
-  apiRouter.use('/availability', authenticate, require('./routes/availability'));
+    // Notification routes with error handling
 
-  // Admin Routes removed
-  
-  // Use /api exclusively as the base path
-  app.use('/api', apiRouter);
+
+
+
+    // Other Protected Routes
+    apiRouter.use('/caregivers', require('./routes/caregiverRoutes'));
+    apiRouter.use('/profile', require('./routes/profileRoutes'));
+    apiRouter.use('/contracts', authenticate, require('./routes/contractRoutes'));
+    apiRouter.use('/bookings', authenticate, require('./routes/bookingRoutes'));
+    apiRouter.use('/jobs', require('./routes/jobsRoutes'));
+    apiRouter.use('/applications', require('./routes/applicationsRoutes'));
+    apiRouter.use('/children', require('./routes/childrenRoutes'));
+    apiRouter.use('/uploads', authenticate, require('./routes/uploadsRoutes'));
+    apiRouter.use('/privacy', require('./routes/privacy'));
+    apiRouter.use('/payments', require('./routes/paymentRoutes'));
+    apiRouter.use('/data', require('./routes/dataRoutes'));
+    apiRouter.use('/availability', authenticate, require('./routes/availability'));
+
+    app.use('/api', apiRouter);
+  } catch (error) {
+    console.error('Error mounting routes:', error);
+  }
 };
 
 mountRoutes();
@@ -246,8 +247,6 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-
-
 
 // ============================================
 // Error Handler
@@ -293,4 +292,16 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json(response);
 });
 
-module.exports = app;
+// 404 Handler for undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `Route ${req.originalUrl} not found`
+  });
+});
+
+// Initialize Socket.IO when server starts
+const server = require('http').createServer(app);
+socketService.initialize(server);
+
+module.exports = { app, server };

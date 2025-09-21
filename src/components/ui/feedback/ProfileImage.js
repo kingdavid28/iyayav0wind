@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { User } from 'lucide-react-native';
-import { getCurrentSocketURL } from '../../../config/api';
+import { getImageUrl } from '../../../utils/imageUtils';
 
 const ProfileImage = ({ 
   imageUrl, 
@@ -23,17 +23,8 @@ const ProfileImage = ({
       return { uri: imageUrl };
     }
     
-    let finalUrl;
-    if (imageUrl.startsWith('http')) {
-      finalUrl = imageUrl;
-    } else {
-      const baseUrl = getCurrentSocketURL();
-      finalUrl = imageUrl.startsWith('/') 
-        ? `${baseUrl}${imageUrl}` 
-        : `${baseUrl}/uploads/${imageUrl}`;
-    }
-    
-    return { uri: finalUrl };
+    const finalUrl = getImageUrl(imageUrl);
+    return finalUrl ? { uri: finalUrl } : null;
   }, [imageUrl, imageError]);
   const imageSize = { width: size, height: size, borderRadius: size / 2 };
 

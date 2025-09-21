@@ -5,7 +5,6 @@ import { authAPI } from "../config/api";
 import { STORAGE_KEYS } from "../config/constants";
 import { firebaseAuthService } from "../services/firebaseAuthService";
 
-
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -13,6 +12,21 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [hasLoggedOut, setHasLoggedOut] = useState(false);
+
+  // Normalize user object to ensure consistent property names
+  const normalizeUser = (userData) => {
+    if (!userData) return null;
+    
+    return {
+      // Use id consistently (prefer _id from MongoDB if available)
+      id: userData._id || userData.id || userData.uid,
+      // Preserve all other properties
+      ...userData,
+      // Ensure we don't have duplicate properties
+      _id: undefined,
+      uid: undefined,
+    };
+  };
 
   // Check authentication status on app start
   const checkAuthStatus = async () => {
@@ -45,7 +59,7 @@ export const AuthProvider = ({ children }) => {
             console.log('❌ Profile fetch failed in checkAuthStatus:', response.status);
           }
           
-          setUser({
+          const normalizedUser = normalizeUser({
             id: currentUser.uid,
             email: currentUser.email,
             name: currentUser.displayName || profile.name,
@@ -59,17 +73,21 @@ export const AuthProvider = ({ children }) => {
             profileImage: profile.profileImage,
             address: profile.address,
             children: profile.children,
-            caregiverProfile: profile.caregiverProfile
+            caregiverProfile: profile.caregiverProfile,
+            // Include MongoDB _id if available
+            _id: profile._id
           });
+          
+          setUser(normalizedUser);
         } catch (error) {
           console.warn('Failed to get profile:', error.message);
-          setUser({
+          setUser(normalizeUser({
             id: currentUser.uid,
             email: currentUser.email,
             name: currentUser.displayName,
             emailVerified: currentUser.emailVerified,
             role: 'parent'
-          });
+          }));
         }
       } else {
         setUser(null);
@@ -106,7 +124,7 @@ export const AuthProvider = ({ children }) => {
             console.log('❌ Profile fetch failed in auth listener:', response.status);
           }
           
-          setUser({
+          const normalizedUser = normalizeUser({
             id: user.uid,
             email: user.email,
             name: user.displayName || profile.name,
@@ -120,17 +138,21 @@ export const AuthProvider = ({ children }) => {
             profileImage: profile.profileImage,
             address: profile.address,
             children: profile.children,
-            caregiverProfile: profile.caregiverProfile
+            caregiverProfile: profile.caregiverProfile,
+            // Include MongoDB _id if available
+            _id: profile._id
           });
+          
+          setUser(normalizedUser);
         } catch (error) {
           console.warn('Failed to get profile:', error.message);
-          setUser({
+          setUser(normalizeUser({
             id: user.uid,
             email: user.email,
             name: user.displayName,
             emailVerified: user.emailVerified,
             role: 'parent'
-          });
+          }));
         }
       } else {
         setUser(null);
@@ -159,7 +181,11 @@ export const AuthProvider = ({ children }) => {
         console.log('⚠️ No token in login response');
       }
       
-      setUser(res.user);
+      // Normalize the user object before setting it
+      if (res.user) {
+        setUser(normalizeUser(res.user));
+      }
+      
       return { success: true, user: res.user };
     } catch (err) {
       console.log('❌ Login error:', err.message);
@@ -236,7 +262,8 @@ export const AuthProvider = ({ children }) => {
         }
         
         console.log('👤 Setting user data:', userData);
-        setUser(userData);
+        // Normalize the user object before setting it
+        setUser(normalizeUser(userData));
         return { success: true, user: userData };
       }
       

@@ -9,10 +9,11 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { profileService } from '../services/profileService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../config/constants';
+import { getCurrentSocketURL } from '../config/api';
 
 const CaregiverProfileComplete = ({ navigation }) => {
   const { user } = useAuth();
@@ -26,6 +27,13 @@ const CaregiverProfileComplete = ({ navigation }) => {
 
   const loadProfile = async () => {
     try {
+      // Force token refresh
+      const { firebaseAuthService } = await import('../services/firebaseAuthService');
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (currentUser) {
+        await currentUser.getIdToken(true);
+      }
+      
       const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
       if (!token) {
         throw new Error('No authentication token found');
@@ -128,10 +136,23 @@ const CaregiverProfileComplete = ({ navigation }) => {
         isComplete={profile?.name && profile?.bio && profile?.profileImage}
       >
         <View style={styles.basicInfo}>
-          <Image 
-            source={{ uri: profile?.profileImage || 'https://via.placeholder.com/100' }}
-            style={styles.profileImage}
-          />
+          <View style={styles.profileImageContainer}>
+            {profile?.profileImage ? (
+              <Image 
+                source={{ 
+                  uri: profile.profileImage.startsWith('/') 
+                    ? `${getCurrentSocketURL() || ''}${profile.profileImage}` 
+                    : profile.profileImage
+                }}
+                style={styles.profileImage}
+                onError={() => console.log('Profile image load error')}
+              />
+            ) : (
+              <View style={styles.profileImagePlaceholder}>
+                <Ionicons name="person" size={40} color="#9CA3AF" />
+              </View>
+            )}
+          </View>
           <View style={styles.basicDetails}>
             <Text style={styles.name}>{profile?.name || 'Add your name'}</Text>
             <Text style={styles.bio}>{profile?.bio || 'Add a professional bio'}</Text>
@@ -366,11 +387,26 @@ const styles = {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  profileImage: {
+  profileImageContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
     marginRight: 16,
+    overflow: 'hidden',
+    backgroundColor: '#f3f4f6',
+  },
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  profileImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   basicDetails: {
     flex: 1,

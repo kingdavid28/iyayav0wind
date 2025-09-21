@@ -4,11 +4,14 @@ import { STORAGE_KEYS } from '../config/constants';
 import { logger } from '../utils/logger';
 import { errorHandler } from '../shared/utils/errorHandler';
 import { tokenManager } from '../utils/tokenManager';
+import { firebaseMessagingService } from './firebaseMessagingService';
 
 // Dynamic API URL from environment
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
   ? `${process.env.EXPO_PUBLIC_API_URL}/api`
-  : 'http://localhost:5000/api';
+  : 'http://192.168.1.10:5000/api';
+
+console.log('🔗 API URL:', API_BASE_URL);
 
 // Network monitoring (from apiService.js)
 let isConnected = true;
@@ -131,7 +134,7 @@ class EnhancedAPIService {
           logger.error(`Request timeout after ${timeout}ms: ${method} ${endpoint}`);
           error.code = 'NETWORK_ERROR';
         } else {
-          logger.error(`API Error (attempt ${attempt}): ${method} ${endpoint}`, error);
+          logger.error(`API Error (attempt ${attempt}): ${method} ${endpoint}`, error.message);
         }
 
         if (attempt > retries) {
@@ -199,7 +202,7 @@ class EnhancedAPIService {
         '@shim_id_token'
       ]);
     } catch (error) {
-      logger.error('Error clearing auth data:', error);
+      logger.error('Error clearing auth data:', error.message);
     }
   }
 
@@ -239,12 +242,15 @@ class EnhancedAPIService {
       return result;
     },
 
-    getProfile: () => this.request('/auth/firebase-profile', {
-      cache: true,
-      cacheKey: 'user-profile',
-      timeout: 5000,
-      retries: 1
-    }),
+    getProfile: (userId = null) => {
+      // For current user profile, userId is not needed
+      return this.request('/auth/profile', {
+        cache: true,
+        cacheKey: 'user-profile',
+        timeout: 5000,
+        retries: 1
+      });
+    },
 
     updateProfile: (data) => {
       this.clearCache('profile');
@@ -412,7 +418,7 @@ class EnhancedAPIService {
         });
         return result;
       } catch (error) {
-        logger.error(`Job deletion failed for ID ${jobId}:`, error);
+        logger.error(`Job deletion failed for ID ${jobId}:`, error.message);
         throw error;
       }
     },
@@ -452,7 +458,9 @@ class EnhancedAPIService {
 
     getForJob: (jobId, page = 1, limit = 10) => {
       return this.request(`/applications/job/${jobId}?page=${page}&limit=${limit}`);
-    }
+    },
+
+
   };
 
   // Enhanced Bookings operations (from bookingService.js)
@@ -614,49 +622,103 @@ class EnhancedAPIService {
     }
   }
 
-  // Enhanced Messaging operations - Real data only
+  // Enhanced Messaging operations
   messaging = {
     getConversations: async () => {
-      const result = await this.request('/messages/conversations', {
-        cache: true,
-        cacheKey: 'conversations'
-      });
-      return result?.data?.conversations || result?.conversations || [];
+      try {
+        return await this.request('/messages/conversations');
+      } catch (error) {
+        console.warn('Conversations API error:', error.message);
+        return { data: [] };
+      }
     },
 
     getMessages: async (conversationId, params = {}) => {
-      const queryParams = new URLSearchParams(params).toString();
-      const endpoint = queryParams 
-        ? `/messages/conversations/${conversationId}/messages?${queryParams}`
-        : `/messages/conversations/${conversationId}/messages`;
+      if (!conversationId) {
+        return { data: { messages: [] } };
+      }
       
-      const result = await this.request(endpoint);
-      return result?.data?.messages || result?.messages || [];
+      // Block blacklisted conversation
+      if (conversationId === '68cba4e4e585e8eeb3ac21b9') {
+        console.log('Blocking API call for blacklisted conversation:', conversationId);
+        return { data: { messages: [] } };
+      }
+      
+      try {
+        const { page = 1, limit = 50 } = params;
+        return await this.request(`/messages/conversation/${conversationId}?page=${page}&limit=${limit}`);
+      } catch (error) {
+        console.warn('Messages API error:', error.message);
+        return { data: { messages: [] } };
+      }
     },
 
     sendMessage: async (messageData) => {
-      this.clearCache('conversations');
-      const result = await this.request('/messages/send', {
-        method: 'POST',
-        body: messageData
-      });
-      return result?.data?.message || result?.message || result;
+      try {
+        // Create Firebase connection before sending message
+        const currentUser = await this.request('/auth/profile');
+        const currentUserId = currentUser.id || currentUser._id;
+
+        if (currentUserId && messageData.recipientId && currentUserId !== messageData.recipientId) {
+          try {
+            console.log('🔗 Creating Firebase connection for message send:', { userId: currentUserId, recipientId: messageData.recipientId });
+            await firebaseMessagingService.createConnection(currentUserId, messageData.recipientId);
+            console.log('✅ Firebase connection created for message');
+          } catch (connectionError) {
+            console.warn('⚠️ Failed to create Firebase connection for message:', connectionError.message);
+            // Continue with sending message even if connection creation fails
+          }
+        }
+
+        return await this.request('/messages', {
+          method: 'POST',
+          body: messageData
+        });
+      } catch (error) {
+        console.error('Send message error:', error.message);
+        throw error;
+      }
     },
 
     startConversation: async (recipientId, recipientName, recipientRole, initialMessage) => {
-      this.clearCache('conversations');
-      const result = await this.request('/messages/conversations', {
-        method: 'POST',
-        body: { recipientId, recipientName, recipientRole, initialMessage }
-      });
-      return result?.data || result;
+      try {
+        // Create Firebase connection before starting conversation
+        const currentUser = await this.request('/auth/profile');
+        const currentUserId = currentUser.id || currentUser._id;
+
+        if (currentUserId && recipientId && currentUserId !== recipientId) {
+          try {
+            console.log('🔗 Creating Firebase connection for conversation start:', { userId: currentUserId, recipientId });
+            await firebaseMessagingService.createConnection(currentUserId, recipientId);
+            console.log('✅ Firebase connection created for conversation');
+          } catch (connectionError) {
+            console.warn('⚠️ Failed to create Firebase connection for conversation:', connectionError.message);
+            // Continue with starting conversation even if connection creation fails
+          }
+        }
+
+        return await this.request('/messages/start', {
+          method: 'POST',
+          body: { recipientId, initialMessage }
+        });
+      } catch (error) {
+        console.error('Start conversation error:', error.message);
+        throw error;
+      }
     },
 
     markAsRead: async (conversationId) => {
-      await this.request(`/messages/conversations/${conversationId}/read`, {
-        method: 'PUT'
-      });
-      return true;
+      if (!conversationId) return true;
+      
+      try {
+        await this.request(`/messages/conversation/${conversationId}/read`, {
+          method: 'POST'
+        });
+        return true;
+      } catch (error) {
+        console.warn('Mark as read error:', error.message);
+        return false;
+      }
     }
   };
 
@@ -708,13 +770,44 @@ class EnhancedAPIService {
       return this.request(`/ratings/caregiver/${caregiverId}?page=${page}&limit=${limit}`);
     },
 
-    getRatingSummary: (userId, userType = 'caregiver') => {
-      return this.request(`/ratings/summary/${userId}?userType=${userType}`);
+    getRatingSummary: (userId, role = 'caregiver') => {
+      return this.request(`/ratings/summary/${userId}?role=${role}`);
     }
   };
 
-  // Notification operations (stub for Expo Go compatibility)
+  // Notification operations
   notifications = {
+    getNotifications: async () => {
+      try {
+        return await this.request('/notifications', {
+          cache: true,
+          cacheKey: 'notifications'
+        });
+      } catch (error) {
+        console.warn('Notifications API error:', error.message);
+        return { data: [] };
+      }
+    },
+    
+    getAll: () => this.request('/notifications', {
+      cache: true,
+      cacheKey: 'notifications'
+    }),
+    
+    markAsRead: (notificationId) => {
+      this.clearCache('notifications');
+      return this.request(`/notifications/${notificationId}/read`, {
+        method: 'PATCH'
+      });
+    },
+    
+    markAllAsRead: () => {
+      this.clearCache('notifications');
+      return this.request('/notifications/read-all', {
+        method: 'PATCH'
+      });
+    },
+    
     requestPermissions: async () => {
       logger.info('Notification permissions granted (stub)');
       return true;
@@ -781,10 +874,12 @@ export const jobsAPI = apiService.jobs;
 export const applicationsAPI = apiService.applications;
 export const bookingsAPI = apiService.bookings;
 export const childrenAPI = apiService.children;
+export const messagingAPI = apiService.messaging;
 export const messagingService = apiService.messaging;
 export const settingsService = apiService.settings;
 export const ratingsService = apiService.ratings;
 export const notificationService = apiService.notifications;
+export const notificationsAPI = apiService.notifications;
 
 // Legacy compatibility exports
 export const uploadsAPI = {
@@ -809,5 +904,5 @@ export const privacyAPI = {
 export const getCurrentAPIURL = () => API_BASE_URL;
 export const getCurrentSocketURL = () => API_BASE_URL.replace('/api', '');
 
-// Export main service
-export default apiService;
+// Legacy compatibility - export API_BASE_URL for direct access
+export { API_BASE_URL };

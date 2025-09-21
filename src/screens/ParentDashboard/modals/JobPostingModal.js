@@ -23,7 +23,7 @@ import {
   Plus
 } from 'lucide-react-native';
 import jobService from '../../../services/jobService';
-import { useAuth } from '../../../core/contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 import CustomDateTimePicker from '../../../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../../../shared/ui/inputs/TimePicker';
@@ -303,16 +303,54 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
         );
         
       case 3:
+        const suggestedSkills = [
+          'CPR Certified',
+          'First Aid Training',
+          'Experience with Infants',
+          'Meal Preparation',
+          'Light Housekeeping'
+        ];
+        
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Requirements</Text>
+            <Text style={styles.stepTitle}>Skills</Text>
             
             <View>
-              <Text style={styles.label}>Add Requirements (Optional)</Text>
+              <Text style={styles.label}>Suggested Skills</Text>
+              <View style={styles.suggestedSkillsContainer}>
+                {suggestedSkills.map((skill, index) => {
+                  const isSelected = jobData.requirements.includes(skill);
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.skillChip, isSelected && styles.skillChipSelected]}
+                      onPress={() => {
+                        if (isSelected) {
+                          setJobData(prev => ({
+                            ...prev,
+                            requirements: prev.requirements.filter(req => req !== skill)
+                          }));
+                        } else {
+                          setJobData(prev => ({
+                            ...prev,
+                            requirements: [...prev.requirements, skill]
+                          }));
+                        }
+                      }}
+                    >
+                      <Text style={[styles.skillChipText, isSelected && styles.skillChipTextSelected]}>
+                        {skill}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              
+              <Text style={[styles.label, { marginTop: 16 }]}>Add Custom Skill</Text>
               <View style={styles.requirementInputContainer}>
                 <TextInput
                   style={[styles.input, styles.requirementInput]}
-                  placeholder="e.g., CPR Certified"
+                  placeholder="e.g., Tutoring Experience"
                   value={jobData.requirementsInput || ''}
                   onChangeText={(text) => setJobData({ ...jobData, requirementsInput: text })}
                   onSubmitEditing={handleAddRequirement}
@@ -346,7 +384,7 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
             <View style={styles.noteContainer}>
               <AlertCircle size={16} color="#6B7280" style={styles.noteIcon} />
               <Text style={styles.noteText}>
-                Adding clear requirements helps you find the best match for your family's needs.
+                Adding clear skills helps you find the best match for your family's needs.
               </Text>
             </View>
           </View>
@@ -654,6 +692,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4B5563',
     lineHeight: 16,
+  },
+  suggestedSkillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  skillChip: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  skillChipSelected: {
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
+  },
+  skillChipText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  skillChipTextSelected: {
+    color: '#fff',
   },
 });
 

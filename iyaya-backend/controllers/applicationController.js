@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { validationResult } = require('express-validator');
 const { process: processError } = require('../utils/errorHandler');
 const logger = require('../utils/logger');
+const socketService = require('../src/core/services/socketService');
 
 // Helper function to calculate total cost
 const calculateTotalCost = (startTime, endTime, hourlyRate) => {
@@ -131,6 +132,20 @@ exports.applyToJob = async (req, res) => {
     });
 
     await application.save();
+    
+    // Get job and parent info for notification
+    const job = await Job.findById(jobId).populate('clientId', 'name');
+    const caregiver = await require('../models/Caregiver').findById(caregiverMongoId).select('name');
+    
+    if (job && caregiver) {
+      // Send real-time notification to parent
+      socketService.notifyNewApplication(job.clientId._id, {
+        applicationId: application._id,
+        jobTitle: job.title,
+        caregiverName: caregiver.name,
+        jobId: job._id
+      });
+    }
 
     res.status(201).json({ 
       success: true, 
@@ -162,7 +177,7 @@ exports.updateApplicationStatus = async (req, res) => {
     const { id } = req.params;
     const { status, feedback } = req.body;
     
-    const validStatuses = ['pending', 'accepted', 'rejected', 'shortlisted'];
+    const validStatuses = ['pending', 'accepted', 'rejected', 'shortlisted', 'completed'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ 
         success: false,
@@ -182,7 +197,14 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 
     // Verify parent owns the job
-    if (!application.jobId || !application.jobId.clientId || application.jobId.clientId.toString() !== parentId.toString()) {
+    if (!application.jobId || !application.jobId.clientId) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Job or client information not found' 
+      });
+    }
+    
+    if (application.jobId.clientId.toString() !== parentId.toString()) {
       return res.status(403).json({ 
         success: false,
         error: 'Not authorized to modify this application' 
@@ -199,6 +221,33 @@ exports.updateApplicationStatus = async (req, res) => {
     }
 
     await application.save();
+    
+    // Update caregiver's hasCompletedJobs flag when application is completed
+    if (status === 'completed' && previousStatus !== 'completed' && application.caregiverId) {
+      try {
+        const Caregiver = require('../models/Caregiver');
+        await Caregiver.findByIdAndUpdate(
+          application.caregiverId._id,
+          { hasCompletedJobs: true },
+          { new: true }
+        );
+        console.log(`✅ Updated hasCompletedJobs for caregiver: ${application.caregiverId._id}`);
+      } catch (error) {
+        console.error('❌ Error updating caregiver hasCompletedJobs:', error);
+      }
+    }
+    
+    // Send booking confirmation notification to parent if accepted
+    if (status === 'accepted' && previousStatus !== 'accepted') {
+      const caregiver = await require('../models/Caregiver').findById(application.caregiverId._id).select('name');
+      if (caregiver) {
+        socketService.notifyBookingConfirmed(parentId, {
+          applicationId: application._id,
+          caregiverName: caregiver.name,
+          jobTitle: application.jobId.title
+        });
+      }
+    }
 
     // Update job status based on applications
     if (application.jobId && application.jobId._id) {
@@ -286,11 +335,11 @@ exports.getMyApplications = async (req, res) => {
     console.log('🔍 getMyApplications - User role check:', {
       userId: req.user?.id,
       role: req.user?.role,
-      userType: req.user?.userType
+      role: req.user?.role
     });
     
     // Check if user is a caregiver
-    if (req.user?.role !== 'caregiver' && req.user?.userType !== 'caregiver') {
+    if (req.user?.role !== 'caregiver') {
       return res.status(403).json({
         success: false,
         error: 'Access denied. Only caregivers can view applications.'
@@ -337,17 +386,19 @@ exports.getMyApplications = async (req, res) => {
       .limit(Number(limit))
       .lean();
     
-    // Manually populate job data
+    // Manually populate job data with parent information
     console.log('🔍 Starting job population for', applications.length, 'applications');
     for (let i = 0; i < applications.length; i++) {
       const app = applications[i];
       console.log('🔍 Processing application', i, 'with jobId:', app.jobId);
       if (app.jobId) {
         try {
-          const job = await Job.findById(app.jobId).lean();
+          const job = await Job.findById(app.jobId).populate('clientId', 'name email').lean();
           if (job) {
             app.jobId = job;
-            console.log('✅ Populated job:', job.title);
+            // Add parent ID directly to application for easy access
+            app.parentId = job.clientId?._id || job.clientId;
+            console.log('✅ Populated job with parent ID:', job.title, 'Parent ID:', app.parentId);
           } else {
             console.log('❌ Job not found for ID:', app.jobId);
           }

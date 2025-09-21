@@ -4,7 +4,7 @@ class RatingService {
   // Submit a rating for a caregiver
   async rateCaregiver(caregiverId, bookingId, rating, review = '') {
     try {
-      const response = await apiService.post('/api/ratings/caregiver', {
+      const response = await apiService.post('/ratings/caregiver', {
         caregiverId,
         bookingId,
         rating,
@@ -20,7 +20,7 @@ class RatingService {
   // Submit a rating for a parent
   async rateParent(parentId, bookingId, rating, review = '') {
     try {
-      const response = await apiService.post('/api/ratings/parent', {
+      const response = await apiService.post('/ratings/parent', {
         parentId,
         bookingId,
         rating,
@@ -36,7 +36,7 @@ class RatingService {
   // Get ratings for a caregiver
   async getCaregiverRatings(caregiverId, page = 1, limit = 10) {
     try {
-      const response = await apiService.get(`/api/ratings/caregiver/${caregiverId}`, {
+      const response = await apiService.get(`/ratings/caregiver/${caregiverId}`, {
         params: { page, limit }
       });
       return response.data;
@@ -49,7 +49,7 @@ class RatingService {
   // Get ratings for a parent
   async getParentRatings(parentId, page = 1, limit = 10) {
     try {
-      const response = await apiService.get(`/api/ratings/parent/${parentId}`, {
+      const response = await apiService.get(`/ratings/parent/${parentId}`, {
         params: { page, limit }
       });
       return response.data;
@@ -62,7 +62,7 @@ class RatingService {
   // Get rating summary for a user
   async getRatingSummary(userId, userType = 'caregiver') {
     try {
-      const response = await apiService.get(`/api/ratings/summary/${userId}`, {
+      const response = await apiService.get(`/ratings/summary/${userId}`, {
         params: { userType }
       });
       return response.data;
@@ -75,7 +75,7 @@ class RatingService {
   // Check if user can rate a booking
   async canRate(bookingId) {
     try {
-      const response = await apiService.get(`/api/ratings/can-rate/${bookingId}`);
+      const response = await apiService.get(`/ratings/can-rate/${bookingId}`);
       return response.data.canRate;
     } catch (error) {
       console.error('Error checking rating eligibility:', error);
@@ -86,7 +86,7 @@ class RatingService {
   // Get existing rating for a booking
   async getBookingRating(bookingId) {
     try {
-      const response = await apiService.get(`/api/ratings/booking/${bookingId}`);
+      const response = await apiService.get(`/ratings/booking/${bookingId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching booking rating:', error);

@@ -1,5 +1,6 @@
 const Booking = require('../models/Booking');
 const User = require('../models/User');
+const socketService = require('../../core/services/socketService');
 
 // Get user's bookings
 exports.getMyBookings = async (req, res) => {
@@ -41,6 +42,20 @@ exports.createBooking = async (req, res) => {
     await newBooking.save();
     
     console.log(`Booking created by user: ${req.user.id}`);
+    
+    // Send real-time notification to caregiver
+    const populatedBooking = await Booking.findById(newBooking._id)
+      .populate('clientId', 'name email')
+      .populate('caregiverId', 'name email');
+    
+    socketService.notifyNewBooking(req.body.caregiverId, {
+      bookingId: newBooking._id,
+      clientName: populatedBooking.clientId.name,
+      date: newBooking.date,
+      startTime: newBooking.startTime,
+      endTime: newBooking.endTime,
+      totalCost: newBooking.totalCost
+    });
     
     res.status(201).json({
       success: true,
@@ -236,12 +251,3 @@ exports.cancelBooking = async (req, res) => {
   }
 };
 
-module.exports = {
-  getMyBookings: exports.getMyBookings,
-  createBooking: exports.createBooking,
-  updateBooking: exports.updateBooking,
-  uploadPaymentProof: exports.uploadPaymentProof,
-  getBookingById: exports.getBookingById,
-  updateBookingStatus: exports.updateBookingStatus,
-  cancelBooking: exports.cancelBooking
-};
