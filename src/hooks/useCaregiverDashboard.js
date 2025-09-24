@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { apiService } from '../services';
+import { caregiversAPI, jobsAPI, applicationsAPI, bookingsAPI } from '../services';
 import { useAuth } from '../core/contexts/AuthContext';
 import { formatAddress } from '../utils/addressUtils';
 
@@ -41,7 +41,7 @@ export const useCaregiverDashboard = () => {
       loadingRef.current = true;
       console.log('🔄 Loading enhanced profile data...');
       
-      const caregiverResponse = await apiService.caregivers.getProfile();
+      const caregiverResponse = await caregiversAPI.getProfile();
       const caregiverProfile = caregiverResponse?.caregiver || caregiverResponse?.data?.caregiver || caregiverResponse || {};
       
       if (caregiverProfile && Object.keys(caregiverProfile).length > 0) {
@@ -79,7 +79,7 @@ export const useCaregiverDashboard = () => {
     
     setJobsLoading(true);
     try {
-      const res = await apiService.jobs.getAvailable();
+      const res = await jobsAPI.getAvailable();
       const jobsList = res?.data?.jobs || res?.jobs || [];
       
       const transformedJobs = jobsList.map(job => ({
@@ -122,7 +122,7 @@ export const useCaregiverDashboard = () => {
     
     try {
       console.log('📋 Fetching applications for caregiver:', user?.id);
-      const res = await apiService.applications.getMy();
+      const res = await applicationsAPI.getMy();
       console.log('📋 Applications API response:', res);
       
       const list = res?.data?.applications || res?.applications || [];
@@ -168,7 +168,7 @@ export const useCaregiverDashboard = () => {
     
     try {
       console.log('📅 Fetching bookings for caregiver:', user?.id);
-      const res = await apiService.bookings.getMy();
+      const res = await bookingsAPI.getMy();
       console.log('📅 Bookings API response:', res);
       
       const list = Array.isArray(res?.bookings) ? res.bookings : [];

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { Image, Platform, Pressable, Text, View } from 'react-native';
-import { User } from 'lucide-react-native';
 import { styles } from '../../styles/ParentDashboard.styles';
 // Privacy components temporarily disabled due to backend API not implemented
 import { usePrivacy } from '../../../components/features/privacy/PrivacyManager';
@@ -79,7 +78,7 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
                     />
                   ) : (
                     <View style={headerStyles.defaultProfileImage}>
-                      <User size={30} color="#db2777" />
+                      <Ionicons name="person-outline" size={30} color="#db2777" />
                     </View>
                   )}
                 </View>

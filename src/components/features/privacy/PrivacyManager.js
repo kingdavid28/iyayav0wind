@@ -1,19 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { privacyAPI } from '../../../config/api';
-
-// Fallback if privacyAPI is not available
-const safePrivacyAPI = privacyAPI || {
-  getPrivacySettings: () => Promise.resolve({ data: null }),
-  getPendingRequests: () => Promise.resolve({ data: [] }),
-  getPrivacyNotifications: () => Promise.resolve({ data: [] }),
-  updatePrivacySettings: () => Promise.resolve({ success: true }),
-  requestInformation: () => Promise.resolve({ success: true }),
-  respondToRequest: () => Promise.resolve({ success: true }),
-  grantPermission: () => Promise.resolve({ success: true }),
-  revokePermission: () => Promise.resolve({ success: true }),
-  markNotificationAsRead: () => Promise.resolve({ success: true })
-};
+import { getFilteredProfileData } from './ProfileDataManager';
 import { tokenManager } from '../../../utils/tokenManager';
 
 // Helper function to check authentication
@@ -25,7 +13,36 @@ const isAuthenticated = async () => {
     return false;
   }
 };
-import { useProfileData } from './ProfileDataManager';
+
+// Data classification levels - moved here to avoid circular dependency
+const DATA_LEVELS = {
+  PUBLIC: 'public',        // Always visible (name, general location, email)
+  PRIVATE: 'private',      // Requires explicit sharing (phone, full address)
+  SENSITIVE: 'sensitive'   // Requires approval (medical, financial, emergency contacts)
+};
+
+// Data classification mapping - moved here to avoid circular dependency
+const dataClassification = {
+  // Public - always visible
+  name: DATA_LEVELS.PUBLIC,
+  email: DATA_LEVELS.PUBLIC,
+  bio: DATA_LEVELS.PUBLIC,
+  experience: DATA_LEVELS.PUBLIC,
+  skills: DATA_LEVELS.PUBLIC,
+  certifications: DATA_LEVELS.PUBLIC,
+  hourlyRate: DATA_LEVELS.PUBLIC,
+
+  // Private - requires privacy setting
+  phone: DATA_LEVELS.PRIVATE,
+  address: DATA_LEVELS.PRIVATE,
+
+  // Sensitive - requires approval
+  emergencyContact: DATA_LEVELS.SENSITIVE,
+  medicalInfo: DATA_LEVELS.SENSITIVE,
+  allergies: DATA_LEVELS.SENSITIVE,
+  behaviorNotes: DATA_LEVELS.SENSITIVE,
+  financialInfo: DATA_LEVELS.SENSITIVE
+};
 
 const PrivacyContext = createContext();
 
@@ -38,8 +55,7 @@ export const usePrivacy = () => {
 };
 
 export const PrivacyProvider = ({ children }) => {
-  const { dataClassification, DATA_LEVELS, getFilteredProfileData } = useProfileData();
-  
+  // Use local data classification instead of importing from ProfileDataManager
   const [privacySettings, setPrivacySettings] = useState({
     sharePhone: false,
     shareAddress: false,
@@ -65,7 +81,7 @@ export const PrivacyProvider = ({ children }) => {
         return;
       }
       
-      const response = await safePrivacyAPI.getPrivacySettings();
+      const response = await privacyAPI.getPrivacySettings();
       if (response?.data) {
         setPrivacySettings(response.data);
       }
@@ -86,7 +102,7 @@ export const PrivacyProvider = ({ children }) => {
       const updatedSettings = { ...privacySettings, [setting]: value };
       setPrivacySettings(updatedSettings);
       
-      await safePrivacyAPI.updatePrivacySettings(updatedSettings);
+      await privacyAPI.updatePrivacySettings(updatedSettings);
       return true;
     } catch (error) {
       console.error('Error updating privacy setting:', error);
@@ -104,7 +120,7 @@ export const PrivacyProvider = ({ children }) => {
         requestedAt: new Date().toISOString(),
       };
 
-      const response = await safePrivacyAPI.requestInformation(requestData);
+      const response = await privacyAPI.requestInformation(requestData);
       
       if (response?.success) {
         Alert.alert('Request Sent', 'Your information request has been sent and is pending approval.');
@@ -120,7 +136,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const respondToRequest = async (requestId, approved, sharedFields = [], expiresIn = null) => {
     try {
-      const response = await safePrivacyAPI.respondToRequest({
+      const response = await privacyAPI.respondToRequest({
         requestId,
         approved,
         sharedFields,
@@ -132,7 +148,7 @@ export const PrivacyProvider = ({ children }) => {
         // Grant specific permissions to the requester
         const request = pendingRequests.find(req => req.id === requestId);
         if (request) {
-          await safePrivacyAPI.grantPermission(
+          await privacyAPI.grantPermission(
             request.targetUserId,
             request.requesterId,
             sharedFields,
@@ -164,7 +180,7 @@ export const PrivacyProvider = ({ children }) => {
   };
 
   const getVisibleData = async (userData, viewerUserId, targetUserId, viewerType = 'caregiver') => {
-    // Use existing profile data manager for consistent data filtering
+    // Use ProfileDataManager for consistent data filtering
     if (targetUserId && viewerUserId) {
       return await getFilteredProfileData(targetUserId, viewerUserId, viewerType);
     }
@@ -197,7 +213,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const grantUserPermission = async (targetUserId, viewerUserId, fields, expiresIn = null) => {
     try {
-      const response = await safePrivacyAPI.grantPermission(targetUserId, viewerUserId, fields, expiresIn);
+      const response = await privacyAPI.grantPermission(targetUserId, viewerUserId, fields, expiresIn);
       if (response?.success) {
         Alert.alert('Permission Granted', 'Data access has been granted successfully.');
         return true;
@@ -212,7 +228,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const revokeUserPermission = async (targetUserId, viewerUserId, fields = null) => {
     try {
-      const response = await safePrivacyAPI.revokePermission(targetUserId, viewerUserId, fields);
+      const response = await privacyAPI.revokePermission(targetUserId, viewerUserId, fields);
       if (response?.success) {
         Alert.alert('Permission Revoked', 'Data access has been revoked successfully.');
         return true;
@@ -235,7 +251,7 @@ export const PrivacyProvider = ({ children }) => {
         return;
       }
       
-      const response = await safePrivacyAPI.getPendingRequests();
+      const response = await privacyAPI.getPendingRequests();
       if (response?.data) {
         setPendingRequests(response.data);
       }
@@ -261,7 +277,7 @@ export const PrivacyProvider = ({ children }) => {
         return;
       }
       
-      const response = await safePrivacyAPI.getPrivacyNotifications();
+      const response = await privacyAPI.getPrivacyNotifications();
       if (response?.data) {
         setNotifications(response.data);
       }
@@ -279,7 +295,7 @@ export const PrivacyProvider = ({ children }) => {
 
   const markNotificationAsRead = async (notificationId) => {
     try {
-      await safePrivacyAPI.markNotificationAsRead(notificationId);
+      await privacyAPI.markNotificationAsRead(notificationId);
       setNotifications(prev => 
         prev.map(notif => 
           notif.id === notificationId 

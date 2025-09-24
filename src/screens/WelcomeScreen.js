@@ -14,7 +14,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { useAuth } from "../core/contexts/AuthContext";
 import { useApp } from "../contexts/AppContext";
-import { AlignCenter } from 'lucide-react-native';
 
 /**
  * WelcomeScreen displays the landing page for the Iyaya app.

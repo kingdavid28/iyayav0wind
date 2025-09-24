@@ -3,7 +3,7 @@ import { useAuth } from '../core/contexts/AuthContext';
 import { useApi } from '../shared/hooks/useApi';
 import { navigateToUserDashboard } from '../utils/navigationUtils';
 import { STRINGS } from '../constants/strings';
-import { apiService } from '../services';
+import { authAPI } from '../services';
 
 export const useAuthSubmit = (navigation) => {
   const { login, signup, resetPassword, verifyEmailToken } = useAuth();
@@ -49,7 +49,7 @@ export const useAuthSubmit = (navigation) => {
         
         return result;
       } else if (mode === 'reset') {
-        const result = await apiService.auth.resetPassword(email);
+        const result = await authAPI.resetPassword(email);
         Alert.alert(STRINGS.RESET_LINK_SENT, STRINGS.RESET_LINK_MESSAGE);
         return result;
       } else {

@@ -1,8 +1,7 @@
 // Consolidated API - Uses new service layer with enhanced features
 // Provides backward compatibility while using improved architecture
 
-import { 
-  apiService,
+import {
   authAPI,
   jobsAPI,
   applicationsAPI,
@@ -32,7 +31,11 @@ export const setAPIBaseURL = (newURL) => {
 export { authAPI };
 
 // Export consolidated caregivers API
-export const caregiversAPI = apiService.caregivers;
+export const caregiversAPI = {
+  getProfile: () => authAPI.getProfile(),
+  updateProfile: (data) => authAPI.updateProfile(data),
+  createProfile: (data) => authAPI.updateProfile(data)
+};
 
 // Export consolidated jobs API
 export { jobsAPI };
@@ -49,19 +52,7 @@ export { childrenAPI };
 // Export uploads API (using auth API upload method)
 export const uploadsAPI = {
   base64Upload: authAPI.uploadProfileImage,
-  uploadDocument: (params) => {
-    // Handle different parameter formats for document uploads
-    if (params.documentBase64) {
-      // Skip size validation for documents by calling the request directly
-      return apiService.request('/auth/upload-profile-image', {
-        method: 'POST',
-        body: { imageBase64: params.documentBase64, mimeType: params.mimeType },
-        timeout: 30000
-      });
-    }
-    // Fallback for other formats
-    return authAPI.uploadProfileImage(params, 'application/pdf');
-  }
+  uploadDocument: authAPI.uploadProfileImage
 };
 
 // Export messaging service
@@ -91,7 +82,7 @@ export const privacyAPI = {
 // Export token manager for advanced usage
 export { tokenManager };
 
-// Export main service for advanced usage
-export { apiService };
-export default apiService;
+// Remove apiService export to prevent circular dependencies
+// export { apiService };
+// export default apiService;
 

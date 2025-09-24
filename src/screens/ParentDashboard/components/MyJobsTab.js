@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Alert, ScrollView, RefreshControl, Image } from 'react-native';
 import { Calendar, Users, Eye, CheckCircle, XCircle, Plus, MapPin, Clock } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
-import { apiService } from '../../../services';
+import { applicationsAPI } from '../../../services';
 import PesoSign from '../../../components/ui/feedback/PesoSign';
 
 const MyJobsTab = ({ 
@@ -33,7 +33,7 @@ const MyJobsTab = ({
     
     setApplicationsLoading(true);
     try {
-      const response = await apiService.applications.getForJob(jobId);
+      const response = await applicationsAPI.getForJob(jobId);
       setApplications(response.data?.applications || []);
       setSelectedJob(jobId);
     } catch (error) {
@@ -51,7 +51,7 @@ const MyJobsTab = ({
     }
     
     try {
-      await apiService.applications.updateStatus(applicationId, action);
+      await applicationsAPI.updateStatus(applicationId, action);
       Alert.alert(
         'Success',
         `Application ${action} successfully`,
@@ -202,7 +202,7 @@ const MyJobsTab = ({
                   source={{ 
                     uri: item.caregiverId.profileImage.startsWith('http') 
                       ? item.caregiverId.profileImage 
-                      : `http://192.168.1.10:5000/${item.caregiverId.profileImage}`
+                      : `http://192.168.1.9:5000/${item.caregiverId.profileImage}`
                   }} 
                   style={styles.caregiverAvatarImage}
                   onError={(error) => console.log('🚨 Image load error:', error.nativeEvent.error)}

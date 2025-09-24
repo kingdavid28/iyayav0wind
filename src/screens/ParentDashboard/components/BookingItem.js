@@ -212,7 +212,7 @@ const BookingItem = ({
     if (!imagePath) return 'https://via.placeholder.com/50x50/E5E7EB/6B7280?text=CG';
     if (imagePath.startsWith('http')) return imagePath;
     if (imagePath.startsWith('/uploads/')) {
-      return `http://192.168.1.4:3000${imagePath}`;
+      return `http://192.168.1.9:5000${imagePath}`;
     }
     return imagePath;
   };

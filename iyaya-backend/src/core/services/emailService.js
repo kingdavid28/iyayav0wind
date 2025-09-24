@@ -20,8 +20,8 @@ exports.sendVerificationEmail = async (email, name, verificationToken) => {
   const transporter = createTransporter();
   
   // Create both HTTP and deep link URLs
-  const httpURL = `http://192.168.1.26:5000/api/auth/verify-email/${verificationToken}`;
-  const expoGoURL = `exp://192.168.1.26:8081/--/verify-email?token=${verificationToken}`;
+  const httpURL = `http://192.168.1.9:5000/api/auth/verify-email/${verificationToken}`;
+  const expoGoURL = `exp://192.168.1.9:8081/--/verify-email?token=${verificationToken}`;
   const customSchemeURL = `iyaya://verify-email?token=${verificationToken}`;
   
   const mailOptions = {

@@ -13,14 +13,18 @@ import ParentAuth from "../../screens/ParentAuth";
 import CaregiverAuth from "../../screens/CaregiverAuth";
 import EmailVerificationScreen from "../../screens/EmailVerificationScreen";
 import VerificationSuccessScreen from "../../screens/VerificationSuccessScreen";
-import ParentDashboard from "../../screens/ParentDashboard";
+import ParentDashboard from "../../screens/ParentDashboard/ParentDashboard";
 import CaregiverDashboard from "../../screens/CaregiverDashboard";
+
+// Messaging components
+import ChatScreen from "../../components/messaging/ChatScreen";
+import MessagingInterface from "../../components/messaging/MessagingInterface";
+import ParentMessaging from "../../screens/messaging/ParentMessaging";
+import CaregiverMessaging from "../../screens/messaging/CaregiverMessaging";
 
 // Legacy screen imports (to be migrated)
 import AvailabilityManagementScreen from "../../screens/AvailabilityManagementScreen";
-import BookingFlowScreen from "../../screens/BookingManagementScreen";
 import BookingManagementScreen from "../../screens/BookingManagementScreen";
-import Bookings from "../../screens/BookingManagementScreen";
 import ChildrenManagementScreen from "../../screens/ChildrenManagementScreen";
 import EnhancedCaregiverProfileWizard from "../../screens/EnhancedCaregiverProfileWizard";
 import JobPostingScreen from "../../screens/JobPostingScreen";
@@ -108,12 +112,42 @@ const AppNavigator = () => {
         <Stack.Screen name="CaregiverAuth" component={CaregiverAuth} options={{ title: "Caregiver Login", headerBackTitle: "Back" }} />
         <Stack.Screen name="ParentDashboard" component={ParentDashboard} options={{ headerShown: false }} />
         <Stack.Screen name="CaregiverDashboard" component={CaregiverDashboard} options={{ headerShown: false }} />
-        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Edit Profile", headerBackTitle: "Back" }} />
+        
+        {/* MESSAGING ROUTES */}
+        <Stack.Screen 
+          name="MessagingInterface" 
+          component={MessagingInterface} 
+          options={{ 
+            title: "Messages", 
+            headerBackTitle: "Back",
+            headerShown: false 
+          }} 
+        />
+        <Stack.Screen
+          name="ParentMessaging"
+          component={ParentMessaging}
+          options={{
+            title: "Parent Messages",
+            headerBackTitle: "Back",
+            headerShown: false
+          }}
+        />
+        <Stack.Screen
+          name="CaregiverMessaging"
+          component={CaregiverMessaging}
+          options={{
+            title: "Caregiver Messages",
+            headerBackTitle: "Back",
+            headerShown: false
+          }}
+        />
+        
         <Stack.Screen name="Chat" component={MessagingScreen} options={{ title: "Chat", headerBackTitle: "Back" }} />
+        <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ title: "Chat", headerBackTitle: "Back", headerShown: false }} />
         <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} options={{ title: "Confirm Payment", headerBackTitle: "Back" }} />
         <Stack.Screen name="JobPosting" component={JobPostingScreen} options={{ title: "Post a Job", headerBackTitle: "Back" }} />
         <Stack.Screen name="JobSearch" component={JobSearchScreen} options={{ title: "Find Jobs", headerBackTitle: "Back" }} />
-        <Stack.Screen name="BookingFlow" component={BookingFlowScreen} options={{ title: "Book Caregiver", headerBackTitle: "Back" }} />
+        <Stack.Screen name="BookingFlow" component={BookingManagementScreen} options={{ title: "Book Caregiver", headerBackTitle: "Back" }} />
         <Stack.Screen name="BookingManagement" component={BookingManagementScreen} options={{ title: "Manage Bookings", headerBackTitle: "Back" }} />
         <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages", headerBackTitle: "Back", headerShown: false }} />
         <Stack.Screen name="Messaging" component={MessagingScreen} options={{ title: "Chat", headerBackTitle: "Back" }} />

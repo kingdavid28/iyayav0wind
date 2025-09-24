@@ -7,11 +7,11 @@ export const sendCustomVerificationEmail = async (user, role) => {
     };
     
     // Get CSRF token
-    const csrfResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/csrf-token`);
+    const csrfResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/csrf-token`);
     const csrfData = await csrfResponse.json();
     
     // Send custom email via backend
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/send-custom-verification`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/send-custom-verification`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

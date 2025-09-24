@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { authAPI } from "../config/api";
+import { authAPI, api } from "../config/api";
 import { STORAGE_KEYS } from "../config/constants";
 import { logger } from "../utils/logger";
 
@@ -105,7 +105,9 @@ class AuthService {
     };
   }
 
-  getCurrentUser() {
+  getCurrentUserId() {
+    // For now, return null since we don't have user ID tracking
+    // This should be implemented based on your user profile structure
     return null;
   }
 
@@ -168,14 +170,7 @@ export const authService = new AuthService();
 
 export const login = async (email, password) => {
   try {
-    const response = await apiService.post(
-      "/auth/login",
-      { email, password },
-      {
-        timeout: API_CONFIG.TIMEOUT.AUTH,
-        maxRetries: 1, // Only retry once for login
-      }
-    );
+    const response = await authAPI.login({ email, password });
     return response;
   } catch (error) {
     logger.error("Login failed:", {

@@ -1,5 +1,3 @@
-"use client"
-
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
@@ -7,7 +5,7 @@ import React, { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native"
 import { Button, Card, Chip, Searchbar } from "react-native-paper"
 import Toast from "../components/ui/feedback/Toast"
-import { apiService } from "../services/index"
+import { bookingsAPI, applicationsAPI, caregiversAPI, authAPI } from "../services/index"
 import { getCurrentSocketURL } from '../config/api'
 import { useAuth } from "../core/contexts/AuthContext"
 import { useMessaging } from "../contexts/MessagingContext"
@@ -384,12 +382,12 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
   const handleConfirmAttendance = async (booking) => {
     try {
-      const response = await apiService.bookings.updateStatus(
-        booking.id, 
-        'confirmed', 
+      const response = await bookingsAPI.updateStatus(
+        booking.id,
+        'confirmed',
         'Caregiver confirmed attendance'
       );
-      
+
       if (response.success) {
         showToast('Attendance confirmed successfully!', 'success');
         fetchBookings(); // Refresh bookings list
@@ -414,8 +412,8 @@ export default function CaregiverDashboard({ onLogout, route }) {
       setApplicationSubmitting(true)
       
       console.log('Submitting application with jobId:', jobId);
-      const response = await apiService.applications.apply({ 
-        jobId: jobId, 
+      const response = await applicationsAPI.apply({
+        jobId: jobId,
         coverLetter: coverLetter || '',
         proposedRate: proposedRate ? Number(proposedRate) : undefined,
         message: coverLetter || ''
@@ -488,18 +486,18 @@ export default function CaregiverDashboard({ onLogout, route }) {
       
       if (isCaregiver) {
         try {
-          const response = await apiService.caregivers.updateProfile(payload)
+          const response = await caregiversAPI.updateProfile(payload)
           console.log('💾 Dashboard update response:', response);
         } catch (e) {
           const status = e?.response?.status
           if (status === 404) {
-            await apiService.caregivers.createProfile(payload)
+            await caregiversAPI.createProfile(payload)
           } else {
             throw e
           }
         }
       } else {
-        await apiService.auth.updateProfile({ name: payload.name })
+        await authAPI.updateProfile({ name: payload.name })
       }
       
       await loadProfile()

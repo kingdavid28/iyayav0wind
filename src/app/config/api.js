@@ -36,7 +36,7 @@ const detectAPIURL = async () => {
   }
   
   // Fallback to default
-  return 'http://192.168.1.26:5000/api';
+  return 'http://192.168.1.9:5000/api';
 };
 
 // Use environment configuration

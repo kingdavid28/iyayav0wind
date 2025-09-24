@@ -1,12 +1,12 @@
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
   sendEmailVerification,
   sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
-import { auth } from '../config/firebaseConfig';
+import { auth } from '../../config/firebase';
 
 export const firebaseAuthService = {
   async signup(userData) {
@@ -42,7 +42,7 @@ export const firebaseAuthService = {
         emailVerified: user.emailVerified
       };
       
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-sync`, {
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/firebase-sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

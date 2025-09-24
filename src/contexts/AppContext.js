@@ -1,5 +1,3 @@
-"use client"
-
 import { createContext, useContext, useReducer, useEffect, useRef } from "react"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { STORAGE_KEYS } from "../config/constants"
@@ -8,7 +6,6 @@ import { userService } from "../services/userService"
 import { logger } from "../utils/logger"
 import { Alert } from "react-native"
 import jobService from '../services/jobService';
-// import { useAuth } from "./AuthContext" // Removed to prevent circular dependency
 
 // Initial State
 const initialState = {

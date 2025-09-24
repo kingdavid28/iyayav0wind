@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { apiService } from '../services/apiService';
+import { caregiversAPI } from '../services';
 
 const CaregiverProfileUpdate = ({ currentProfile, onUpdate }) => {
   const navigation = useNavigation();
@@ -38,7 +38,7 @@ const CaregiverProfileUpdate = ({ currentProfile, onUpdate }) => {
         }
       };
 
-      const response = await apiService.put('/caregivers/profile', updateData);
+      const response = await caregiversAPI.updateProfile(updateData);
       
       if (response.success) {
         Alert.alert('Success', response.message || 'Profile updated successfully', [

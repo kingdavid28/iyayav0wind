@@ -44,7 +44,7 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
     if (!imagePath) return null;
     if (imagePath.startsWith('http')) return imagePath;
     if (imagePath.startsWith('/uploads/')) {
-      return `http://192.168.1.4:3000${imagePath}`;
+      return `http://192.168.1.9:5000${imagePath}`;
     }
     return imagePath;
   };

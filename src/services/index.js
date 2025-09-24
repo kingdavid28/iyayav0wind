@@ -786,6 +786,9 @@ export const settingsService = apiService.settings;
 export const ratingsService = apiService.ratings;
 export const notificationService = apiService.notifications;
 
+// Export the EnhancedAPIService class itself
+export { EnhancedAPIService };
+
 // Legacy compatibility exports
 export const uploadsAPI = {
   base64Upload: apiService.auth.uploadProfileImage,
@@ -809,5 +812,5 @@ export const privacyAPI = {
 export const getCurrentAPIURL = () => API_BASE_URL;
 export const getCurrentSocketURL = () => API_BASE_URL.replace('/api', '');
 
-// Export main service
-export default apiService;
+// Remove default export to prevent circular dependencies
+// export default apiService;

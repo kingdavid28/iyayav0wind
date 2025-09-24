@@ -1,4 +1,3 @@
-import { apiService } from "./apiService"
 import { api, authAPI, caregiversAPI } from "../config/api"
 import { logger } from "../utils/logger"
 import { validator } from "../utils/validation"
@@ -22,9 +21,10 @@ class UserService {
 
       // Update cache
       try {
-        await apiService.setCachedData(`profile:${userId}`, updated)
+        // Note: Cache functionality removed to prevent circular dependencies
+        logger.info('Profile created successfully, cache update skipped');
       } catch (cacheError) {
-        logger.warn('Failed to cache created profile', cacheError)
+        logger.warn('Cache update skipped:', cacheError)
       }
 
       return updated
@@ -66,11 +66,11 @@ class UserService {
       })
 
       logger.info(`Updating children for user: ${userId}`)
-      const result = await apiService.put(`${API_CONFIG.BASE_URL}/users/${userId}/children`, { children })
-      
-      // Invalidate profile cache
-      await apiService.invalidateCache(`profile:${userId}`)
-      
+      const result = await api.put(`${API_CONFIG.BASE_URL}/users/${userId}/children`, { children })
+
+      // Note: Cache invalidation removed to prevent circular dependencies
+      logger.info('Children updated successfully');
+
       return result
     } catch (error) {
       logger.error('Failed to update children:', error)
@@ -89,18 +89,7 @@ class UserService {
       
       const cacheKey = `profile:${userId}`
       
-      // Return cached data if available and not forcing refresh
-      if (!forceRefresh) {
-        try {
-          const cached = await apiService.getCachedData(cacheKey)
-          if (cached) {
-            return cached
-          }
-        } catch (cacheError) {
-          logger.warn('Cache read failed, proceeding with API call', cacheError)
-        }
-      }
-
+      // Note: Cache functionality removed to prevent circular dependencies
       logger.info(`Fetching authenticated profile (auth/profile) for user: ${userId || 'unknown'}`)
       const data = await authAPI.getProfile()
       
@@ -109,13 +98,9 @@ class UserService {
         throw new Error('Invalid profile data received from server')
       }
       
-      // Cache the profile data
-      try {
-        await apiService.setCachedData(cacheKey, data)
-      } catch (cacheError) {
-        logger.warn('Failed to cache profile data', cacheError)
-      }
-      
+      // Note: Cache functionality removed to prevent circular dependencies
+      logger.info('Profile fetched successfully');
+
       return data
     } catch (error) {
       logger.error("Failed to get user profile:", error)
@@ -168,13 +153,9 @@ class UserService {
       // Use authAPI.updateProfile instead of direct API call
       const updated = await authAPI.updateProfile(updates)
       
-      // Update cache
-      try {
-        await apiService.setCachedData(`profile:${userId}`, updated)
-      } catch (cacheError) {
-        logger.warn('Failed to update profile cache', cacheError)
-      }
-      
+      // Note: Cache functionality removed to prevent circular dependencies
+      logger.info('Profile updated successfully');
+
       return updated
     } catch (error) {
       logger.error("Failed to update user profile:", error)
@@ -224,11 +205,11 @@ class UserService {
       }
 
       logger.info(`Updating preferences for user: ${userId}`)
-      const result = await apiService.put(`/users/${userId}/preferences`, preferences)
-      
-      // Invalidate cache
-      await apiService.invalidateCache(`preferences:${userId}`)
-      
+      const result = await api.put(`/users/${userId}/preferences`, preferences)
+
+      // Note: Cache invalidation removed to prevent circular dependencies
+      logger.info('Preferences updated successfully');
+
       return result
     } catch (error) {
       logger.error("Failed to update preferences:", error)
@@ -239,18 +220,13 @@ class UserService {
   async getPreferences(userId) {
     try {
       const cacheKey = `preferences:${userId}`
-      const cached = await apiService.getCachedData(cacheKey)
-      
-      if (cached) {
-        return cached
-      }
-
+      // Note: Cache functionality removed to prevent circular dependencies
       logger.info(`Fetching preferences for user: ${userId}`)
-      const preferences = await apiService.get(`/users/${userId}/preferences`)
-      
-      // Cache the preferences
-      await apiService.setCachedData(cacheKey, preferences)
-      
+      const preferences = await api.get(`/users/${userId}/preferences`)
+
+      // Note: Cache functionality removed to prevent circular dependencies
+      logger.info('Preferences fetched successfully');
+
       return preferences
     } catch (error) {
       logger.error("Failed to get preferences:", error)
@@ -274,11 +250,10 @@ class UserService {
       }
 
       logger.info(`Updating availability for user: ${userId}`)
-      const result = await apiService.put(`/users/${userId}/availability`, availability)
-      
-      // Invalidate cache
-      await apiService.invalidateCache(`availability:${userId}`)
-      
+      const result = await api.put(`/users/${userId}/availability`, availability)
+
+      logger.info('Availability updated successfully');
+
       return result
     } catch (error) {
       logger.error("Failed to update availability:", error)
@@ -303,15 +278,15 @@ class UserService {
         name: 'profile.jpg'
       })
 
-      const result = await apiService.upload(`/users/${userId}/profile-image`, formData, {
+      const result = await api.post(`/users/${userId}/profile-image`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         }
       })
 
-      // Invalidate profile cache
-      await apiService.invalidateCache(`profile:${userId}`)
-      
+      // Note: Cache invalidation removed to prevent circular dependencies
+      logger.info('Profile image uploaded successfully');
+
       return result
     } catch (error) {
       logger.error("Failed to upload profile image:", error)
@@ -324,14 +299,9 @@ class UserService {
     try {
       // Create cache key based on filters
       const cacheKey = `caregivers:${JSON.stringify(filters)}:${page}:${limit}`
-      const cached = await apiService.getCachedData(cacheKey)
-      
-      if (cached) {
-        return cached
-      }
-
+      // Note: Cache functionality removed to prevent circular dependencies
       logger.info('Searching caregivers with filters:', filters)
-      
+
       // Build query string from filters
       const queryParams = new URLSearchParams({
         page: page.toString(),
@@ -339,11 +309,11 @@ class UserService {
         ...filters
       })
 
-      const result = await apiService.get(`/caregivers?${queryParams}`)
-      
-      // Cache the result
-      await apiService.setCachedData(cacheKey, result)
-      
+      const result = await api.get(`/caregivers?${queryParams}`)
+
+      // Note: Cache functionality removed to prevent circular dependencies
+      logger.info('Caregivers search completed successfully');
+
       return result
     } catch (error) {
       logger.error("Failed to search caregivers:", error)

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { Home, Search, Calendar, User, MessageCircle, Plus, Briefcase } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import { useMessaging } from '../../../contexts/MessagingContext';
 
@@ -18,7 +18,7 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         style={[styles.navItem, activeTab === 'home' && styles.activeNavItem]}
         onPress={() => setActiveTab('home')}
       >
-        <Home size={20} color={activeTab === 'home' ? colors.secondary : colors.textTertiary} />
+        <Ionicons name="home-outline" size={20} color={activeTab === 'home' ? colors.secondary : colors.textTertiary} />
         <Text style={[styles.navText, activeTab === 'home' && styles.activeNavText]}>
           Home
         </Text>
@@ -28,7 +28,7 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         style={[styles.navItem, activeTab === 'search' && styles.activeNavItem]}
         onPress={() => setActiveTab('search')}
       >
-        <Search size={20} color={activeTab === 'search' ? colors.secondary : colors.textTertiary} />
+        <Ionicons name="search-outline" size={20} color={activeTab === 'search' ? colors.secondary : colors.textTertiary} />
         <Text style={[styles.navText, activeTab === 'search' && styles.activeNavText]}>
           Search
         </Text>
@@ -38,19 +38,26 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         style={[styles.navItem, activeTab === 'bookings' && styles.activeNavItem]}
         onPress={() => setActiveTab('bookings')}
       >
-        <Calendar size={20} color={activeTab === 'bookings' ? colors.secondary : colors.textTertiary} />
+        <Ionicons name="calendar-outline" size={20} color={activeTab === 'bookings' ? colors.secondary : colors.textTertiary} />
         <Text style={[styles.navText, activeTab === 'bookings' && styles.activeNavText]}>
           Bookings
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.navItem, activeTab === 'job-management' && styles.activeNavItem]}
-        onPress={() => setActiveTab('job-management')}
+        style={[styles.navItem, activeTab === 'messages' && styles.activeNavItem]}
+        onPress={() => setActiveTab('messages')}
       >
-        <Briefcase size={20} color={activeTab === 'job-management' ? colors.secondary : colors.textTertiary} />
-        <Text style={[styles.navText, activeTab === 'job-management' && styles.activeNavText]}>
-          My Jobs
+        <Ionicons name="chatbubble-ellipses-outline" size={20} color={activeTab === 'messages' ? colors.secondary : colors.textTertiary} />
+        {unreadCount > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Text>
+          </View>
+        )}
+        <Text style={[styles.navText, activeTab === 'messages' && styles.activeNavText]}>
+          Messages
         </Text>
       </TouchableOpacity>
 
@@ -58,12 +65,21 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         style={[styles.navItem, activeTab === 'jobs' && styles.activeNavItem]}
         onPress={() => setActiveTab('jobs')}
       >
-        <Plus size={20} color={activeTab === 'jobs' ? colors.secondary : colors.textTertiary} />
+        <Ionicons name="briefcase-outline" size={20} color={activeTab === 'jobs' ? colors.secondary : colors.textTertiary} />
         <Text style={[styles.navText, activeTab === 'jobs' && styles.activeNavText]}>
-          Post Job
+          Jobs
         </Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={[styles.navItem, activeTab === 'job-management' && styles.activeNavItem]}
+        onPress={() => setActiveTab('job-management')}
+      >
+        <Ionicons name="add-outline" size={20} color={activeTab === 'job-management' ? colors.secondary : colors.textTertiary} />
+        <Text style={[styles.navText, activeTab === 'job-management' && styles.activeNavText]}>
+          Post Job
+        </Text>
+      </TouchableOpacity>
 
       </ScrollView>
     </View>

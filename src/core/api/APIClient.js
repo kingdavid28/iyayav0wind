@@ -5,7 +5,7 @@ import { Alert } from 'react-native';
 // Environment-based configuration
 const Config = {
   API_BASE_URL: __DEV__ 
-    ? 'http://192.168.1.10:5000/api'  // Match the network IP and backend port
+    ? 'http://192.168.1.9:5000/api'  // Match the network IP and backend port
     : 'https://api.iyaya.com/api',
   TIMEOUT: 15000,  // Increased timeout
   RETRY_ATTEMPTS: 3,

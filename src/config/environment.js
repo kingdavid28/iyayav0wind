@@ -3,8 +3,8 @@ import Constants from 'expo-constants';
 
 const ENV = {
   development: {
-    API_URL: 'http://192.168.1.10:5000/api',
-    SOCKET_URL: 'http://192.168.1.10:5000',
+    API_URL: 'http://192.168.1.9:5000/api',
+    SOCKET_URL: 'http://192.168.1.9:5000',
     ANALYTICS_ENABLED: false,
     DEBUG_MODE: true,
   },

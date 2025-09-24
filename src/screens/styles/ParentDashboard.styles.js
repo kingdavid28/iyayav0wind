@@ -652,9 +652,7 @@ export const styles = StyleSheet.create({
     marginRight: 12,
     backgroundColor: '#f3f4f6',
   },
-  caregiverInfo: {
-    flex: 1,
-  },
+  
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',

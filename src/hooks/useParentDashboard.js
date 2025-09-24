@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { apiService } from '../services';
+import { authAPI, jobsAPI, caregiversAPI, bookingsAPI, childrenAPI } from '../services';
 import { useAuth } from '../core/contexts/AuthContext';
 import { formatAddress } from '../utils/addressUtils';
 
@@ -26,7 +26,7 @@ export const useParentDashboard = () => {
     if (!user?.id) return;
     
     try {
-      const profileResponse = await apiService.auth.getProfile();
+      const profileResponse = await authAPI.getProfile();
       const profileData = profileResponse?.data || profileResponse || {};
       
       if (profileData) {
@@ -55,7 +55,7 @@ export const useParentDashboard = () => {
     
     setLoading(true);
     try {
-      const res = await apiService.jobs.getMy();
+      const res = await jobsAPI.getMy();
       const jobsList = res?.data?.jobs || res?.jobs || [];
       
       const transformedJobs = jobsList.map(job => ({
@@ -87,7 +87,7 @@ export const useParentDashboard = () => {
     if (!user?.id) return;
     
     try {
-      const res = await apiService.caregivers.getAll();
+      const res = await caregiversAPI.getAll();
       const caregiversList = res?.data?.caregivers || res?.caregivers || [];
       
       console.log('🔍 Raw caregivers response:', {
@@ -142,8 +142,8 @@ export const useParentDashboard = () => {
     
     try {
       const [bookingsRes, caregiversRes] = await Promise.all([
-        apiService.bookings.getMy(),
-        apiService.caregivers.getAll()
+        bookingsAPI.getMy(),
+        caregiversAPI.getAll()
       ]);
       
       const list = Array.isArray(bookingsRes?.bookings) ? bookingsRes.bookings : [];
@@ -207,7 +207,7 @@ export const useParentDashboard = () => {
     if (!user?.id || user?.role !== 'parent') return;
     
     try {
-      const res = await apiService.children.getMy();
+      const res = await childrenAPI.getMy();
       const childrenList = res?.data?.children || res?.children || [];
       
       setChildren(childrenList);
