@@ -198,29 +198,10 @@ const BookingItem = ({
     }
   };
 
-<<<<<<< HEAD
-  // Debug logging for caregiver data
-  console.log('📋 BookingItem - Full item:', item);
-  console.log('📋 BookingItem - Caregiver data:', item.caregiverId);
-  console.log('📋 BookingItem - Caregiver avatar sources:', {
-    caregiverAvatar: item.caregiverAvatar,
-    caregiverIdAvatar: item.caregiverId?.avatar,
-    caregiverIdProfileImage: item.caregiverId?.profileImage,
-    caregiverAvatar2: item.caregiver?.avatar,
-    caregiverProfileImage2: item.caregiver?.profileImage
-  });
-
-  const getFullImageURL = (imagePath) => {
-    if (!imagePath) return 'https://via.placeholder.com/50x50/E5E7EB/6B7280?text=CG';
-    if (imagePath.startsWith('http')) return imagePath;
-    if (imagePath.startsWith('/uploads/')) {
-      return `http://192.168.1.9:5000${imagePath}`;
-=======
   const caregiverImageUri = getProfileImageUrl(
     item.caregiver || item.caregiverId || {
       avatar: item.caregiverAvatar,
       profileImage: item.caregiver?.profileImage || item.caregiverId?.profileImage
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
     }
   );
 

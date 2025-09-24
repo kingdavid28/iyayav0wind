@@ -312,21 +312,30 @@ const AppProvider = ({ children }) => {
         dispatch({ type: ACTION_TYPES.SET_USER, payload: user })
 
         // Only fetch profile if user is present, token exists, and profile is not loaded or is for a different user
-        const token = await authService.getCurrentToken();
-        if (user && token && (!state.userProfile || state.userProfile.uid !== user.uid)) {
+        if (user) {
           try {
-            const profile = await userService.getProfile(user.uid)
-            const normalizedProfile = profile ? { ...profile, role: normalizeRole(profile.role) } : null
-            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: normalizedProfile })
-            // Merge role and name into user for downstream consumers (Navigator, jobService)
-            if (normalizedProfile) {
-              const mergedUser = { ...user, role: normalizedProfile.role, displayName: normalizedProfile.name }
-              dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser })
+            const token = await authService.getCurrentToken();
+            if (token && (!state.userProfile || state.userProfile.uid !== user.uid)) {
+              try {
+                const profile = await userService.getProfile(user.uid)
+                const normalizedProfile = profile ? { ...profile, role: normalizeRole(profile.role) } : null
+                dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: normalizedProfile })
+                // Merge role and name into user for downstream consumers (Navigator, jobService)
+                if (normalizedProfile) {
+                  const mergedUser = { ...user, role: normalizedProfile.role, displayName: normalizedProfile.name }
+                  dispatch({ type: ACTION_TYPES.SET_USER, payload: mergedUser })
+                }
+              } catch (error) {
+                logger.warn("Failed to load user profile:", error)
+                dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: null })
+              }
             }
           } catch (error) {
-            logger.warn("Failed to load user profile:", error)
-            dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: null })
+            logger.warn("Failed to get token for profile loading:", error)
           }
+        } else {
+          // Clear profile when no user
+          dispatch({ type: ACTION_TYPES.SET_USER_PROFILE, payload: null })
         }
       } catch (error) {
         handleError("auth", error)
@@ -433,11 +442,23 @@ const AppProvider = ({ children }) => {
           type: ACTION_TYPES.SET_LOADING,
           payload: { key: "bookings", value: true },
         });
-        if (!state.user || !state.user.role) {
-          Alert.alert('Error', 'User is not loaded or missing role. Please log in again.');
-          dispatch({ type: ACTION_TYPES.SET_ERROR, payload: { error: 'User not loaded or missing role' } });
+        
+        // Check if user is authenticated before making API calls
+        if (!state.user) {
+          console.log('User not authenticated - skipping bookings load');
+          dispatch({
+            type: ACTION_TYPES.SET_BOOKINGS,
+            payload: [],
+          });
+          return [];
+        }
+        
+        if (!state.user.role) {
+          Alert.alert('Error', 'User is missing role. Please log in again.');
+          dispatch({ type: ACTION_TYPES.SET_ERROR, payload: { key: 'general', value: 'User not loaded or missing role' } });
           return;
         }
+        
         const token = await authService.getCurrentToken();
         const bookings = await require('../services/bookingService').getBookings(state.user.role, token);
         dispatch({
@@ -446,8 +467,11 @@ const AppProvider = ({ children }) => {
         });
         return bookings;
       } catch (error) {
-        handleError("general", error);
-        throw error;
+        console.warn('Failed to load bookings:', error.message);
+        dispatch({
+          type: ACTION_TYPES.SET_BOOKINGS,
+          payload: [],
+        });
       } finally {
         dispatch({
           type: ACTION_TYPES.SET_LOADING,
@@ -463,13 +487,23 @@ const AppProvider = ({ children }) => {
           type: ACTION_TYPES.SET_LOADING,
           payload: { key: "jobs", value: true },
         });
-        // Ensure jobService is imported at the top
-        console.log('[AppContext] loadJobs: user =', state.user, 'role =', state.user?.role);
-        if (!state.user || !state.user.role) {
-          Alert.alert('Error', 'User is not loaded or missing role. Please log in again.');
-          dispatch({ type: ACTION_TYPES.SET_ERROR, payload: { error: 'User not loaded or missing role' } });
+        
+        // Check if user is authenticated before making API calls
+        if (!state.user) {
+          console.log('User not authenticated - skipping jobs load');
+          dispatch({
+            type: ACTION_TYPES.SET_JOBS,
+            payload: [],
+          });
+          return [];
+        }
+        
+        if (!state.user.role) {
+          Alert.alert('Error', 'User is missing role. Please log in again.');
+          dispatch({ type: ACTION_TYPES.SET_ERROR, payload: { key: 'general', value: 'User not loaded or missing role' } });
           return;
         }
+        
         const jobs = await jobService.getJobs(state.user.role, state.token);
         dispatch({
           type: ACTION_TYPES.SET_JOBS,
@@ -477,8 +511,11 @@ const AppProvider = ({ children }) => {
         });
         return jobs;
       } catch (error) {
-        handleError("general", error);
-        throw error;
+        console.warn('Failed to load jobs:', error.message);
+        dispatch({
+          type: ACTION_TYPES.SET_JOBS,
+          payload: [],
+        });
       } finally {
         dispatch({
           type: ACTION_TYPES.SET_LOADING,

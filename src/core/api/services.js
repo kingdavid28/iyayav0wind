@@ -13,6 +13,13 @@ export const authService = {
   },
 
   async getProfile() {
+    // Check if user is authenticated first
+    const token = await SecureStore.getItemAsync('auth_token');
+    if (!token) {
+      console.log('No authentication token - returning null profile');
+      return { data: null };
+    }
+
     const response = await APIClient.get('/auth/profile');
     return response.data;
   },

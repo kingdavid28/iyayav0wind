@@ -14,13 +14,6 @@ import VerificationSuccessScreen from "../../screens/VerificationSuccessScreen";
 import ParentDashboard from "../../screens/ParentDashboard/ParentDashboard";
 import CaregiverDashboard from "../../screens/CaregiverDashboard";
 
-<<<<<<< HEAD
-// Messaging components
-import ChatScreen from "../../components/messaging/ChatScreen";
-import MessagingInterface from "../../components/messaging/MessagingInterface";
-import ParentMessaging from "../../screens/messaging/ParentMessaging";
-import CaregiverMessaging from "../../screens/messaging/CaregiverMessaging";
-=======
 // Auth screen imports
 import ParentAuth from "../../screens/ParentAuth";
 import CaregiverAuth from "../../screens/CaregiverAuth";
@@ -32,7 +25,6 @@ import ParentProfile from "../../screens/ParentProfile";
 // Chat screen imports
 import ChatScreen from "../../screens/ChatScreen";
 import CaregiverReviewsScreen from "../../screens/CaregiverReviewsScreen";
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
 
 // Legacy screen imports (to be migrated)
 import AvailabilityManagementScreen from "../../screens/AvailabilityManagementScreen";
@@ -122,43 +114,7 @@ const AppNavigatorWithAuth = () => {
         <Stack.Screen name="CaregiverAuth" component={CaregiverAuth} options={{ title: "Caregiver Login", headerBackTitle: "Back" }} />
         <Stack.Screen name="ParentDashboard" component={ParentDashboard} options={{ headerShown: false }} />
         <Stack.Screen name="CaregiverDashboard" component={CaregiverDashboard} options={{ headerShown: false }} />
-<<<<<<< HEAD
-        
-        {/* MESSAGING ROUTES */}
-        <Stack.Screen 
-          name="MessagingInterface" 
-          component={MessagingInterface} 
-          options={{ 
-            title: "Messages", 
-            headerBackTitle: "Back",
-            headerShown: false 
-          }} 
-        />
-        <Stack.Screen
-          name="ParentMessaging"
-          component={ParentMessaging}
-          options={{
-            title: "Parent Messages",
-            headerBackTitle: "Back",
-            headerShown: false
-          }}
-        />
-        <Stack.Screen
-          name="CaregiverMessaging"
-          component={CaregiverMessaging}
-          options={{
-            title: "Caregiver Messages",
-            headerBackTitle: "Back",
-            headerShown: false
-          }}
-        />
-        
-        <Stack.Screen name="Chat" component={MessagingScreen} options={{ title: "Chat", headerBackTitle: "Back" }} />
-        <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ title: "Chat", headerBackTitle: "Back", headerShown: false }} />
-=======
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Edit Profile", headerBackTitle: "Back" }} />
-
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
         <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} options={{ title: "Confirm Payment", headerBackTitle: "Back" }} />
         <Stack.Screen name="JobPosting" component={JobPostingScreen} options={{ title: "Post a Job", headerBackTitle: "Back" }} />
         <Stack.Screen name="JobSearch" component={JobSearchScreen} options={{ title: "Find Jobs", headerBackTitle: "Back" }} />

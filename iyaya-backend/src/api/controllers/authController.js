@@ -989,18 +989,12 @@ exports.firebaseSync = async (req, res, next) => {
   }
 };
 
-// Send custom verification email
 exports.sendCustomVerification = async (req, res, next) => {
   try {
     const { email, name, role, uid } = req.body;
     
-<<<<<<< HEAD
-    const verifyURL = `https://iyayav0.firebaseapp.com/__/auth/action?mode=verifyEmail&oobCode=${uid}&continueUrl=${encodeURIComponent(`exp://192.168.1.9:8081/--/verify-success?role=${role}`)}`;
-    const expoGoURL = `exp://192.168.1.9:8081/--/verify-success?role=${role}`;
-=======
     const verifyURL = `https://iyayav0.firebaseapp.com/__/auth/action?mode=verifyEmail&oobCode=${encodeURIComponent(uid)}&continueUrl=${encodeURIComponent(`exp://192.168.1.10:8081/--/verify-success?role=${encodeURIComponent(role)}`)}`;
     const expoGoURL = `exp://192.168.1.10:8081/--/verify-success?role=${role}`;
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
     const customSchemeURL = `iyaya://verify-success?role=${role}`;
     
     const mailOptions = {

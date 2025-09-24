@@ -8,9 +8,13 @@ import {
   firebaseQuery as query,
   firebaseOrderByChild as orderByChild,
   firebaseLimitToLast as limitToLast,
-  firebaseEqualTo as equalTo
-} from '../config/firebaseConfig';
-import { database as firebaseDatabase } from '../config/firebaseConfig';
+  firebaseEqualTo as equalTo,
+  ensureFirebaseInitialized,
+  getDatabaseSafely,
+  withFirebaseCheck,
+  safeDatabaseOperation
+} from '../config/firebase';
+import { getFirebaseDatabase } from '../config/firebase';
 import { Platform } from 'react-native';
 import { getMessageQueue } from '../components/messaging/OfflineMessageQueue';
 import { MessagingErrorHandler } from '../components/messaging/ErrorHandler';
@@ -28,8 +32,15 @@ import {
 
 // Mobile-specific: Create database reference using imported functions
 const createRef = (path) => {
+  // Ensure Firebase is initialized before database operations
+  if (!ensureFirebaseInitialized()) {
+    console.error('❌ Firebase not initialized, cannot create reference');
+    return null;
+  }
+
   try {
-    return ref(firebaseDatabase, path);
+    const db = getFirebaseDatabase();
+    return ref(db, path);
   } catch (error) {
     console.error('❌ Error creating Firebase reference:', error);
     return null;
@@ -38,6 +49,12 @@ const createRef = (path) => {
 
 // Mobile-specific: Create query using imported functions
 const createQuery = (ref, ...queryConstraints) => {
+  // Ensure Firebase is initialized before database operations
+  if (!ensureFirebaseInitialized()) {
+    console.error('❌ Firebase not initialized, cannot create query');
+    return null;
+  }
+
   if (!ref) {
     console.error('❌ Cannot create query - reference is null');
     return null;
@@ -57,9 +74,16 @@ const checkFirebaseConnection = () => {
   console.log('📱 Platform:', Platform.OS);
   console.log('🔥 Database object:', firebaseDatabase ? 'Available' : 'Not available');
 
+  // Ensure Firebase is initialized before connection check
+  if (!ensureFirebaseInitialized()) {
+    console.error('❌ Firebase not initialized, cannot check connection');
+    return () => {};
+  }
+
   // Check if Firebase functions are available at runtime
   const checkFirebaseAvailability = () => {
-    return !!(firebaseDatabase && onValue && ref && set && get && update);
+    const db = getFirebaseDatabase();
+    return !!(db && onValue && ref && set && get && update);
   };
 
   if (!checkFirebaseAvailability()) {
@@ -71,7 +95,8 @@ const checkFirebaseConnection = () => {
     console.log('📱 Mobile Firebase - Checking connection...');
     try {
       // Check if database is available
-      if (!firebaseDatabase) {
+      const db = getFirebaseDatabase();
+      if (!db) {
         console.error('❌ Database object is null or undefined!');
         return () => {};
       }
@@ -80,7 +105,7 @@ const checkFirebaseConnection = () => {
       if (ref) {
         // Try to create a simple test reference instead of .info/connected
         // .info/connected requires a working Firebase Realtime Database connection
-        const testRef = ref(firebaseDatabase, 'test');
+        const testRef = ref(db, 'test');
 
         if (onValue) {
           const unsubscribe = onValue(testRef, (snapshot) => {
@@ -119,8 +144,16 @@ const checkFirebaseConnection = () => {
   return () => {};
 };
 
-// Initialize connection check
-let connectionCheckUnsubscribe = checkFirebaseConnection();
+// Example of using the safe database operation wrapper
+const safeCreateConnection = safeDatabaseOperation('Create Connection', async (userId, caregiverId) => {
+  const db = getFirebaseDatabase();
+  const connectionRef = ref(db, `connections/${userId}/${caregiverId}`);
+  await set(connectionRef, {
+    createdAt: Date.now(),
+    lastActivity: Date.now()
+  });
+  return true;
+});
 
 class FirebaseMessagingService {
   // Enhanced createConnection with better error handling
@@ -128,8 +161,15 @@ class FirebaseMessagingService {
     try {
       console.log('🔗 Creating connection between:', { userId, caregiverId });
 
+      // Ensure Firebase is initialized before database operations
+      if (!ensureFirebaseInitialized()) {
+        console.error('❌ Firebase not initialized, cannot create connection');
+        return false;
+      }
+
       // Check if database is available
-      if (!firebaseDatabase) {
+      const db = getFirebaseDatabase();
+      if (!db) {
         console.error('❌ Database is not available for createConnection');
         return false;
       }
@@ -150,7 +190,7 @@ class FirebaseMessagingService {
       let connectionRef;
       try {
         // Use the imported ref function instead of database.ref
-        connectionRef = ref(firebaseDatabase, `connections/${userId}/${caregiverId}`);
+        connectionRef = ref(db, `connections/${userId}/${caregiverId}`);
 
         if (!connectionRef) {
           console.error('❌ Failed to create connection reference');
@@ -182,7 +222,7 @@ class FirebaseMessagingService {
 
       // Create reverse connection
       try {
-        const reverseConnectionRef = ref(firebaseDatabase, `connections/${caregiverId}/${userId}`);
+        const reverseConnectionRef = ref(db, `connections/${caregiverId}/${userId}`);
         if (reverseConnectionRef) {
           await set(reverseConnectionRef, {
             createdAt: Date.now(),
@@ -809,19 +849,21 @@ class FirebaseMessagingService {
   // Enhanced update message status with conflict resolution
   async updateMessageStatus(conversationId, messageId, newStatus, userId, options = {}) {
     const statusManager = getMessageStatusManager();
-    return await statusManager.updateMessageStatus(conversationId, messageId, newStatus, userId, options);
-  }
-
-  // Get connection pool statistics (directly integrated)
-  getConnectionPoolStats() {
-    const connectionPool = getFirebaseConnectionPool();
-    return connectionPool.getPoolStats();
+    const result = await statusManager.updateMessageStatus(conversationId, messageId, newStatus, userId, options);
+    if (result.status === 'fulfilled') {
+      console.log(`✅ Updated message status for message: ${messageId}`);
+    } else {
+      console.error(`❌ Failed to update message status: ${messageId}`, result.reason);
+    }
+    return result;
   }
 
   // Get message status with caching
   async getMessageStatus(conversationId, messageId) {
     const statusManager = getMessageStatusManager();
-    return await statusManager.getMessageStatus(conversationId, messageId);
+    const status = await statusManager.getMessageStatus(conversationId, messageId);
+    console.log(`📝 Retrieved message status for message: ${messageId}`, status);
+    return status;
   }
 
   // Track message for analytics

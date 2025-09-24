@@ -15,9 +15,9 @@ import {
   Surface,
 } from 'react-native-paper';
 import { MessageCircle, Clock } from 'lucide-react-native';
-import { useAuth } from '../../core/contexts/AuthContext';
-import { messagingService } from '../../services/messagingService';
-import { authService } from '../../services/authService';
+import { useAuth } from '../../../contexts/AuthContext';
+import { messagingService } from '../../../services/firebaseMessagingService';
+import { authService } from '../../../services/authService';
 
 const ConversationList = ({ onSelectConversation, selectedConversation, navigation }) => {
   const { user } = useAuth();

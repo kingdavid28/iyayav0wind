@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { database as db, firebaseRef as ref, firebaseOnValue as onValue, firebaseQuery as query, firebaseOrderByChild as orderByChild, firebaseLimitToLast as limitToLast, firebaseStartAfter as startAfter, firebaseEndBefore as endBefore } from '../../config/firebaseConfig.js';
+import { getFirebaseDatabase, firebaseRef as ref, firebaseOnValue as onValue, firebaseQuery as query, firebaseOrderByChild as orderByChild, firebaseLimitToLast as limitToLast, firebaseStartAfter as startAfter, firebaseEndBefore as endBefore } from '../../config/firebase.js';
 
 // Message pagination constants
 const MESSAGES_PER_PAGE = 50;
@@ -28,6 +28,7 @@ class MessagePaginationSystem {
       }
 
       // Fetch from Firebase
+      const db = await getFirebaseDatabase();
       const messagesRef = ref(db, `messages/${conversationId}`);
       const messagesQuery = query(
         messagesRef,
@@ -42,6 +43,7 @@ class MessagePaginationSystem {
       if (page > 0) {
         const lastMessageId = this.getLastMessageIdForPage(conversationId, page - 1);
         if (lastMessageId) {
+          const db = await getFirebaseDatabase();
           const lastMessageRef = ref(db, `messages/${conversationId}/${lastMessageId}`);
           paginatedQuery = query(
             messagesQuery,
@@ -79,6 +81,7 @@ class MessagePaginationSystem {
     try {
       console.log(`📄 Getting next page after ${currentLastMessageId}`);
 
+      const db = await getFirebaseDatabase();
       const messagesRef = ref(db, `messages/${conversationId}`);
       const messagesQuery = query(
         messagesRef,
@@ -112,6 +115,7 @@ class MessagePaginationSystem {
     try {
       console.log(`📄 Getting previous page before ${currentFirstMessageId}`);
 
+      const db = await getFirebaseDatabase();
       const messagesRef = ref(db, `messages/${conversationId}`);
       const messagesQuery = query(
         messagesRef,
@@ -297,9 +301,10 @@ class FirebaseConnectionPool {
   }
 
   // Create a new connection
-  createConnection(conversationId, resolve, reject) {
+  async createConnection(conversationId, resolve, reject) {
     try {
       const connectionKey = `messages/${conversationId}`;
+      const db = await getFirebaseDatabase();
       const messagesRef = ref(db, `messages/${conversationId}`);
 
       const connection = {

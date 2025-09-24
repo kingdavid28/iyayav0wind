@@ -1,6 +1,6 @@
-// firebase.js - Consolidated Firebase configuration with best practices
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue, off, push, set, query, orderByChild } from 'firebase/database';
+// firebase.js - Enhanced with better synchronization
+import { initializeApp, getApps } from 'firebase/app';
+import { getDatabase, ref, onValue, off, push, set, query, orderByChild, get, update, limitToLast, startAfter, endBefore, equalTo } from 'firebase/database';
 import { getAuth, initializeAuth, getReactNativePersistence, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -16,61 +16,220 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Validate required Firebase configuration
+// Validate configuration
 const requiredFields = ['apiKey', 'projectId', 'databaseURL'];
-const missingFields = requiredFields.filter(field => !firebaseConfig[field]);
+const missingFields = requiredFields.filter(field => !firebaseConfig[field] || firebaseConfig[field] === 'undefined');
 
 if (missingFields.length > 0) {
   console.error('❌ Missing required Firebase environment variables:', missingFields);
-  console.error('Please check your .env file and ensure all Firebase variables are set');
-} else {
-  console.log('✅ Firebase configuration loaded successfully');
+  throw new Error(`Missing Firebase configuration: ${missingFields.join(', ')}`);
 }
 
-let app;
-let database;
-let auth;
+console.log('✅ Firebase configuration loaded successfully');
 
-try {
-  app = initializeApp(firebaseConfig);
-  database = getDatabase(app);
-  console.log('✅ Firebase initialized successfully');
-} catch (error) {
-  console.error('❌ Firebase initialization failed:', error);
-  // Provide fallback values to prevent runtime errors
-  app = null;
-  database = null;
-}
+// State management
+let app = null;
+let database = null;
+let auth = null;
+let isInitializing = false;
+let initializationPromise = null;
 
-// React Native compatible auth setup
-try {
-  if (Platform.OS === 'web') {
-    if (app) {
-      auth = getAuth(app);
-    } else {
-      console.warn('⚠️ Firebase app is null, skipping auth initialization');
-      auth = null;
-    }
-  } else {
-    if (app) {
-      auth = initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage)
-      });
-    } else {
-      console.warn('⚠️ Firebase app is null, skipping auth initialization');
-      auth = null;
-    }
+// Core initialization function
+const initializeFirebaseCore = async () => {
+  if (isInitializing) {
+    console.log('⏳ Firebase initialization already in progress...');
+    return initializationPromise;
   }
-  console.log('✅ Firebase Auth initialized successfully');
-} catch (error) {
-  console.error('❌ Firebase Auth initialization failed:', error);
-  auth = null;
-}
 
+  isInitializing = true;
+  console.log('🔥 Starting Firebase initialization...');
+
+  initializationPromise = (async () => {
+    try {
+      // Check for existing apps
+      const existingApps = getApps();
+      if (existingApps.length > 0) {
+        app = existingApps[0];
+        console.log('✅ Using existing Firebase app');
+      } else {
+        app = initializeApp(firebaseConfig);
+        console.log('✅ Firebase app initialized successfully');
+      }
+
+      // Initialize database
+      database = getDatabase(app);
+      console.log('✅ Firebase database initialized successfully');
+
+      // Initialize auth
+      if (Platform.OS === 'web') {
+        auth = getAuth(app);
+      } else {
+        auth = initializeAuth(app, {
+          persistence: getReactNativePersistence(AsyncStorage)
+        });
+      }
+      console.log('✅ Firebase Auth initialized successfully');
+
+      isInitializing = false;
+      return { app, database, auth };
+    } catch (error) {
+      console.error('❌ Firebase initialization failed:', error);
+      isInitializing = false;
+      throw error;
+    }
+  })();
+
+  return initializationPromise;
+};
+
+// Public initialization function
+export const initializeFirebase = async () => {
+  if (app && database && auth) {
+    return { app, database, auth };
+  }
+  return await initializeFirebaseCore();
+};
+
+// Safe database getter
+export const getDatabaseSafely = async () => {
+  try {
+    const isInitialized = await ensureFirebaseInitialized();
+    if (!isInitialized) {
+      throw new Error('Firebase not initialized');
+    }
+    return database;
+  } catch (error) {
+    console.error('❌ Error getting database safely:', error);
+    return null;
+  }
+};
+
+// Test Firebase connection
+export const testFirebaseConnection = async () => {
+  try {
+    const isInitialized = await ensureFirebaseInitialized();
+    if (!isInitialized) {
+      console.log('❌ Firebase not initialized');
+      return false;
+    }
+    
+    const db = await getFirebaseDatabase();
+    if (!db) {
+      console.log('❌ Database not available');
+      return false;
+    }
+    
+    console.log('✅ Firebase connection test passed');
+    return true;
+  } catch (error) {
+    console.error('❌ Firebase connection test failed:', error);
+    return false;
+  }
+};
+
+// Safe getters with initialization
+export const getFirebaseApp = async () => {
+  if (!app) {
+    await initializeFirebase();
+  }
+  return app;
+};
+
+export const getFirebaseDatabase = async () => {
+  if (!database) {
+    await initializeFirebase();
+  }
+  return database;
+};
+
+export const getFirebaseAuth = async () => {
+  if (!auth) {
+    await initializeFirebase();
+  }
+  return auth;
+};
+
+// Synchronous getters (use with caution)
+export const getDatabaseSync = () => {
+  if (!database) {
+    throw new Error('Database not initialized. Call initializeFirebase() first.');
+  }
+  return database;
+};
+
+export const getAuthSync = () => {
+  if (!auth) {
+    throw new Error('Auth not initialized. Call initializeFirebase() first.');
+  }
+  return auth;
+};
+
+// Safe operation wrappers
+export const withDatabase = async (operation) => {
+  const db = await getFirebaseDatabase();
+  return operation(db);
+};
+
+export const withAuth = async (operation) => {
+  const authInstance = await getFirebaseAuth();
+  return operation(authInstance);
+};
+
+// Safe reference creation
+export const createRef = async (path) => {
+  const db = await getFirebaseDatabase();
+  return ref(db, path);
+};
+
+export const safeUpdate = async (updates) => {
+  const db = await getFirebaseDatabase();
+  return update(ref(db), updates);
+};
+
+// Safe database operation wrapper
+export const safeDatabaseOperation = (operationName, operation) => {
+  return async (...args) => {
+    console.log(`🔄 Executing ${operationName}...`);
+
+    try {
+      const result = await operation(...args);
+      console.log(`✅ ${operationName} completed successfully`);
+      return result;
+    } catch (error) {
+      console.error(`❌ ${operationName} failed:`, error);
+      throw error;
+    }
+  };
+};
+
+// Enhanced safe operations
+export const safeOnValue = async (path, callback, options) => {
+  const dbRef = await createRef(path);
+  return onValue(dbRef, callback, options);
+};
+
+export const safeSet = async (path, data) => {
+  const dbRef = await createRef(path);
+  return set(dbRef, data);
+};
+
+export const safePush = async (path, data) => {
+  const dbRef = await createRef(path);
+  return push(dbRef, data);
+};
+
+export const safeGet = async (path) => {
+  const dbRef = await createRef(path);
+  return get(dbRef);
+};
+
+// Initialize Firebase immediately but don't block exports
+initializeFirebase().catch(error => {
+  console.error('Failed to initialize Firebase:', error);
+});
+
+// Export Firebase methods
 export {
-  database,
-  auth,
-  app,
   ref,
   onValue,
   off,
@@ -78,6 +237,18 @@ export {
   set,
   query,
   orderByChild,
+  get,
+  update,
+  limitToLast,
+  startAfter,
+  endBefore,
+  equalTo,
   onAuthStateChanged,
   signInAnonymously
+};
+
+// Export instances with clear naming (use async getters instead)
+export {
+  app as firebaseApp,
+  auth as firebaseAuth
 };

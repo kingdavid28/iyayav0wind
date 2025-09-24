@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { firebaseMessagingService } from '../services/firebaseMessagingService';
-import { getMessageLazyLoadingSystem } from '../components/messaging/MessagePerformanceSystem';
+import { firebaseMessagingService } from '../../../services/firebaseMessagingService';
+import { getMessageLazyLoadingSystem } from './MessagePerformanceSystem';
 
 // Hook for lazy loading message history
 export const useMessageLazyLoading = (conversationId, userId, caregiverId) => {

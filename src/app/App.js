@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, LogBox } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -15,49 +14,109 @@ import { ErrorBoundary, LoadingSpinner } from '../shared/ui';
 // Auth Context
 import { AuthProvider } from '../contexts/AuthContext';
 
-// Log filter - only show errors and warnings
+// Firebase - Direct import for initialization
+import { initializeFirebase, getAuthSync } from '../config/firebase';
+
+// Log filter
 import '../utils/logFilter';
 
 // Navigation
 import AppNavigator from './navigation/AppNavigator';
 
-// Utils
-import { hasSeenOnboarding } from '../utils/onboarding';
-
-// Development mode setup - logs suppressed
-
 LogBox.ignoreLogs([
   "AsyncStorage has been extracted",
-  "Setting a timer", 
+  "Setting a timer",
   "Non-serializable values",
 ]);
 
 SplashScreen.preventAutoHideAsync();
 
+// Enhanced Firebase Provider that ensures Auth is ready
+const FirebaseAuthProvider = ({ children }) => {
+  const [firebaseReady, setFirebaseReady] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const initFirebase = async () => {
+      try {
+        console.log('🔥 Initializing Firebase with Auth...');
+        await initializeFirebase();
+
+        // Test that auth is actually available
+        const auth = getAuthSync();
+        console.log('✅ Firebase Auth is ready');
+
+        setFirebaseReady(true);
+      } catch (err) {
+        console.error('❌ Firebase Auth initialization failed:', err);
+        setError(err);
+        setFirebaseReady(true); // Continue anyway
+      }
+    };
+
+    initFirebase();
+  }, []);
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
+        <Text style={{ color: 'red', fontSize: 16, textAlign: 'center', padding: 20 }}>
+          Firebase Error
+        </Text>
+        <Text style={{ color: '#666', fontSize: 14, textAlign: 'center', padding: 20 }}>
+          {error.message}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!firebaseReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+        <LoadingSpinner text="Initializing Firebase Auth..." />
+      </View>
+    );
+  }
+
+  // Only render AuthProvider when Firebase is definitely ready
+  return (
+    <AuthProvider>
+      {children}
+    </AuthProvider>
+  );
+};
+
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
     async function prepare() {
       try {
-        console.log('Initializing app...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('🚀 Initializing Iyaya app...');
+
+        // Pre-initialize Firebase to ensure it's ready
+        await initializeFirebase().catch(error => {
+          console.warn('⚠️ Firebase init warning (continuing):', error.message);
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
       } catch (e) {
-        console.error('Error during app initialization:', e);
+        console.error('❌ Error during app initialization:', e);
       } finally {
-        setIsReady(true);
+        setAppReady(true);
         await SplashScreen.hideAsync();
-        console.log('App initialization complete');
+        console.log('✅ App initialization complete');
       }
     }
 
     prepare();
   }, []);
 
-  if (!isReady) {
+  if (!appReady) {
     return (
       <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
-        <LoadingSpinner text="Initializing app..." />
+        <LoadingSpinner text="Starting Iyaya..." />
       </View>
     );
   }
@@ -68,13 +127,13 @@ export default function App() {
         <AppProvider>
           <ProfileDataProvider>
             <PrivacyProvider>
-              {/* Wrap AppIntegration with AuthProvider */}
-              <AuthProvider>
+              {/* Wrap with FirebaseAuthProvider to ensure proper initialization order */}
+              <FirebaseAuthProvider>
                 <AppIntegration>
                   <AppNavigator />
                   <StatusBar style="auto" />
                 </AppIntegration>
-              </AuthProvider>
+              </FirebaseAuthProvider>
             </PrivacyProvider>
           </ProfileDataProvider>
         </AppProvider>

@@ -1,5 +1,5 @@
 // firebaseRealtimeService.js - Firebase for real-time features only
-import { database, auth, ref, onValue, off, push, set, query, orderByChild, onAuthStateChanged, signInAnonymously } from '../config/firebase';
+import { getFirebaseDatabase, getFirebaseAuth, ref, onValue, off, push, set, query, orderByChild, onAuthStateChanged, signInAnonymously } from '../config/firebase';
 
 class FirebaseRealtimeService {
   constructor() {
@@ -9,7 +9,8 @@ class FirebaseRealtimeService {
   }
 
   async initializeRealtimeAuth() {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
+      const auth = await getFirebaseAuth();
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           this.currentUser = user;
@@ -45,6 +46,7 @@ class FirebaseRealtimeService {
   // Real-time database methods for messaging
   async sendMessage(chatId, messageData) {
     try {
+      const database = await getFirebaseDatabase();
       const messagesRef = ref(database, `chats/${chatId}/messages`);
       const newMessageRef = push(messagesRef);
       await set(newMessageRef, {
@@ -59,7 +61,8 @@ class FirebaseRealtimeService {
     }
   }
 
-  listenToMessages(chatId, callback) {
+  async listenToMessages(chatId, callback) {
+    const database = await getFirebaseDatabase();
     const messagesRef = ref(database, `chats/${chatId}/messages`);
     const messagesQuery = query(messagesRef, orderByChild('timestamp'));
 
@@ -88,7 +91,8 @@ class FirebaseRealtimeService {
   }
 
   // Listen to user presence/status
-  listenToUserStatus(userId, callback) {
+  async listenToUserStatus(userId, callback) {
+    const database = await getFirebaseDatabase();
     const userStatusRef = ref(database, `users/${userId}/status`);
 
     const listener = onValue(userStatusRef, (snapshot) => {
@@ -99,9 +103,10 @@ class FirebaseRealtimeService {
     return listener;
   }
 
-  updateUserStatus(status) {
+  async updateUserStatus(status) {
     if (!this.currentUser) return;
 
+    const database = await getFirebaseDatabase();
     const userStatusRef = ref(database, `users/${this.currentUser.uid}/status`);
     set(userStatusRef, {
       ...status,

@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-<<<<<<< HEAD
-import { caregiversAPI, jobsAPI, applicationsAPI, bookingsAPI } from '../services';
-import { useAuth } from '../core/contexts/AuthContext';
-=======
 import { apiService } from '../services';
 import { useAuth } from '../contexts/AuthContext';
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
 import { formatAddress } from '../utils/addressUtils';
 
 export const useCaregiverDashboard = () => {
@@ -45,10 +40,6 @@ export const useCaregiverDashboard = () => {
     try {
       loadingRef.current = true;
       console.log('🔄 Loading enhanced profile data...');
-<<<<<<< HEAD
-      
-      const caregiverResponse = await caregiversAPI.getProfile();
-=======
 
       // Retry with token refresh
       let caregiverResponse;
@@ -71,7 +62,6 @@ export const useCaregiverDashboard = () => {
           throw error;
         }
       }
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
       const caregiverProfile = caregiverResponse?.caregiver || caregiverResponse?.data?.caregiver || caregiverResponse || {};
 
       if (caregiverProfile && Object.keys(caregiverProfile).length > 0) {
@@ -110,7 +100,7 @@ export const useCaregiverDashboard = () => {
 
     setJobsLoading(true);
     try {
-      const res = await jobsAPI.getAvailable();
+      const res = await apiService.jobs.getAvailable();
       const jobsList = res?.data?.jobs || res?.jobs || [];
 
       const transformedJobs = jobsList.map(job => ({
@@ -153,7 +143,7 @@ export const useCaregiverDashboard = () => {
 
     try {
       console.log('📋 Fetching applications for caregiver:', user?.id);
-      const res = await applicationsAPI.getMy();
+      const res = await apiService.applications.getMy();
       console.log('📋 Applications API response:', res);
 
       const list = res?.data?.applications || res?.applications || [];
@@ -201,7 +191,7 @@ export const useCaregiverDashboard = () => {
 
     try {
       console.log('📅 Fetching bookings for caregiver:', user?.id);
-      const res = await bookingsAPI.getMy();
+      const res = await apiService.bookings.getMy();
       console.log('📅 Bookings API response:', res);
 
       const list = Array.isArray(res?.bookings) ? res.bookings : [];

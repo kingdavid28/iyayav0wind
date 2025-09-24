@@ -208,7 +208,6 @@ const mountRoutes = () => {
 
 
 
-
     // Other Protected Routes
     apiRouter.use('/caregivers', require('./routes/caregiverRoutes'));
     apiRouter.use('/profile', require('./routes/profileRoutes'));
@@ -222,6 +221,9 @@ const mountRoutes = () => {
     apiRouter.use('/payments', require('./routes/paymentRoutes'));
     apiRouter.use('/data', require('./routes/dataRoutes'));
     apiRouter.use('/availability', authenticate, require('./routes/availability'));
+    apiRouter.use('/messages', require('./routes/messagingRoutes'));
+    apiRouter.use('/notifications', require('./routes/notificationRoutes'));
+    apiRouter.use('/ratings', require('./routes/ratingRoutes'));
 
     app.use('/api', apiRouter);
   } catch (error) {

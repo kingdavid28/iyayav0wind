@@ -1560,9 +1560,6 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
   },
-  ratingContainer: {
-    flexDirection: 'row',
-  },
   reviewText: {
     fontSize: 14,
     color: '#4B5563',

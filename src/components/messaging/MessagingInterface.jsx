@@ -4,12 +4,12 @@ import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Text, Surface, ActivityIndicator, Snackbar } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import ConversationList from './ConversationList';
 import MessageInput from './MessageInput';
 import MessageList from './MessageList';
-import { messagingService } from '../../services/messagingService';
-import { firebaseRealtimeService } from '../../services/firebaseRealtimeService';
+import { messagingService } from '../../../services/firebaseMessagingService';
+import { firebaseRealtimeService } from '../../../services/firebaseRealtimeService';
 
 const MessagingInterface = () => {
   const navigation = useNavigation();

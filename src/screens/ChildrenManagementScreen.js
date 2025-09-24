@@ -1,11 +1,5 @@
 // screens/ChildrenManagementScreen.js
 import React, { useState, useEffect } from 'react';
-<<<<<<< HEAD
-import { View, StyleSheet, Alert } from 'react-native';
-import { Button, Text, ActivityIndicator, Card } from 'react-native-paper';
-import { childService } from '../services/childService';
-import { useAuth } from '../core/contexts/AuthContext';
-=======
 import {
   View,
   Text,
@@ -19,13 +13,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
-import profileService from '../services/profileService';
-import { useApi } from '../hooks/useApi';
+import { apiService } from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { styles } from './styles/ChildrenManagementScreen.styles';
 import { validateForm, VALIDATION_RULES } from '../utils/validation';
 import { logger } from '../utils/logger';
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
 
 const ChildrenManagementScreen = () => {
   const { user } = useAuth();
@@ -40,7 +32,7 @@ const ChildrenManagementScreen = () => {
   const loadChildren = async () => {
     try {
       setLoading(true);
-      const childrenData = await childService.getChildren();
+      const childrenData = await apiService.children.getMy();
       setChildren(childrenData);
     } catch (error) {
       console.error('Error loading children:', error);
@@ -60,7 +52,7 @@ const ChildrenManagementScreen = () => {
         // Don't include ID - let server generate it
       };
 
-      const savedChild = await childService.createChild(newChild);
+      const savedChild = await apiService.children.create(newChild);
       setChildren(prev => [...prev, savedChild]);
 
       Alert.alert('Success', 'Child added successfully');
@@ -87,13 +79,13 @@ const ChildrenManagementScreen = () => {
 
       if (childId.startsWith('temp_')) {
         // This was a temporary ID, create new child
-        const savedChild = await childService.createChild(dataToSend);
+        const savedChild = await apiService.children.create(dataToSend);
         setChildren(prev => prev.map(child =>
           child.id === childId ? savedChild : child
         ));
       } else {
         // Update existing child
-        const updatedChild = await childService.updateChild(childId, dataToSend);
+        const updatedChild = await apiService.children.update(childId, dataToSend);
         setChildren(prev => prev.map(child =>
           child.id === childId ? updatedChild : child
         ));
@@ -174,30 +166,5 @@ const ChildCard = ({ child, onSave }) => {
     </Card>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  addButton: {
-    marginBottom: 16,
-  },
-  card: {
-    marginBottom: 8,
-  },
-  input: {
-    marginBottom: 8,
-  },
-});
 
 export default ChildrenManagementScreen;

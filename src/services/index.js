@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { errorHandler } from '../shared/utils/errorHandler';
 import { tokenManager } from '../utils/tokenManager';
 import { firebaseMessagingService } from './firebaseMessagingService';
+import { firebaseAuthService } from './firebaseAuthService';
 
 // Dynamic API URL from environment
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
@@ -32,12 +33,29 @@ class EnhancedAPIService {
     this.isRefreshing = false;
   }
 
+  // Enhanced request method with fallback support
+  async requestWithFallback(endpoint, fallbackData, options = {}) {
+    try {
+      return await this.request(endpoint, options);
+    } catch (error) {
+      // Log the error but don't throw - return fallback data instead
+      console.warn(`API Error for ${endpoint}, using fallback data:`, error.message);
+      logger.warn(`Using fallback data for ${endpoint}:`, error.message);
+
+      // Return fallback data structure that matches expected API response
+      if (Array.isArray(fallbackData)) {
+        return { data: fallbackData, success: true };
+      }
+      return { data: fallbackData, success: true, ...fallbackData };
+    }
+  }
+
   // Enhanced request method with all best practices
   async request(endpoint, options = {}) {
-    const { 
-      method = 'GET', 
-      body, 
-      headers = {}, 
+    const {
+      method = 'GET',
+      body,
+      headers = {},
       useAuth = true,
       retries = 2,
       cache = false,
@@ -92,7 +110,7 @@ class EnhancedAPIService {
 
         const response = await fetch(url, config);
         clearTimeout(timeoutId);
-        
+
         // Handle different response types
         let data;
         const contentType = response.headers.get('content-type');
@@ -107,7 +125,7 @@ class EnhancedAPIService {
           if (response.status === 401 && useAuth) {
             return this.handleUnauthorized(endpoint, options);
           }
-          
+
           // Create detailed error with backend response info
           const errorMessage = data?.message || data?.error || `HTTP ${response.status}`;
           const error = new Error(errorMessage);
@@ -128,7 +146,7 @@ class EnhancedAPIService {
 
       } catch (error) {
         attempt++;
-        
+
         // Handle timeout errors specifically
         if (error.name === 'AbortError') {
           logger.error(`Request timeout after ${timeout}ms: ${method} ${endpoint}`);
@@ -243,6 +261,13 @@ class EnhancedAPIService {
     },
 
     getProfile: (userId = null) => {
+      // Check if user is authenticated first
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (!currentUser) {
+        console.log('No authenticated user - skipping profile fetch');
+        return Promise.resolve({ data: null });
+      }
+
       // For current user profile, userId is not needed
       return this.request('/auth/profile', {
         cache: true,
@@ -373,7 +398,7 @@ class EnhancedAPIService {
       const cacheKey = `jobs:${JSON.stringify(filters)}`;
       const queryParams = new URLSearchParams(filters).toString();
       const endpoint = queryParams ? `/jobs?${queryParams}` : '/jobs';
-      
+
       return this.request(endpoint, {
         cache: true,
         cacheKey
@@ -381,10 +406,20 @@ class EnhancedAPIService {
     },
 
     getMy: (page = 1, limit = 10) => {
-      return this.request(`/jobs/my?page=${page}&limit=${limit}`);
+      return this.requestWithFallback(`/jobs/my?page=${page}&limit=${limit}`, {
+        jobs: [],
+        total: 0,
+        page: 1,
+        limit: 10
+      });
     },
     getMyJobs: (page = 1, limit = 10) => {
-      return this.request(`/jobs/my?page=${page}&limit=${limit}`);
+      return this.requestWithFallback(`/jobs/my?page=${page}&limit=${limit}`, {
+        jobs: [],
+        total: 0,
+        page: 1,
+        limit: 10
+      });
     }, // Backward compatibility
 
     getById: (jobId) => this.request(`/jobs/${jobId}`, {
@@ -458,9 +493,7 @@ class EnhancedAPIService {
 
     getForJob: (jobId, page = 1, limit = 10) => {
       return this.request(`/applications/job/${jobId}?page=${page}&limit=${limit}`);
-    },
-
-
+    }
   };
 
   // Enhanced Bookings operations (from bookingService.js)
@@ -468,7 +501,12 @@ class EnhancedAPIService {
     getMy: (filters = {}) => {
       const queryParams = new URLSearchParams(filters).toString();
       const endpoint = queryParams ? `/bookings/my?${queryParams}` : '/bookings/my';
-      return this.request(endpoint);
+      return this.requestWithFallback(endpoint, {
+        bookings: [],
+        total: 0,
+        page: 1,
+        limit: 10
+      });
     },
 
     getById: (bookingId) => this.request(`/bookings/${bookingId}`),
@@ -524,13 +562,13 @@ class EnhancedAPIService {
 
   // Enhanced Children operations (from childrenAPI + userService.js)
   children = {
-    getMy: () => this.request('/children'),
-    getMyChildren: () => this.request('/children'), // Backward compatibility
+    getMy: () => this.requestWithFallback('/children', []),
+    getMyChildren: () => this.requestWithFallback('/children', []), // Backward compatibility
 
     create: (childData) => {
       // Create a deep copy to avoid mutating the original
       const processedData = JSON.parse(JSON.stringify(childData));
-      
+
       try {
         // Validate and process child data
         this.validateChildData(processedData);
@@ -539,18 +577,20 @@ class EnhancedAPIService {
         // Ensure allergies is always an array even if validation fails
         processedData.allergies = [];
       }
-      
+
       this.clearCache('children');
+      // POST requests should not retry on duplicate key errors
       return this.request('/children', {
         method: 'POST',
-        body: processedData
+        body: processedData,
+        retries: 0 // No retries for child creation to avoid duplicate errors
       });
     },
 
     update: (childId, childData) => {
       // Create a deep copy to avoid mutating the original
       const processedData = JSON.parse(JSON.stringify(childData));
-      
+
       try {
         // Validate and process child data
         this.validateChildData(processedData);
@@ -559,7 +599,7 @@ class EnhancedAPIService {
         // Ensure allergies is always an array even if validation fails
         processedData.allergies = [];
       }
-      
+
       this.clearCache('children');
       return this.request(`/children/${childId}`, {
         method: 'PUT',
@@ -657,7 +697,7 @@ class EnhancedAPIService {
       try {
         // Create Firebase connection before sending message
         const currentUser = await this.request('/auth/profile');
-        const currentUserId = currentUser.id || currentUser._id;
+        const currentUserId = currentUser?.id || currentUser?._id;
 
         if (currentUserId && messageData.recipientId && currentUserId !== messageData.recipientId) {
           try {
@@ -684,7 +724,7 @@ class EnhancedAPIService {
       try {
         // Create Firebase connection before starting conversation
         const currentUser = await this.request('/auth/profile');
-        const currentUserId = currentUser.id || currentUser._id;
+        const currentUserId = currentUser?.id || currentUser?._id;
 
         if (currentUserId && recipientId && currentUserId !== recipientId) {
           try {
@@ -724,7 +764,16 @@ class EnhancedAPIService {
 
   // Enhanced Settings operations (from settingsService.js)
   settings = {
-    getProfile: () => this.request('/auth/profile'),
+    getProfile: () => {
+      // Check if user is authenticated first
+      const currentUser = firebaseAuthService.getCurrentUser();
+      if (!currentUser) {
+        console.log('No authenticated user - skipping profile fetch');
+        return Promise.resolve({ data: null });
+      }
+
+      return this.request('/auth/profile');
+    },
     
     updateProfile: (data) => this.request('/auth/profile', {
       method: 'PUT',
@@ -907,10 +956,5 @@ export const privacyAPI = {
 export const getCurrentAPIURL = () => API_BASE_URL;
 export const getCurrentSocketURL = () => API_BASE_URL.replace('/api', '');
 
-<<<<<<< HEAD
-// Remove default export to prevent circular dependencies
-// export default apiService;
-=======
 // Legacy compatibility - export API_BASE_URL for direct access
 export { API_BASE_URL };
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2

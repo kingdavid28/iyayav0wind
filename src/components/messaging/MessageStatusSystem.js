@@ -1,19 +1,25 @@
-import { database as db, firebaseRef as ref, firebaseOnValue as onValue, firebaseSet as set, firebaseGet as get, firebaseUpdate as update, firebaseQuery as query, firebaseOrderByChild as orderByChild, firebaseEqualTo as equalTo } from '../../config/firebaseConfig.js';
+import { getFirebaseDatabase, firebaseRef as ref, firebaseOnValue as onValue, firebaseSet as set, firebaseGet as get, firebaseUpdate as update, firebaseQuery as query, firebaseOrderByChild as orderByChild, firebaseEqualTo as equalTo } from '../../config/firebase.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Check if Firebase functions are available at runtime
-const checkFirebaseAvailability = () => {
-  const isAvailable = !!(db && onValue && ref && set && get && update);
-  console.log('🔍 MessageStatusSystem - Firebase runtime check:', {
-    hasDb: !!db,
-    hasOnValue: !!onValue,
-    hasRef: !!ref,
-    hasSet: !!set,
-    hasGet: !!get,
-    hasUpdate: !!update,
-    isAvailable
-  });
-  return isAvailable;
+const checkFirebaseAvailability = async () => {
+  try {
+    const db = await getFirebaseDatabase();
+    const isAvailable = !!(db && onValue && ref && set && get && update);
+    console.log('🔍 MessageStatusSystem - Firebase runtime check:', {
+      hasDb: !!db,
+      hasOnValue: !!onValue,
+      hasRef: !!ref,
+      hasSet: !!set,
+      hasGet: !!get,
+      hasUpdate: !!update,
+      isAvailable
+    });
+    return isAvailable;
+  } catch (error) {
+    console.error('❌ MessageStatusSystem - Firebase not available:', error);
+    return false;
+  }
 };
 
 // Message status constants
@@ -67,6 +73,7 @@ class MessageStatusManager {
     try {
       console.log(`📨 Updating message status: ${messageId} -> ${newStatus} in ${conversationId}`);
 
+      const db = await getFirebaseDatabase();
       const messageRef = ref(db, `messages/${conversationId}/${messageId}`);
 
       // Get current message data
@@ -149,13 +156,14 @@ class MessageStatusManager {
   }
 
   // Real-time status listener
-  listenToMessageStatus(conversationId, messageId, callback) {
-    if (!checkFirebaseAvailability()) {
+  async listenToMessageStatus(conversationId, messageId, callback) {
+    if (!(await checkFirebaseAvailability())) {
       console.warn('⚠️ Firebase not available, cannot listen to message status');
       return () => {}; // Return empty unsubscribe function
     }
 
     const listenerKey = `${conversationId}_${messageId}`;
+    const db = await getFirebaseDatabase();
     const messageRef = ref(db, `messages/${conversationId}/${messageId}`);
 
     const unsubscribe = onValue(messageRef, (snapshot) => {
@@ -181,12 +189,13 @@ class MessageStatusManager {
 
   // Get message status with caching
   async getMessageStatus(conversationId, messageId) {
-    if (!checkFirebaseAvailability()) {
+    if (!(await checkFirebaseAvailability())) {
       console.warn('⚠️ Firebase not available, cannot get message status');
       return null;
     }
 
     try {
+      const db = await getFirebaseDatabase();
       const messageRef = ref(db, `messages/${conversationId}/${messageId}`);
       const snapshot = await get(messageRef);
 
@@ -312,7 +321,7 @@ class DeliveryConfirmationSystem {
 
   // Sync message status across devices
   async syncMessageStatus(conversationId, messageId, userId, status) {
-    if (!checkFirebaseAvailability()) {
+    if (!(await checkFirebaseAvailability())) {
       console.warn('⚠️ Firebase not available, cannot sync message status');
       return;
     }
@@ -320,6 +329,7 @@ class DeliveryConfirmationSystem {
     try {
       console.log(`📱 Syncing status ${status} for ${messageId} across devices`);
 
+      const db = await getFirebaseDatabase();
       // Create a sync reference for cross-device updates
       const syncRef = ref(db, `messageSync/${conversationId}/${messageId}/${userId}`);
       await set(syncRef, {
@@ -336,12 +346,13 @@ class DeliveryConfirmationSystem {
   }
 
   // Listen for cross-device status updates
-  listenForStatusSync(conversationId, userId, callback) {
-    if (!checkFirebaseAvailability()) {
+  async listenForStatusSync(conversationId, userId, callback) {
+    if (!(await checkFirebaseAvailability())) {
       console.warn('⚠️ Firebase not available, cannot listen for status sync');
       return () => {}; // Return empty unsubscribe function
     }
 
+    const db = await getFirebaseDatabase();
     const syncRef = ref(db, `messageSync/${conversationId}`);
 
     const unsubscribe = onValue(syncRef, (snapshot) => {

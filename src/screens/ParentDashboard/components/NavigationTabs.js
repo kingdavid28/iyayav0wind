@@ -1,18 +1,20 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
-<<<<<<< HEAD
 import { Ionicons } from '@expo/vector-icons';
-=======
-import { Home, Search, Calendar, User, Plus, Briefcase, MessageCircle } from 'lucide-react-native';
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 
-const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation }) => {
-  
+const NavigationTabs = ({
+  activeTab,
+  setActiveTab,
+  onProfilePress,
+  navigation,
+  unreadCount = 0
+}) => {
+
   return (
     <View style={styles.tabContainer}>
-      <ScrollView 
-        horizontal 
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabsScrollContent}
       >
@@ -63,18 +65,6 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         </Text>
       </TouchableOpacity>
 
-
-
-      <TouchableOpacity
-        style={[styles.navItem, activeTab === 'messages' && styles.activeNavItem]}
-        onPress={() => setActiveTab('messages')}
-      >
-        <MessageCircle size={20} color={activeTab === 'messages' ? colors.secondary : colors.textTertiary} />
-        <Text style={[styles.navText, activeTab === 'messages' && styles.activeNavText]}>
-          Messages
-        </Text>
-      </TouchableOpacity>
-
       <TouchableOpacity
         style={[styles.navItem, activeTab === 'jobs' && styles.activeNavItem]}
         onPress={() => setActiveTab('jobs')}
@@ -85,7 +75,6 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
         </Text>
       </TouchableOpacity>
 
-<<<<<<< HEAD
       <TouchableOpacity
         style={[styles.navItem, activeTab === 'job-management' && styles.activeNavItem]}
         onPress={() => setActiveTab('job-management')}
@@ -95,9 +84,6 @@ const NavigationTabs = ({ activeTab, setActiveTab, onProfilePress, navigation })
           Post Job
         </Text>
       </TouchableOpacity>
-
-=======
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
       </ScrollView>
     </View>
   );

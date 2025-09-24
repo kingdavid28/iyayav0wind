@@ -40,21 +40,6 @@ import { getCurrentDeviceLocation, searchLocation } from '../../../utils/locatio
 import { getImageUrl } from '../../../utils/imageUtils';
 
 const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visible }) => {
-
-  
-<<<<<<< HEAD
-  const getFullImageURL = (imagePath) => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith('http')) return imagePath;
-    if (imagePath.startsWith('/uploads/')) {
-      return `http://192.168.1.9:5000${imagePath}`;
-    }
-    return imagePath;
-  };
-=======
-
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
-  
   const [currentStep, setCurrentStep] = useState(1);
   const [bookingData, setBookingData] = useState({
     date: null,

@@ -21,10 +21,7 @@
   },
   "dependencies": {
     "@expo/image-utils": "^0.8.7",
-<<<<<<< HEAD
-=======
     "@expo/metro-config": "^54.0.4",
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
     "@miblanchard/react-native-slider": "^2.6.0",

@@ -383,7 +383,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
     // Check if Firebase is available
     const checkFirebaseAvailability = () => {
-      const { database: db, firebaseRef: ref, firebaseOnValue: onValue, firebaseQuery: query, firebaseOrderByChild: orderByChild } = require('../config/firebaseConfig');
+      const { database: db, ref, onValue, query, orderByChild } = require('../config/firebase');
       return !!(db && onValue && ref && query && orderByChild);
     };
 
@@ -392,7 +392,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
       return;
     }
 
-    const { database: db, firebaseRef: ref, firebaseOnValue: onValue, firebaseQuery: query, firebaseOrderByChild: orderByChild } = require('../config/firebaseConfig');
+    const { database: db, ref, onValue, query, orderByChild } = require('../config/firebase');
 
     const reviewsRef = ref(db, `reviews/${user.id}`);
     const reviewsQuery = query(reviewsRef, orderByChild('timestamp'));
@@ -583,11 +583,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
       setApplicationSubmitting(true)
 
       console.log('Submitting application with jobId:', jobId);
-<<<<<<< HEAD
-      const response = await applicationsAPI.apply({
-=======
       const response = await apiService.applications.apply({
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
         jobId: jobId,
         coverLetter: coverLetter || '',
         proposedRate: proposedRate ? Number(proposedRate) : undefined,

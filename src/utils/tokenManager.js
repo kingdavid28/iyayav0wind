@@ -47,7 +47,9 @@ class TokenManager {
     try {
       const currentUser = firebaseAuthService.getCurrentUser();
       if (!currentUser) {
-        throw new Error('No authenticated user');
+        console.log('No authenticated user - returning null silently');
+        performanceMonitor.endTimer('token-refresh');
+        return null;
       }
 
       const token = await currentUser.getIdToken(false); // Don't force refresh
@@ -55,10 +57,10 @@ class TokenManager {
       performanceMonitor.endTimer('token-refresh');
       return token;
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      console.warn('Token refresh failed:', error.message);
       performanceMonitor.endTimer('token-refresh');
       this.clearCache();
-      throw error;
+      return null;
     }
   }
 

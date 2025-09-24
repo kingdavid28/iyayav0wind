@@ -302,7 +302,7 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
           </View>
         );
         
-      case 3:
+      case 3: {
         const suggestedSkills = [
           'CPR Certified',
           'First Aid Training',
@@ -389,6 +389,7 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
             </View>
           </View>
         );
+      }
         
       default:
         return null;

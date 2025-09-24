@@ -21,19 +21,13 @@ import ProfileDataProvider from '../../components/features/privacy/ProfileDataMa
 
 
 
-
 // Component imports
 import Header from './components/Header';
 import NavigationTabs from './components/NavigationTabs';
 import HomeTab from './components/HomeTab';
 import SearchTab from './components/SearchTab';
 import BookingsTab from './components/BookingsTab';
-<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
-import MessagesTab from '../../components/features/messaging/MessagesTab';
-=======
 import MessagesTab from './components/MessagesTab';
-
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
 import PostJobsTab from './components/PostJobsTab';
 import MyJobsTab from './components/MyJobsTab';
 
@@ -69,7 +63,7 @@ const DEFAULT_CAREGIVER = {
 const ParentDashboard = () => {
   const navigation = useNavigation();
   const { signOut, user } = useAuth();
-  
+
   // Custom hook for dashboard data
   const {
     activeTab, setActiveTab: setActiveTabHook,
@@ -78,17 +72,17 @@ const ParentDashboard = () => {
     loading,
     loadProfile, fetchJobs, fetchCaregivers, fetchBookings, fetchChildren
   } = useParentDashboard();
-  
+
 
 
   const setActiveTab = setActiveTabHook;
-  
+
   // UI State
   const [refreshing, setRefreshing] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showAllChildren, setShowAllChildren] = useState(false);
 
-  
+
   // Modal states
   const [modals, setModals] = useState({
     child: false,
@@ -98,14 +92,14 @@ const ParentDashboard = () => {
     payment: false,
     booking: false
   });
-  
+
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [filteredCaregivers, setFilteredCaregivers] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [activeFilters, setActiveFilters] = useState(0);
-  
+
   // Form states
   const [childForm, setChildForm] = useState({
     name: '',
@@ -114,14 +108,14 @@ const ParentDashboard = () => {
     notes: '',
     editingId: null
   });
-  
+
   const [profileForm, setProfileForm] = useState({
     name: '',
     contact: '',
     location: '',
     image: ''
   });
-  
+
   // Booking state
   const [bookingsFilter, setBookingsFilter] = useState('upcoming');
   const [selectedCaregiver, setSelectedCaregiver] = useState(DEFAULT_CAREGIVER);
@@ -130,7 +124,7 @@ const ParentDashboard = () => {
     base64: '',
     mimeType: 'image/jpeg'
   });
-  
+
   // Update profile form when profile data changes
   useEffect(() => {
     if (profile) {
@@ -148,7 +142,7 @@ const ParentDashboard = () => {
   const displayName = useMemo(() => {
     return (user?.displayName || (user?.email ? String(user.email).split('@')[0] : '') || '').trim();
   }, [user]);
-  
+
   const greetingName = useMemo(() => {
     return (profileForm.name && String(profileForm.name).trim()) || displayName;
   }, [profileForm.name, displayName]);
@@ -160,7 +154,7 @@ const ParentDashboard = () => {
       [modalName]: isOpen !== null ? isOpen : !prev[modalName]
     }));
   }, []);
-  
+
   // Helper function to create caregiver object
   const createCaregiverObject = useCallback((caregiverData = null) => {
     const caregiver = caregiverData || (caregivers?.length > 0 ? caregivers[0] : null);
@@ -203,7 +197,7 @@ const ParentDashboard = () => {
     },
     {
       id: 'add-child',
-      icon: 'plus',
+      icon: 'person-add',
       title: 'Add Child',
       onPress: () => openAddChild()
     }
@@ -228,7 +222,9 @@ const ParentDashboard = () => {
 
 
 
+
   // Initial data load handled by hook
+
 
 
 
@@ -405,24 +401,15 @@ const ParentDashboard = () => {
   const handleMessageCaregiver = useCallback(async (caregiver) => {
     // Create connection in Firebase before navigating
     const firebaseMessagingService = (await import('../../services/firebaseMessagingService')).default;
-    
+
     try {
-<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
-      const conversation = await messagingService.startConversation(
-        caregiver._id,
-        caregiver.name,
-        'caregiver',
-        `Hi ${caregiver.name}, I'm interested in your services.`
-      );
-=======
       // Ensure connection exists in Firebase
       await firebaseMessagingService.createConnection(user.uid, caregiver._id || caregiver.id);
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
-      
+
     } catch (error) {
       console.log('Connection setup warning:', error.message);
     }
-    
+
     navigation.navigate('CaregiverChat', {
       userId: user.uid,
       caregiverId: caregiver._id || caregiver.id,
@@ -458,7 +445,7 @@ const ParentDashboard = () => {
     if (!bookingData.caregiverId || !bookingData.date || !bookingData.startTime || !bookingData.endTime) {
       throw new Error('Missing required booking information');
     }
-    
+
     // Transform selected children names to child objects
     const selectedChildrenObjects = (bookingData.selectedChildren || []).map(childName => {
       const childData = children.find(child => child.name === childName);
@@ -489,19 +476,13 @@ const ParentDashboard = () => {
 
 
     try {
-<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
-      const booking = await bookingsAPI.create(payload);
-      console.log('✅ Booking created successfully:', booking);
-=======
       const booking = await apiService.bookings.create(payload);
 
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
-      
       setActiveTab('bookings');
       await fetchBookings();
       toggleModal('booking', false);
       Alert.alert('Success', 'Booking created successfully!');
-      
+
       return booking;
     } catch (error) {
 
@@ -533,7 +514,7 @@ const ParentDashboard = () => {
 
   const handleUploadPayment = useCallback(async () => {
     if (!paymentData.bookingId || !paymentData.base64) return;
-    
+
     try {
       await bookingsAPI.uploadPaymentProof(paymentData.bookingId, paymentData.base64, paymentData.mimeType);
       toggleModal('payment', false);
@@ -548,13 +529,13 @@ const ParentDashboard = () => {
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
     setSearchLoading(true);
-    
+
     setTimeout(() => {
       if (!query.trim()) {
         setFilteredCaregivers([]);
         setSearchResults([]);
       } else {
-        const searchResults = caregivers.filter(caregiver => 
+        const searchResults = caregivers.filter(caregiver =>
           caregiver.name?.toLowerCase().includes(query.toLowerCase()) ||
           caregiver.location?.toLowerCase().includes(query.toLowerCase()) ||
           caregiver.bio?.toLowerCase().includes(query.toLowerCase()) ||
@@ -571,7 +552,7 @@ const ParentDashboard = () => {
   const handleApplyFilters = (newFilters) => {
     setFilters(newFilters);
     setActiveFilters(countActiveFilters(newFilters));
-    
+
     const currentResults = searchQuery ? searchResults : caregivers;
     const filtered = applyFilters(currentResults, newFilters);
     setFilteredCaregivers(filtered);
@@ -657,25 +638,25 @@ const ParentDashboard = () => {
         address: profileForm.location.trim(),
         location: profileForm.location.trim()
       };
-      
+
       console.log('Profile form location:', profileForm.location);
       console.log('Update data being sent:', updateData);
-      
 
-      
+
+
       // Handle image upload if provided
       if (imageUri) {
         try {
           const base64Image = await FileSystem.readAsStringAsync(imageUri, {
             encoding: 'base64',
           });
-          
+
           const imageResult = await authAPI.uploadProfileImage(base64Image, 'image/jpeg');
           const imageUrl = imageResult?.data?.url || imageResult?.url || imageResult?.data?.profileImageUrl;
-          
+
           if (imageUrl) {
             setProfileForm(prev => ({ ...prev, image: imageUrl }));
-            
+
             if (imageResult?.data?.user) {
               toggleModal('profile', false);
               Alert.alert('Success', 'Profile updated successfully');
@@ -688,16 +669,16 @@ const ParentDashboard = () => {
           Alert.alert('Warning', 'Image upload failed, but will continue with profile update');
         }
       }
-      
+
       const { tokenManager } = await import('../../utils/tokenManager');
       const freshToken = await tokenManager.getValidToken(true);
-      
+
       if (!freshToken) {
         throw new Error('Authentication required. Please log in again.');
       }
-      
+
       const result = await authAPI.updateProfile(updateData);
-      
+
       if (result?.data) {
         console.log('Profile update result:', result.data);
         // Keep the location we just saved since server doesn't return it
@@ -708,7 +689,7 @@ const ParentDashboard = () => {
           location: prev.location, // Keep our saved location
           image: result.data.profileImage || prev.image
         }));
-        
+
         toggleModal('profile', false);
         Alert.alert('Success', 'Profile updated successfully');
         await loadProfile();
@@ -774,10 +755,7 @@ const ParentDashboard = () => {
             onViewCaregiver={handleViewCaregiver}
             onSearch={handleSearch}
             onOpenFilter={() => toggleModal('filter', true)}
-<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
-=======
             loading={loading}
->>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
           />
         );
       case 'bookings':
@@ -830,9 +808,9 @@ const ParentDashboard = () => {
       <PrivacyProvider>
         <ProfileDataProvider>
           <View style={styles.container}>
-      <Header 
-        navigation={navigation} 
-        onProfilePress={() => toggleModal('profile', true)} 
+      <Header
+        navigation={navigation}
+        onProfilePress={() => toggleModal('profile', true)}
         onSignOut={signOut}
         greetingName={greetingName}
         onProfileEdit={() => toggleModal('profile', true)}
@@ -842,14 +820,15 @@ const ParentDashboard = () => {
         profileLocation={profileForm.location}
         setActiveTab={setActiveTab}
       />
-      
-      <NavigationTabs 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+
+      <NavigationTabs
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         onProfilePress={() => toggleModal('profile', true)}
         navigation={navigation}
+        unreadCount={0}
       />
-      
+
       {renderActiveTab()}
 
       {/* Modals */}

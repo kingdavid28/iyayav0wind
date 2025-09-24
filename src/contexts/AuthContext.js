@@ -5,6 +5,9 @@ import { authAPI } from "../config/api";
 import { STORAGE_KEYS } from "../config/constants";
 import { firebaseAuthService } from "../services/firebaseAuthService";
 
+// Import safety functions for Firebase initialization
+import { getAuthSync, initializeFirebase } from '../config/firebase';
+
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -12,11 +15,12 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
   const [hasLoggedOut, setHasLoggedOut] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   // Normalize user object to ensure consistent property names
   const normalizeUser = (userData) => {
     if (!userData) return null;
-    
+
     return {
       // Use id consistently (prefer _id from MongoDB if available)
       id: userData._id || userData.id || userData.uid,
@@ -28,140 +32,99 @@ export const AuthProvider = ({ children }) => {
     };
   };
 
-  // Check authentication status on app start
-  const checkAuthStatus = async () => {
-    try {
-      if (hasLoggedOut) {
-        setUser(null);
-        setIsLoading(false);
-        return;
-      }
-      
-      // Check Firebase auth state
-      const currentUser = firebaseAuthService.getCurrentUser();
-      if (currentUser && currentUser.emailVerified) {
-        const token = await currentUser.getIdToken();
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-        
-        // Get user profile from MongoDB
-        try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/firebase-profile`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          let profile = { role: 'parent' };
-          if (response.ok) {
-            profile = await response.json();
-            console.log('🔍 Profile data received in checkAuthStatus:', profile);
-          } else {
-            console.log('❌ Profile fetch failed in checkAuthStatus:', response.status);
-          }
-          
-          const normalizedUser = normalizeUser({
-            id: currentUser.uid,
-            email: currentUser.email,
-            name: currentUser.displayName || profile.name,
-            emailVerified: currentUser.emailVerified,
-            role: profile.role || 'parent',
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            middleInitial: profile.middleInitial,
-            birthDate: profile.birthDate,
-            phone: profile.phone,
-            profileImage: profile.profileImage,
-            address: profile.address,
-            children: profile.children,
-            caregiverProfile: profile.caregiverProfile,
-            // Include MongoDB _id if available
-            _id: profile._id
-          });
-          
-          setUser(normalizedUser);
-        } catch (error) {
-          console.warn('Failed to get profile:', error.message);
-          setUser(normalizeUser({
-            id: currentUser.uid,
-            email: currentUser.email,
-            name: currentUser.displayName,
-            emailVerified: currentUser.emailVerified,
-            role: 'parent'
-          }));
-        }
-      } else {
-        setUser(null);
-      }
-    } catch (e) {
-      console.log("Auth check error:", e.message);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    // Set up Firebase auth state listener
-    const unsubscribe = firebaseAuthService.onAuthStateChanged(async (user) => {
-      if (user && user.emailVerified) {
-        const token = await user.getIdToken();
-        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-        console.log('💾 Token stored in auth listener:', !!token);
-        
-        // Get user profile from MongoDB
-        try {
-          const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          let profile = { role: 'parent' };
-          if (response.ok) {
-            profile = await response.json();
-            console.log('🔍 Profile data received in auth listener:', profile);
-          } else {
-            console.log('❌ Profile fetch failed in auth listener:', response.status);
-          }
-          
-          const normalizedUser = normalizeUser({
-            id: user.uid,
-            email: user.email,
-            name: user.displayName || profile.name,
-            emailVerified: user.emailVerified,
-            role: profile.role || 'parent',
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            middleInitial: profile.middleInitial,
-            birthDate: profile.birthDate,
-            phone: profile.phone,
-            profileImage: profile.profileImage,
-            address: profile.address,
-            children: profile.children,
-            caregiverProfile: profile.caregiverProfile,
-            // Include MongoDB _id if available
-            _id: profile._id
-          });
-          
-          setUser(normalizedUser);
-        } catch (error) {
-          console.warn('Failed to get profile:', error.message);
-          setUser(normalizeUser({
-            id: user.uid,
-            email: user.email,
-            name: user.displayName,
-            emailVerified: user.emailVerified,
-            role: 'parent'
-          }));
-        }
-      } else {
-        setUser(null);
-        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      }
-      setIsLoading(false);
-    });
+    let unsubscribe = null;
 
-    return () => unsubscribe();
+    const initializeAuth = async () => {
+      try {
+        console.log('🔄 Initializing AuthContext with safety checks...');
+
+        // Ensure Firebase is initialized first with safety checks
+        await initializeFirebase();
+
+        // Get auth instance safely
+        const auth = getAuthSync();
+        console.log('✅ AuthContext: Firebase initialized, setting up listener');
+
+        // Set up auth state listener with error handling
+        unsubscribe = firebaseAuthService.onAuthStateChanged(async (user) => {
+          console.log('🔐 Auth state changed:', user ? 'User logged in' : 'User logged out');
+
+          if (user && user.emailVerified) {
+            try {
+              const token = await user.getIdToken();
+              await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+              console.log('💾 Token stored in auth listener:', !!token);
+
+              // Get user profile from MongoDB
+              const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/firebase-profile`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+              let profile = { role: 'parent' };
+              if (response.ok) {
+                profile = await response.json();
+                console.log('🔍 Profile data received in auth listener:', profile);
+              } else {
+                console.log('❌ Profile fetch failed in auth listener:', response.status);
+              }
+
+              const normalizedUser = normalizeUser({
+                id: user.uid,
+                email: user.email,
+                name: user.displayName || profile.name,
+                emailVerified: user.emailVerified,
+                role: profile.role || 'parent',
+                firstName: profile.firstName,
+                lastName: profile.lastName,
+                middleInitial: profile.middleInitial,
+                birthDate: profile.birthDate,
+                phone: profile.phone,
+                profileImage: profile.profileImage,
+                address: profile.address,
+                children: profile.children,
+                caregiverProfile: profile.caregiverProfile,
+                // Include MongoDB _id if available
+                _id: profile._id
+              });
+
+              setUser(normalizedUser);
+            } catch (profileError) {
+              console.warn('Failed to get profile:', profileError.message);
+              setUser(normalizeUser({
+                id: user.uid,
+                email: user.email,
+                name: user.displayName,
+                emailVerified: user.emailVerified,
+                role: 'parent'
+              }));
+            }
+          } else {
+            setUser(null);
+            await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+          }
+          setIsLoading(false);
+        });
+
+        setAuthInitialized(true);
+
+      } catch (error) {
+        console.error('❌ AuthContext initialization failed:', error);
+        setError(error.message);
+        setIsLoading(false);
+        setAuthInitialized(true); // Mark as initialized anyway to avoid blocking
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const login = async (email, password) => {
@@ -169,23 +132,23 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
       setError(null);
       setHasLoggedOut(false);
-      
+
       console.log('🔐 Attempting Firebase login with:', { email });
       const res = await firebaseAuthService.login(email, password);
       console.log('✅ Firebase login successful:', res);
-      
+
       if (res?.token) {
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, res.token);
         console.log('💾 Token stored successfully:', !!res.token);
       } else {
         console.log('⚠️ No token in login response');
       }
-      
+
       // Normalize the user object before setting it
       if (res.user) {
         setUser(normalizeUser(res.user));
       }
-      
+
       return { success: true, user: res.user };
     } catch (err) {
       console.log('❌ Login error:', err.message);
@@ -202,12 +165,12 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
       setError(null);
       setHasLoggedOut(false);
-      
+
       console.log('🚀 Starting Firebase signup for:', userData.email);
-      
+
       const res = await firebaseAuthService.signup(userData);
       console.log('✅ Firebase signup successful:', res);
-      
+
       return res;
     } catch (err) {
       console.error('❌ Signup error:', err.message);
@@ -219,20 +182,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Safe sign out function with Firebase safety checks
   const signOut = async () => {
     try {
-      console.log('🚪 Starting Firebase signOut...');
+      console.log('🚪 Starting Firebase signOut with safety checks...');
       setIsLoading(true);
-      
+
+      // Use Firebase auth service which has safety checks
       await firebaseAuthService.signOut();
       await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      
+
       setUser(null);
       setError(null);
       setHasLoggedOut(true);
       console.log('✅ Firebase signOut completed');
     } catch (err) {
       console.log('❌ Logout error:', err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -242,31 +208,31 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       console.log('🔐 Verifying email token:', token);
       const result = await authAPI.verifyEmail(token);
       console.log('✅ Verification API response:', result);
-      
+
       if (result.success && result.token) {
         // Store the new token
         await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, result.token);
         console.log('💾 Token stored successfully');
-        
+
         // Use user data from verification response if available
         let userData = result.user;
-        
+
         // If no user data in response, fetch profile
         if (!userData) {
           const profile = await authAPI.getProfile();
           userData = profile?.data || profile;
         }
-        
+
         console.log('👤 Setting user data:', userData);
         // Normalize the user object before setting it
         setUser(normalizeUser(userData));
         return { success: true, user: userData };
       }
-      
+
       throw new Error(result.message || 'Email verification failed');
     } catch (error) {
       console.error('❌ Email verification error:', error);
@@ -291,14 +257,22 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
-    loading: isLoading,
+    loading: isLoading || !authInitialized, // Include auth initialization state
     error,
     login,
     signup,
     signOut,
     resetPassword,
-    checkAuthStatus,
     verifyEmailToken,
+    // Safe current user getter
+    getCurrentUser: () => {
+      try {
+        return firebaseAuthService.getCurrentUser();
+      } catch (error) {
+        console.error('❌ Get current user error:', error);
+        return null;
+      }
+    }
   };
 
   return (

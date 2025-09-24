@@ -15,8 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from 'react-native-paper';
 import firebaseMessagingService from '../services/firebaseMessagingService';
-import firebaseConfig from '../config/firebaseConfig';
-const { database } = firebaseConfig;
+import { getFirebaseDatabase } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 // MessageItem component with simplified features

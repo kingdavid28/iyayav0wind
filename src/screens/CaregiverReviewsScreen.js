@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  FlatList, 
-  StyleSheet,
-  Alert 
-} from 'react-native';
 import {
-  ref as firebaseRef,
-  onValue as firebaseOnValue,
-  push as firebasePush,
-  set as firebaseSet,
-  query as firebaseQuery,
-  orderByChild as firebaseOrderByChild
-} from 'firebase/database';
-import firebaseConfig from '../config/firebaseConfig';
-const { database } = firebaseConfig;
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  Alert
+} from 'react-native';
+import { getFirebaseDatabase, ref, onValue, push, set, query, orderByChild } from '../config/firebase';
 import { StarRatingInput, StarRatingDisplay } from 'react-native-star-rating-widget';
 
 const ReviewItem = ({ review }) => (
@@ -45,47 +36,59 @@ const CaregiverReviewsScreen = ({ route }) => {
 
   // Fetch reviews
   useEffect(() => {
-    const reviewsRef = firebaseRef(database, `reviews/${caregiverId}`);
-    const reviewsQuery = firebaseQuery(reviewsRef, firebaseOrderByChild('timestamp'));
+    const fetchReviews = async () => {
+      const database = await getFirebaseDatabase();
+      const reviewsRef = ref(database, `reviews/${caregiverId}`);
+      const reviewsQuery = query(reviewsRef, orderByChild('timestamp'));
 
-    const unsubscribe = firebaseOnValue(reviewsQuery, (snapshot) => {
-      const reviewsData = [];
-      snapshot.forEach((childSnapshot) => {
-        reviewsData.push({
-          id: childSnapshot.key,
-          parentId: childSnapshot.val().parentId,
-          rating: childSnapshot.val().rating,
-          comment: childSnapshot.val().comment,
-          timestamp: childSnapshot.val().timestamp
+      const unsubscribe = onValue(reviewsQuery, (snapshot) => {
+        const reviewsData = [];
+        snapshot.forEach((childSnapshot) => {
+          reviewsData.push({
+            id: childSnapshot.key,
+            parentId: childSnapshot.val().parentId,
+            rating: childSnapshot.val().rating,
+            comment: childSnapshot.val().comment,
+            timestamp: childSnapshot.val().timestamp
+          });
         });
+        setReviews(reviewsData);
       });
-      setReviews(reviewsData);
+
+      return unsubscribe;
+    };
+
+    let unsubscribe;
+    fetchReviews().then((unsub) => {
+      unsubscribe = unsub;
     });
 
-    return () => unsubscribe();
+    return () => unsubscribe && unsubscribe();
   }, [caregiverId]);
 
-  const submitReview = () => {
+  const submitReview = async () => {
     if (rating === 0) {
       Alert.alert('Error', 'Please select a rating');
       return;
     }
 
-    const reviewRef = firebasePush(firebaseRef(database, `reviews/${caregiverId}`));
-    firebaseSet(reviewRef, {
-      parentId: userId,
-      rating: rating,
-      comment: comment,
-      timestamp: Date.now()
-    }).then(() => {
+    try {
+      const database = await getFirebaseDatabase();
+      const reviewRef = push(ref(database, `reviews/${caregiverId}`));
+      await set(reviewRef, {
+        parentId: userId,
+        rating: rating,
+        comment: comment,
+        timestamp: Date.now()
+      });
       setRating(0);
       setComment('');
       setShowReviewForm(false);
       Alert.alert('Success', 'Review submitted successfully');
-    }).catch((error) => {
+    } catch (error) {
       Alert.alert('Error', 'Failed to submit review');
       console.error('Error submitting review:', error);
-    });
+    }
   };
 
   const renderReviewItem = ({ item }) => (
