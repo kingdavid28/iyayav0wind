@@ -47,32 +47,47 @@ exports.createChild = async (req, res) => {
       return res.status(401).json({ success: false, error: 'User not authenticated' });
     }
 
-    const { name, age, allergies, preferences } = req.body;
-    console.log('👶 Child data:', { name, age, allergies, preferences });
-
-    if (!name || age === undefined || age === null) {
+    // Option A: Remove ID from request body and let MongoDB generate it
+    const { _id, id, childId, ...childData } = req.body;
+    
+    // Validate required fields
+    if (!childData.name || childData.age === undefined || childData.age === null) {
       return res.status(400).json({ 
         success: false, 
         error: 'Name and age are required' 
       });
     }
 
-    const childData = {
+    const cleanChildData = {
       parentId: userId,
-      name: String(name).trim(),
-      age: Number(age),
-      allergies: allergies || '',
-      preferences: preferences || ''
+      name: String(childData.name).trim(),
+      age: Number(childData.age),
+      allergies: childData.allergies || '',
+      preferences: childData.preferences || ''
     };
     
-    console.log('👶 Creating child with data:', childData);
+    console.log('👶 Creating child with data:', cleanChildData);
     
-    const child = await Child.create(childData);
-    console.log('✅ Child created successfully:', child._id);
+    // Option B: Check if ID exists first (if somehow an ID was passed)
+    if (_id || id || childId) {
+      const providedId = _id || id || childId;
+      const existingChild = await Child.findById(providedId);
+      if (existingChild) {
+        return res.status(400).json({
+          success: false,
+          error: 'Child ID already exists',
+          suggestion: 'Remove the ID field to generate a new one automatically'
+        });
+      }
+    }
+    
+    const child = new Child(cleanChildData);
+    const savedChild = await child.save();
+    console.log('✅ Child created successfully:', savedChild._id);
 
     res.status(201).json({
       success: true,
-      child
+      child: savedChild
     });
   } catch (err) {
     console.error('❌ Create child error:', {
@@ -84,18 +99,34 @@ exports.createChild = async (req, res) => {
       requestBody: req.body
     });
     
-    let errorMessage = 'Failed to create child';
-    if (err.name === 'ValidationError') {
-      errorMessage = Object.values(err.errors).map(e => e.message).join(', ');
-    } else if (err.code === 11000) {
-      errorMessage = 'Child ID already exists';
+    if (err.code === 11000) { // MongoDB duplicate key error
+      // Check which field caused the duplicate error
+      if (err.message.includes('parentId_1_name_1')) {
+        res.status(400).json({
+          success: false,
+          error: 'A child with this name already exists',
+          message: 'Please choose a different name for this child'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: 'Child ID already exists',
+          message: 'Please remove the ID field or provide a unique ID'
+        });
+      }
+    } else if (err.name === 'ValidationError') {
+      const errorMessage = Object.values(err.errors).map(e => e.message).join(', ');
+      res.status(400).json({
+        success: false,
+        error: errorMessage
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create child',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
     }
-    
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
   }
 };
 

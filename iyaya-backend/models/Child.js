@@ -32,4 +32,7 @@ const childSchema = new mongoose.Schema({
 // Indexes for better query performance
 childSchema.index({ parentId: 1 });
 
+// Unique compound index to prevent duplicate children with same name for same parent
+childSchema.index({ parentId: 1, name: 1 }, { unique: true });
+
 module.exports = mongoose.model('Child', childSchema);

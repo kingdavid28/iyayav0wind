@@ -262,9 +262,14 @@ class EnhancedAPIService {
 
     getProfile: (userId = null) => {
       // Check if user is authenticated first
-      const currentUser = firebaseAuthService.getCurrentUser();
-      if (!currentUser) {
-        console.log('No authenticated user - skipping profile fetch');
+      try {
+        const currentUser = firebaseAuthService?.getCurrentUser();
+        if (!currentUser) {
+          console.log('No authenticated user - skipping profile fetch');
+          return Promise.resolve({ data: null });
+        }
+      } catch (error) {
+        console.warn('Error checking authentication:', error.message);
         return Promise.resolve({ data: null });
       }
 
@@ -770,9 +775,14 @@ class EnhancedAPIService {
   settings = {
     getProfile: () => {
       // Check if user is authenticated first
-      const currentUser = firebaseAuthService.getCurrentUser();
-      if (!currentUser) {
-        console.log('No authenticated user - skipping profile fetch');
+      try {
+        const currentUser = firebaseAuthService?.getCurrentUser();
+        if (!currentUser) {
+          console.log('No authenticated user - skipping profile fetch');
+          return Promise.resolve({ data: null });
+        }
+      } catch (error) {
+        console.warn('Error checking authentication:', error.message);
         return Promise.resolve({ data: null });
       }
 
