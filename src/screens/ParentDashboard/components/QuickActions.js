@@ -4,31 +4,32 @@ import { Plus, Calendar, MessageCircle, Search } from 'lucide-react-native';
 import QuickAction from './QuickAction';
 import { colors } from '../../styles/ParentDashboard.styles';
 
-const QuickActions = ({ actions }) => {
-  const styleFor = (id) => {
-    switch (id) {
-      case 'find':
-        return { color: '#EC4899', bgColor: '#FFF1F7' };
-      case 'book':
-        return { color: '#3B82F6', bgColor: '#EFF6FF' };
-      case 'messages':
-        return { color: '#8B5CF6', bgColor: '#F5F3FF' };
-      case 'add-child':
-        return { color: '#10B981', bgColor: '#ECFDF5' };
-      default:
-        return { color: colors.primary, bgColor: colors.surface };
-    }
-  };
+const styleFor = (id) => {
+  switch (id) {
+    case 'find':
+      return { color: colors.secondary, bgColor: '#FFF1F7' };
+    case 'book':
+      return { color: colors.info, bgColor: '#EFF6FF' };
+    case 'messages':
+      return { color: colors.primary, bgColor: '#F5F3FF' };
+    case 'add-child':
+      return { color: colors.success, bgColor: '#ECFDF5' };
+    default:
+      return { color: colors.primary, bgColor: colors.surface };
+  }
+};
 
-  const renderIcon = (iconName) => {
-    switch (iconName) {
-      case 'plus': return Plus;
-      case 'calendar': return Calendar;
-      case 'message-circle': return MessageCircle;
-      case 'search': return Search;
-      default: return Plus;
-    }
-  };
+const renderIcon = (iconName) => {
+  switch (iconName) {
+    case 'plus': return Plus;
+    case 'calendar': return Calendar;
+    case 'message-circle': return MessageCircle;
+    case 'search': return Search;
+    default: return Plus;
+  }
+};
+
+const QuickActions = ({ actions }) => {
 
   const rows = [];
   for (let i = 0; i < actions.length; i += 2) {

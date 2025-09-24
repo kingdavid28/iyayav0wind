@@ -19,12 +19,14 @@ export function QuickAction({ icon, label, onPress, gradientColors, styles }) {
   const colors = gradientColors || ['#60a5fa', '#6366f1'];
   return (
     <Pressable onPress={onPress} style={styles.quickActionTile} accessibilityRole="button" accessibilityLabel={label}>
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickActionGradient}>
-        <View style={styles.quickActionIconWrap}>
-          <Ionicons name={icon} size={20} color="#ffffff" />
-        </View>
-        <Text style={[styles.quickActionLabel, { color: '#ffffff' }]}>{label}</Text>
-      </LinearGradient>
+      <View style={styles.quickActionContent}>
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickActionGradient}>
+          <View style={styles.quickActionIconWrap}>
+            <Ionicons name={icon} size={20} color="#ffffff" />
+          </View>
+          <Text style={[styles.quickActionLabel, { color: '#ffffff' }]}>{label}</Text>
+        </LinearGradient>
+      </View>
     </Pressable>
   );
 }

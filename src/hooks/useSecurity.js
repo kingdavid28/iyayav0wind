@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { security } from '../utils/security';
 import { defaultRateLimiter } from '../utils/securityUtils';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const useSecurity = () => {
   const { user } = useAuth();

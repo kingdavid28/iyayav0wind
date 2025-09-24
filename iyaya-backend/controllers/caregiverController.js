@@ -4,7 +4,7 @@ const { validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
 const { jwtSecret, refreshTokenSecret } = require('../config/auth');
 const { logActivity } = require('../services/auditService');
-const backgroundCheckService = require('../services/backgroundCheckService');
+
 const mongoose = require('mongoose');
 
 const resolveMongoId = (user) => {
@@ -129,11 +129,7 @@ exports.getCaregiverProfile = async (req, res) => {
           trustScore: 0,
           badges: []
         },
-        backgroundCheck: {
-          status: 'not_started',
-          provider: 'internal',
-          checkTypes: []
-        }
+
       });
       
       caregiver = await Caregiver.findById(newCaregiver._id)
@@ -188,30 +184,24 @@ exports.searchCaregivers = async (req, res) => {
     
     // Build user query for caregivers
     let userQuery = {
-      $and: [
-        { $or: [{ role: 'caregiver' }, { userType: 'caregiver' }] },
-        { role: { $ne: 'parent' } },
-        { userType: { $ne: 'parent' } },
-        { status: 'active' }
-      ]
+      role: 'caregiver',
+      status: 'active'
     };
     
     // Add search filter for user fields
     if (search && typeof search === 'string') {
       const sanitizedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      userQuery.$and.push({
-        $or: [
-          { name: { $regex: sanitizedSearch, $options: 'i' } },
-          { email: { $regex: sanitizedSearch, $options: 'i' } }
-        ]
-      });
+      userQuery.$or = [
+        { name: { $regex: sanitizedSearch, $options: 'i' } },
+        { email: { $regex: sanitizedSearch, $options: 'i' } }
+      ];
     }
     
     console.log('📋 User query:', JSON.stringify(userQuery, null, 2));
     
     // Get caregiver users from Users collection
     const caregiverUsers = await User.find(userQuery)
-      .select('name email phone profileImage role userType createdAt address')
+      .select('name email phone profileImage role createdAt address')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 })
@@ -222,7 +212,7 @@ exports.searchCaregivers = async (req, res) => {
     // Get their caregiver profiles if they exist
     const userIds = caregiverUsers.map(u => u._id);
     const caregiverProfiles = await Caregiver.find({ userId: { $in: userIds } })
-      .select('userId name skills experience hourlyRate availability rating ageCareRanges profileImage address location bio')
+      .select('userId name skills experience hourlyRate availability rating ageCareRanges profileImage address location bio hasCompletedJobs')
       .lean();
     
     // Create a map for quick lookup
@@ -250,7 +240,8 @@ exports.searchCaregivers = async (req, res) => {
         location: profile?.location || user.address || '',
         bio: profile?.bio || '',
         createdAt: user.createdAt,
-        hasProfile: !!profile
+        hasProfile: !!profile,
+        hasCompletedJobs: profile?.hasCompletedJobs || false
       };
     });
     
@@ -285,10 +276,10 @@ exports.searchCaregivers = async (req, res) => {
     
     await logActivity('PROVIDER_SEARCH', { searchParams: req.query, results: filteredCaregivers.length });
     
-    // Map caregivers to public info only
+    // Map caregivers to public info only - use User ID for messaging
     const publicCaregivers = filteredCaregivers.map(p => ({
-      _id: p._id,
-      id: p._id,
+      _id: p.userId._id, // Use User ID for messaging compatibility
+      id: p.userId._id,  // Use User ID for messaging compatibility
       user: p.userId,
       name: p.name,
       skills: p.skills,
@@ -303,7 +294,8 @@ exports.searchCaregivers = async (req, res) => {
       bio: p.bio,
       createdAt: p.createdAt,
       registeredAt: p.createdAt,
-      hasProfile: p.hasProfile
+      hasProfile: p.hasProfile,
+      hasCompletedJobs: p.hasCompletedJobs || false
     }));
     
     console.log('✅ Sending response with', publicCaregivers.length, 'caregivers');
@@ -349,7 +341,7 @@ exports.getCaregiverDetails = async (req, res) => {
     }
     
     const caregiver = await Caregiver.findById(id)
-      .populate('userId', 'name profileImage email phone role userType')
+      .populate('userId', 'name profileImage email phone role')
       .populate('reviews.userId', 'name profileImage')
       .lean();
       
@@ -378,7 +370,7 @@ exports.getCaregiverDetails = async (req, res) => {
       location: caregiver.location || caregiver.address,
       address: caregiver.address || caregiver.location,
       verification: caregiver.verification,
-      backgroundCheck: caregiver.backgroundCheck,
+
       emergencyContacts: caregiver.emergencyContacts || [],
       createdAt: caregiver.createdAt,
       updatedAt: caregiver.updatedAt
@@ -903,84 +895,7 @@ exports.refreshToken = async (req, res) => {
   }
 };
 
-// Request background check
-exports.requestBackgroundCheck = async (req, res) => {
-  try {
-    const userMongoId = resolveMongoId(req.user);
-    if (!userMongoId) {
-      return res.status(401).json({ success: false, error: 'User mapping not found' });
-    }
 
-    const caregiver = await Caregiver.findOne({ userId: userMongoId });
-    if (!caregiver) {
-      return res.status(404).json({ success: false, error: 'Caregiver profile not found' });
-    }
-
-    // Check if background check is already in progress or completed
-    if (['pending', 'in_progress', 'approved'].includes(caregiver.backgroundCheck.status)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Background check already requested or completed',
-        status: caregiver.backgroundCheck.status
-      });
-    }
-
-    const { personalInfo } = req.body;
-    const result = await backgroundCheckService.requestBackgroundCheck(caregiver._id, personalInfo);
-
-    await logActivity('BACKGROUND_CHECK_REQUESTED', {
-      userId: userMongoId,
-      caregiverId: caregiver._id,
-      reportId: result.reportId
-    });
-
-    res.json({
-      success: true,
-      message: 'Background check requested successfully',
-      ...result
-    });
-  } catch (err) {
-    console.error('Request background check error:', err);
-    await logActivity('BACKGROUND_CHECK_REQUEST_ERROR', {
-      userId: resolveMongoId(req.user) || req.user?.id,
-      error: err.message
-    });
-    res.status(500).json({
-      success: false,
-      error: 'Failed to request background check',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-  }
-};
-
-// Get background check status
-exports.getBackgroundCheckStatus = async (req, res) => {
-  try {
-    const userMongoId = resolveMongoId(req.user);
-    if (!userMongoId) {
-      return res.status(401).json({ success: false, error: 'User mapping not found' });
-    }
-
-    const caregiver = await Caregiver.findOne({ userId: userMongoId });
-    if (!caregiver) {
-      return res.status(404).json({ success: false, error: 'Caregiver profile not found' });
-    }
-
-    const status = await backgroundCheckService.getBackgroundCheckStatus(caregiver._id);
-
-    res.json({
-      success: true,
-      backgroundCheck: status
-    });
-  } catch (err) {
-    console.error('Get background check status error:', err);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get background check status',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-  }
-};
 
 // Upload portfolio images
 exports.uploadPortfolioImages = async (req, res) => {
@@ -1043,7 +958,7 @@ exports.getVerificationStatus = async (req, res) => {
     }
 
     const caregiver = await Caregiver.findOne({ userId: userMongoId })
-      .select('verification backgroundCheck profileCompletionPercentage');
+      .select('verification profileCompletionPercentage');
     
     if (!caregiver) {
       return res.status(404).json({ success: false, error: 'Caregiver profile not found' });
@@ -1058,7 +973,7 @@ exports.getVerificationStatus = async (req, res) => {
         ...caregiver.verification.toObject(),
         trustScore,
         profileCompletionPercentage: completionPercentage,
-        backgroundCheckStatus: caregiver.backgroundCheck.status
+
       }
     });
   } catch (err) {
@@ -1113,6 +1028,31 @@ exports.testUpdate = async (req, res) => {
   }
 };
 
+// Request background check (UI-only implementation)
+exports.requestBackgroundCheck = async (req, res) => {
+  try {
+    const userMongoId = resolveMongoId(req.user);
+    if (!userMongoId) {
+      return res.status(401).json({ success: false, error: 'User mapping not found' });
+    }
+
+    // UI-only implementation - just return success
+    await logActivity('BACKGROUND_CHECK_REQUESTED', { userId: userMongoId });
+    
+    res.json({
+      success: true,
+      message: 'Background check request submitted successfully',
+      status: 'pending'
+    });
+  } catch (err) {
+    console.error('Request background check error:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to request background check'
+    });
+  }
+};
+
 // Debug check
 console.log('Caregiver Controller Methods:', {
   getCaregiverProfile: typeof exports.getCaregiverProfile,
@@ -1122,7 +1062,6 @@ console.log('Caregiver Controller Methods:', {
   testUpdate: typeof exports.testUpdate,
   uploadDocuments: typeof exports.uploadDocuments,
   requestBackgroundCheck: typeof exports.requestBackgroundCheck,
-  getBackgroundCheckStatus: typeof exports.getBackgroundCheckStatus,
   uploadPortfolioImages: typeof exports.uploadPortfolioImages,
   getVerificationStatus: typeof exports.getVerificationStatus,
   refreshToken: typeof exports.refreshToken

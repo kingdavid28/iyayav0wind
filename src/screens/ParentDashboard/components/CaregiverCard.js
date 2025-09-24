@@ -11,10 +11,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Card } from '../../../shared/ui';
 
-import { API_CONFIG } from "../../../config/constants";
 import { formatAddress } from "../../../utils/addressUtils";
+import { getProfileImageUrl } from "../../../utils/imageUtils";
 import { userService } from "../../../services/userService";
-import { messagingService } from "../../../services/messagingService";
+
 import { bookingService } from "../../../services/bookingService";
 import {
   colors,
@@ -34,47 +34,8 @@ import {
  * @param {string} [props.testID] - Test ID for testing frameworks
  * @returns {JSX.Element} Rendered CaregiverCard component
  */
-const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID, style }) => {
-  // Log the caregiver data for debugging
-  useEffect(() => {
-    const getLocationString = (location) => {
-      if (!location) return null;
-      if (typeof location === "string") return location;
-      if (location.formattedAddress) return location.formattedAddress;
-      if (location.street && location.city)
-        return `${location.street}, ${location.city}`;
-      if (location.street) return location.street;
-      if (location.city) return location.city;
-      if (location.coordinates) {
-        const [lat, lng] = location.coordinates;
-        return `${lat?.toFixed(4)}, ${lng?.toFixed(4)}`;
-      }
-      return JSON.stringify(location);
-    };
+const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, onViewReviews, testID, style }) => {
 
-    console.log(
-      "Rendering CaregiverCard with data:",
-      JSON.stringify(
-        {
-          id: caregiver?.id || caregiver?._id,
-          name: caregiver?.name,
-          rating: caregiver?.rating,
-          reviewCount: caregiver?.reviewCount,
-          location: getLocationString(
-            caregiver?.location || caregiver?.address
-          ),
-          hourlyRate: caregiver?.hourlyRate,
-          skills: caregiver?.skills,
-          experience: caregiver?.experience,
-          avatar: caregiver?.avatar ? "has avatar" : "no avatar",
-          user: caregiver?.user ? "has user data" : "no user data",
-          rawLocation: caregiver?.location || caregiver?.address, // Include raw location for debugging
-        },
-        null,
-        2
-      )
-    );
-  }, [caregiver]);
 
   // Safe defaults
   const name = caregiver?.name || "Caregiver";
@@ -100,7 +61,7 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID, style 
     caregiver?.user?.location ||
     caregiver?.user?.address;
 
-  const address = getLocationString(locationSource);
+
   const hourlyRate =
     typeof caregiver?.hourlyRate === "number" ? caregiver.hourlyRate : 0;
   const specialties = Array.isArray(caregiver?.specialties)
@@ -118,22 +79,12 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID, style 
   // Track image load failure for graceful fallback
   const [imageError, setImageError] = useState(false);
 
-  // Normalize image URL: prefix base host for relative paths
-  const avatar = useMemo(() => {
-    try {
-      if (!avatarRaw) return "";
-      // If already absolute (http/https) or data URI, return as-is
-      if (/^https?:\/\//i.test(avatarRaw) || avatarRaw.startsWith("data:"))
-        return avatarRaw;
-      // Derive host by stripping trailing /api from API base
-      const host = (API_CONFIG?.BASE_URL || "").replace(/\/?api$/i, "");
-      // Ensure leading slash for relative paths
-      const path = avatarRaw.startsWith("/") ? avatarRaw : `/${avatarRaw}`;
-      return `${host}${path}`;
-    } catch (_) {
-      return avatarRaw || "";
-    }
-  }, [avatarRaw]);
+  // Use centralized image URL handling
+  const avatar = getProfileImageUrl({ 
+    avatar: avatarRaw, 
+    profileImage: caregiver?.profileImage,
+    user: caregiver?.user 
+  });
 
   const accessibilityLabel = `${name}${specialties.length ? `, ${specialties.join(", ")}` : ""}, ${rating} star rating`;
   const bookButtonLabel = `Book ${name} for a session`;
@@ -298,6 +249,16 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, testID, style 
           >
             <MessageCircle size={20} color={colors.primary} />
           </TouchableOpacity>
+          {caregiver?.hasCompletedJobs && onViewReviews && (
+            <TouchableOpacity
+              style={[styles.iconButton, { marginRight: spacing.sm }]}
+              onPress={() => onViewReviews(caregiver)}
+              accessibilityLabel={`View reviews for ${name}`}
+              accessibilityRole="button"
+            >
+              <Star size={20} color={colors.primary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[
               styles.button,

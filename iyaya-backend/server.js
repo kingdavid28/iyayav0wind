@@ -4,11 +4,9 @@
 require('dotenv').config({ path: './.env' });
 const config = require('./config/env');
 const { createServer } = require('http');
-const app = require('./app');
+const { app, server } = require('./app');
 const realtime = require('./services/realtime');
 const connectDB = require('./config/database'); // Import from dedicated file
-
-const server = createServer(app);
 
 // ============================================
 // Server Startup

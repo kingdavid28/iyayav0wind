@@ -4,7 +4,7 @@ import { Text, Card, Avatar, Button, Divider, ActivityIndicator, TextInput } fro
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { authAPI, getCurrentAPIURL } from '../config/api';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import ProfileImage from '../components/ui/feedback/ProfileImage';
 
 const ParentProfile = ({ navigation }) => {

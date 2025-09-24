@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { useTheme } from 'react-native-paper'; // Import useTheme
 import { styles } from '../../styles/ParentDashboard.styles';
 import QuickActions from './QuickActions';
+
 
 import MobileProfileSection from './MobileProfileSection';
 import CaregiverCard from './CaregiverCard';
@@ -25,15 +26,33 @@ const HomeTab = ({
   caregivers = [],
   onBookCaregiver,
   onMessageCaregiver,
-  navigation
+  onViewReviews,
+  navigation,
+  refreshing = false,
+  onRefresh,
+  loading = false,
+  setActiveTab
 }) => {
+
   // Get latest 3 registered caregivers (sorted by creation date)
-  const featuredCaregivers = caregivers
-    .sort((a, b) => new Date(b.createdAt || b.registeredAt || 0) - new Date(a.createdAt || a.registeredAt || 0))
-    .slice(0, 3);
+  const featuredCaregivers = useMemo(() => 
+    caregivers
+      .sort((a, b) => new Date(b.createdAt || b.registeredAt || 0) - new Date(a.createdAt || a.registeredAt || 0))
+      .slice(0, 3),
+    [caregivers]
+  );
     
   console.log('🎯 HomeTab - Caregivers received:', caregivers.length);
   console.log('🎯 HomeTab - Featured caregivers:', featuredCaregivers.length, featuredCaregivers.map(c => c.name));
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#db2777" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -43,7 +62,17 @@ const HomeTab = ({
         showsVerticalScrollIndicator={false}
         bounces={true}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#db2777']}
+            tintColor="#db2777"
+          />
+        }
       >
+
+        
         <MobileProfileSection 
           greetingName={greetingName}
           profileImage={profileImage}
@@ -116,19 +145,20 @@ const HomeTab = ({
         </View>
         
         {/* Featured Caregivers Section */}
-        {featuredCaregivers.length > 0 && (
+        {featuredCaregivers.length > 0 ? (
           <View style={{ paddingHorizontal: 8, marginBottom: 20, overflow: 'visible' }}>
-            <Text style={[styles.sectionTitle, { marginBottom: 12, marginLeft: 8 }]}>Featured Caregivers</Text>
+            <Text style={[styles.sectionTitle, { marginBottom: 12, marginLeft: 8 }]}>Featured Caregivers ({featuredCaregivers.length})</Text>
             {featuredCaregivers.map((caregiver) => (
               <CaregiverCard
                 key={caregiver.id || caregiver._id}
                 caregiver={caregiver}
                 onPress={onBookCaregiver}
                 onMessagePress={onMessageCaregiver}
+                onViewReviews={onViewReviews}
               />
             ))}
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </View>
   );

@@ -1,12 +1,10 @@
 // Enhanced logger for mobile debugging
 export const logger = {
   debug: (message, ...args) => {
-    if (__DEV__) {
-      console.log(`[DEBUG] ${message}`, ...args);
-    }
+    // Disabled in production
   },
   info: (message, ...args) => {
-    console.log(`[INFO] ${message}`, ...args);
+    // Disabled - only show errors and warnings
   },
   error: (message, ...args) => {
     // Filter out empty error objects to reduce noise

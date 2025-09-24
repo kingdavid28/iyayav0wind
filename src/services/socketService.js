@@ -1,135 +1,107 @@
-import { getCurrentSocketURL } from '../config/api';
-
-let io = null;
-
-// Try to import socket.io-client, but handle gracefully if not available
-try {
-  const socketIO = require('socket.io-client');
-  io = socketIO.io || socketIO.default;
-} catch (error) {
-  console.warn('socket.io-client not available, realtime features disabled');
-}
+import io from 'socket.io-client';
+import { getAuthToken } from '../utils/auth';
 
 class SocketService {
   constructor() {
     this.socket = null;
     this.isConnected = false;
-    this.listeners = new Map();
+    this.messageHandlers = new Map();
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
   }
 
-  connect(token) {
-    if (!io) {
-      console.warn('Socket.IO not available, skipping connection');
-      return null;
-    }
-    
-    if (this.socket?.connected) return this.socket;
+  async connect(userId) {
+    // Socket connection completely disabled
+    return Promise.resolve();
+  }
 
-    const url = getCurrentSocketURL();
-    this.socket = io(url, {
-      auth: { token },
-      transports: ['websocket'],
-      timeout: 10000,
-    });
+  setupEventHandlers() {
+    // Socket event handlers disabled
+    return;
+  }
 
-    this.socket.on('connect', () => {
-      console.log('🔌 Socket connected');
-      this.isConnected = true;
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('🔌 Socket disconnected');
-      this.isConnected = false;
-    });
-
-    this.socket.on('error', (error) => {
-      console.error('🔌 Socket error:', error);
-    });
-
-    return this.socket;
+  handleReconnect() {
+    // Reconnection disabled
+    return;
   }
 
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      this.isConnected = false;
     }
+    this.isConnected = false;
+    this.messageHandlers.clear();
   }
 
-  emit(event, data) {
-    if (this.socket?.connected) {
-      this.socket.emit(event, data);
-    }
-  }
-
-  on(event, callback) {
-    if (this.socket) {
-      this.socket.on(event, callback);
-      if (!this.listeners.has(event)) {
-        this.listeners.set(event, []);
-      }
-      this.listeners.get(event).push(callback);
-    }
-  }
-
-  off(event, callback) {
-    if (this.socket) {
-      this.socket.off(event, callback);
-      if (this.listeners.has(event)) {
-        const callbacks = this.listeners.get(event);
-        const index = callbacks.indexOf(callback);
-        if (index > -1) {
-          callbacks.splice(index, 1);
-        }
-      }
-    }
-  }
-
-  // Messaging events
+  // Room management
   joinConversation(conversationId) {
-    this.emit('join:conversation', { conversationId });
+    if (this.socket?.connected) {
+      this.socket.emit('join_conversation', conversationId);
+    }
   }
 
   leaveConversation(conversationId) {
-    this.emit('leave:conversation', { conversationId });
+    if (this.socket?.connected) {
+      this.socket.emit('leave_conversation', conversationId);
+    }
   }
 
-  sendMessage(messageData) {
-    this.emit('message:send', messageData);
-  }
-
-  onNewMessage(callback) {
-    this.on('message:new', callback);
-  }
-
-  onTypingStart(callback) {
-    this.on('typing:start', callback);
-  }
-
-  onTypingStop(callback) {
-    this.on('typing:stop', callback);
-  }
-
+  // Typing indicators
   startTyping(conversationId) {
-    this.emit('typing:start', { conversationId });
+    if (this.socket?.connected) {
+      this.socket.emit('typing_start', { conversationId });
+    }
   }
 
   stopTyping(conversationId) {
-    this.emit('typing:stop', { conversationId });
+    if (this.socket?.connected) {
+      this.socket.emit('typing_stop', { conversationId });
+    }
   }
 
-  // Notification events
-  onNotification(callback) {
-    this.on('notification', callback);
+  // Event handlers
+  onNewMessage(handler) {
+    this.messageHandlers.set('new_message', handler);
   }
 
-  onBookingUpdate(callback) {
-    this.on('booking:update', callback);
+  onNewNotification(handler) {
+    this.messageHandlers.set('new_notification', handler);
   }
 
-  onJobUpdate(callback) {
-    this.on('job:update', callback);
+  onUserTyping(handler) {
+    this.messageHandlers.set('user_typing', handler);
+  }
+
+  onUserStoppedTyping(handler) {
+    this.messageHandlers.set('user_stopped_typing', handler);
+  }
+
+  // Job and application event handlers
+  onNewJob(handler) {
+    this.messageHandlers.set('new_job', handler);
+  }
+
+  onNewApplication(handler) {
+    this.messageHandlers.set('new_application', handler);
+  }
+
+  onNewBooking(handler) {
+    this.messageHandlers.set('new_booking', handler);
+  }
+
+  // Remove listener method
+  removeListener(eventType) {
+    this.messageHandlers.delete(eventType);
+  }
+
+  // Utility methods
+  getConnectionStatus() {
+    return {
+      connected: this.isConnected,
+      socketId: this.socket?.id,
+      reconnectAttempts: this.reconnectAttempts
+    };
   }
 }
 

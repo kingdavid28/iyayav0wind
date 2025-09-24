@@ -224,7 +224,12 @@ const CaregiverSchema = new mongoose.Schema({
       default: Date.now 
     },
     expiryDate: Date
-  }]
+  }],
+  // Job completion tracking
+  hasCompletedJobs: {
+    type: Boolean,
+    default: false
+  }
 }, { 
   timestamps: true,
   toJSON: { 

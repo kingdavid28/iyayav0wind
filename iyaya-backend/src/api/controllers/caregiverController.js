@@ -182,24 +182,19 @@ exports.getCaregiverProfile = async (req, res) => {
 exports.searchCaregivers = async (req, res) => {
   try {
     const { skills, minRate, maxRate, daysAvailable, search, page = 1, limit = 50 } = req.query;
-    console.log('🔍 Caregiver search request:', { skills, minRate, maxRate, daysAvailable, search, page, limit });
+
     
     // First check if we have any caregivers at all
     const totalCaregivers = await Caregiver.countDocuments();
-    console.log('📊 Total caregivers in database:', totalCaregivers);
+
     
     // Debug: Check what's in the database
     const allCaregivers = await Caregiver.find({}).populate('userId', 'name role userType').lean();
-    console.log('🔍 All caregivers in DB:', allCaregivers.map(c => ({
-      id: c._id,
-      name: c.name,
-      userRole: c.userId?.role,
-      userType: c.userId?.userType
-    })));
+
     
     // If no caregivers exist, return empty array
     if (totalCaregivers === 0) {
-      console.log('❌ No caregivers found in database, returning empty array');
+  
       return res.json({
         success: true,
         count: 0,

@@ -8,6 +8,7 @@ import { getCaregiverDisplayName, normalizeStatus, getStatusColor } from '../../
 import { BOOKING_STATUSES, STATUS_LABELS } from '../../../constants/bookingStatuses';
 import { getPaymentActions, calculateDeposit, calculateRemainingPayment } from '../../../utils/paymentUtils';
 import { formatAddress } from '../../../utils/addressUtils';
+import { getProfileImageUrl } from '../../../utils/imageUtils';
 
 const BookingItem = ({ 
   item, 
@@ -197,6 +198,7 @@ const BookingItem = ({
     }
   };
 
+<<<<<<< HEAD
   // Debug logging for caregiver data
   console.log('📋 BookingItem - Full item:', item);
   console.log('📋 BookingItem - Caregiver data:', item.caregiverId);
@@ -213,19 +215,16 @@ const BookingItem = ({
     if (imagePath.startsWith('http')) return imagePath;
     if (imagePath.startsWith('/uploads/')) {
       return `http://192.168.1.9:5000${imagePath}`;
+=======
+  const caregiverImageUri = getProfileImageUrl(
+    item.caregiver || item.caregiverId || {
+      avatar: item.caregiverAvatar,
+      profileImage: item.caregiver?.profileImage || item.caregiverId?.profileImage
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
     }
-    return imagePath;
-  };
-
-  const caregiverImageUri = getFullImageURL(
-    item.caregiverId?.profileImage || 
-    item.caregiverId?.avatar || 
-    item.caregiverAvatar || 
-    item.caregiver?.avatar || 
-    item.caregiver?.profileImage
   );
 
-  console.log('📋 BookingItem - Final image URI:', caregiverImageUri);
+
 
   return (
     <View style={styles.bookingItemCard}>
@@ -234,10 +233,11 @@ const BookingItem = ({
           <Image
             source={{ uri: caregiverImageUri }}
             style={styles.bookingAvatar}
+            onError={() => console.warn('Failed to load caregiver image')}
           />
           <View style={styles.bookingCaregiverDetails}>
             <Text style={styles.bookingCaregiverName}>
-              {getCaregiverDisplayName(item.caregiverId || item.caregiver)}
+              {getCaregiverDisplayName(item.caregiver || item.caregiverId)}
             </Text>
             {renderStatusBadge()}
           </View>

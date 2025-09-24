@@ -11,7 +11,9 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Image,
+  Modal,
 } from 'react-native';
+import { Button } from 'react-native-paper';
 import { ModalWrapper } from '../../../shared/ui';
 import KeyboardAvoidingWrapper from '../../../shared/ui/layout/KeyboardAvoidingWrapper';
 import { 
@@ -34,12 +36,13 @@ import {
 import CustomDateTimePicker from '../../../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../../../shared/ui/inputs/TimePicker';
 import { formatAddress } from '../../../utils/addressUtils';
+import { getCurrentDeviceLocation, searchLocation } from '../../../utils/locationUtils';
+import { getImageUrl } from '../../../utils/imageUtils';
 
 const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visible }) => {
-  console.log('📋 BookingModal - Caregiver prop:', caregiver);
-  console.log('📋 BookingModal - Caregiver avatar:', caregiver?.avatar);
-  console.log('📋 BookingModal - Caregiver profileImage:', caregiver?.profileImage);
+
   
+<<<<<<< HEAD
   const getFullImageURL = (imagePath) => {
     if (!imagePath) return null;
     if (imagePath.startsWith('http')) return imagePath;
@@ -48,6 +51,9 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
     }
     return imagePath;
   };
+=======
+
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
   
   const [currentStep, setCurrentStep] = useState(1);
   const [bookingData, setBookingData] = useState({
@@ -66,6 +72,11 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationSearchVisible, setLocationSearchVisible] = useState(false);
+  const [locationSearchText, setLocationSearchText] = useState('');
+  const [locationSearchResults, setLocationSearchResults] = useState([]);
+  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
 
   const resolveHourlyRate = () => {
     if (typeof caregiver?.hourlyRate === 'number' && caregiver.hourlyRate > 0) return caregiver.hourlyRate;
@@ -99,6 +110,46 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
   const handlePrevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    try {
+      setLocationLoading(true);
+      const locationData = await getCurrentDeviceLocation();
+      
+      if (locationData && locationData.address) {
+        const formattedAddress = `${locationData.address.street || ''} ${locationData.address.city || ''}, ${locationData.address.province || ''}`;
+        setBookingData({ ...bookingData, address: formattedAddress.trim() });
+      }
+    } catch (error) {
+      Alert.alert('Location Error', error.message || 'Failed to get current location.');
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  const handleLocationSearch = async () => {
+    if (!locationSearchText.trim()) return;
+    
+    try {
+      setLocationSearchLoading(true);
+      const result = await searchLocation(locationSearchText);
+      setLocationSearchResults([result]);
+    } catch (error) {
+      Alert.alert('Search Failed', error.message || 'Failed to search location.');
+    } finally {
+      setLocationSearchLoading(false);
+    }
+  };
+
+  const selectLocationFromSearch = (location) => {
+    if (location && location.address) {
+      const formattedAddress = `${location.address.street || ''} ${location.address.city || ''}, ${location.address.province || ''}`;
+      setBookingData({ ...bookingData, address: formattedAddress.trim() });
+      setLocationSearchVisible(false);
+      setLocationSearchText('');
+      setLocationSearchResults([]);
     }
   };
 
@@ -306,6 +357,28 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
     <View style={styles.stepContainer}>
       <Text style={styles.sectionTitle}>Contact & Location</Text>
       
+      <View style={styles.locationSection}>
+        <Button
+          mode="outlined"
+          onPress={getCurrentLocation}
+          loading={locationLoading}
+          disabled={locationLoading}
+          style={styles.gpsButton}
+          icon="map-marker-outline"
+        >
+          {locationLoading ? 'Getting Location...' : 'Use Current Location (GPS)'}
+        </Button>
+        
+        <Button
+          mode="outlined"
+          onPress={() => setLocationSearchVisible(true)}
+          style={styles.searchButton}
+          icon="magnify"
+        >
+          Search Location
+        </Button>
+      </View>
+      
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Address</Text>
         <TextInput
@@ -371,9 +444,9 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
       {/* Caregiver Info */}
       <View style={styles.caregiverSummary}>
         <View style={styles.caregiverHeader}>
-          {(caregiver?.avatar || caregiver?.profileImage) ? (
+          {getImageUrl(caregiver?.avatar || caregiver?.profileImage) ? (
             <Image 
-              source={{ uri: getFullImageURL(caregiver.avatar || caregiver.profileImage) }} 
+              source={{ uri: getImageUrl(caregiver.avatar || caregiver.profileImage) }} 
               style={styles.avatar}
             />
           ) : (
@@ -410,9 +483,9 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <View style={styles.caregiverAvatar}>
-                {(caregiver?.avatar || caregiver?.profileImage) ? (
+                {getImageUrl(caregiver?.avatar || caregiver?.profileImage) ? (
                   <Image 
-                    source={{ uri: getFullImageURL(caregiver.avatar || caregiver.profileImage) }} 
+                    source={{ uri: getImageUrl(caregiver.avatar || caregiver.profileImage) }} 
                     style={styles.avatarImage} 
                   />
                 ) : (
@@ -523,6 +596,69 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
             )}
           </View>
       </KeyboardAvoidingView>
+      
+      {/* Location Search Modal */}
+      <Modal
+        visible={locationSearchVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLocationSearchVisible(false)}
+      >
+        <View style={styles.searchModalOverlay}>
+          <View style={styles.searchModalContainer}>
+            <View style={styles.searchModalHeader}>
+              <Text style={styles.searchModalTitle}>Search Location</Text>
+              <TouchableOpacity onPress={() => setLocationSearchVisible(false)}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.searchModalContent}>
+              <TextInput
+                value={locationSearchText}
+                onChangeText={setLocationSearchText}
+                style={styles.searchInput}
+                placeholder="Enter address or location"
+                onSubmitEditing={handleLocationSearch}
+                returnKeyType="search"
+              />
+              
+              <Button
+                mode="contained"
+                onPress={handleLocationSearch}
+                loading={locationSearchLoading}
+                style={styles.searchSubmitButton}
+              >
+                Search
+              </Button>
+              
+              {locationSearchLoading && (
+                <View style={styles.searchLoading}>
+                  <ActivityIndicator size="small" color="#3b82f6" />
+                  <Text style={styles.searchLoadingText}>Searching...</Text>
+                </View>
+              )}
+              
+              {locationSearchResults.length > 0 && (
+                <View style={styles.searchResults}>
+                  {locationSearchResults.map((result, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.searchResultItem}
+                      onPress={() => selectLocationFromSearch(result)}
+                    >
+                      <MapPin size={20} color="#3b82f6" />
+                      <Text style={styles.searchResultText}>
+                        {result.address.formatted}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ModalWrapper>
   );
 }
@@ -1422,6 +1558,87 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontWeight: '500',
     fontSize: 13,
+  },
+  
+  // Location functionality styles
+  locationSection: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  gpsButton: {
+    flex: 1,
+  },
+  searchButton: {
+    flex: 1,
+  },
+  
+  // Location search modal styles
+  searchModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  searchModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  searchModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  searchModalContent: {
+    padding: 16,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  searchSubmitButton: {
+    marginBottom: 16,
+  },
+  searchLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+  },
+  searchLoadingText: {
+    color: '#6b7280',
+  },
+  searchResults: {
+    gap: 8,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    backgroundColor: '#f9fafb',
+  },
+  searchResultText: {
+    flex: 1,
+    color: '#374151',
   },
 });
 

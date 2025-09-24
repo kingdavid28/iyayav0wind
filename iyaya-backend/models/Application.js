@@ -7,7 +7,7 @@ const ApplicationSchema = new mongoose.Schema(
     coverLetter: { type: String },
     proposedRate: { type: Number },
     message: { type: String },
-    status: { type: String, enum: ['pending', 'accepted', 'rejected', 'shortlisted'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'accepted', 'rejected', 'shortlisted', 'completed'], default: 'pending' },
     reviewedAt: { type: Date },
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },

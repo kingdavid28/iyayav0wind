@@ -1,67 +1,46 @@
 const express = require('express');
-const { rateLimit } = require('express-rate-limit');
 const router = express.Router();
-const { authenticate } = require('../utils/auth');
+const { authenticate } = require('../middleware/auth');
 
-// Rate limiter
-const rateLimiter = (options) => rateLimit(options);
+// Mock data controller for now
+const dataController = {
+  exportUserData: async (req, res) => {
+    res.json({
+      success: true,
+      message: 'Data export not implemented yet',
+      data: { exportId: 'mock-export-id' }
+    });
+  },
+  
+  deleteUserData: async (req, res) => {
+    res.json({
+      success: true,
+      message: 'Data deletion not implemented yet'
+    });
+  },
+  
+  getDataUsage: async (req, res) => {
+    res.json({
+      success: true,
+      data: { 
+        storageUsed: '0 MB',
+        messagesCount: 0,
+        documentsCount: 0
+      }
+    });
+  }
+};
 
-// Apply authentication to all routes
+// All data routes require authentication
 router.use(authenticate);
 
-// Get data usage statistics
-router.get('/usage', 
-  rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }),
-  async (req, res) => {
-    try {
-      // Mock response - replace with actual database logic
-      const usage = {
-        profile: [
-          { name: 'User Profile', email: 'user@example.com', status: 'Active' }
-        ],
-        jobs: [],
-        bookings: [],
-        applications: []
-      };
-      
-      res.json(usage);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get data usage' });
-    }
-  }
-);
+// GET /api/data/export - Export user data
+router.get('/export', dataController.exportUserData);
 
-// Export user data
-router.post('/export',
-  rateLimiter({ windowMs: 60 * 60 * 1000, max: 5 }), // 5 exports per hour
-  async (req, res) => {
-    try {
-      // Mock response - replace with actual export logic
-      res.json({ 
-        success: true, 
-        message: 'Data export initiated. You will receive an email with your data within 24 hours.',
-        exportId: 'export_' + Date.now()
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to initiate data export' });
-    }
-  }
-);
+// DELETE /api/data/delete - Delete user data
+router.delete('/delete', dataController.deleteUserData);
 
-// Delete all user data
-router.delete('/all',
-  rateLimiter({ windowMs: 24 * 60 * 60 * 1000, max: 1 }), // 1 delete per day
-  async (req, res) => {
-    try {
-      // Mock response - replace with actual deletion logic
-      res.json({ 
-        success: true, 
-        message: 'All user data has been scheduled for deletion. This process may take up to 30 days to complete.'
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to delete user data' });
-    }
-  }
-);
+// GET /api/data/usage - Get data usage statistics
+router.get('/usage', dataController.getDataUsage);
 
 module.exports = router;

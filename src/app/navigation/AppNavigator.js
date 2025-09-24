@@ -4,23 +4,35 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 // Core imports
-import { useAuth } from "../../core/contexts/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { useThemeContext } from "../../core/contexts/ThemeContext";
 
 // Main screen imports
 import WelcomeScreen from "../../screens/WelcomeScreen";
-import ParentAuth from "../../screens/ParentAuth";
-import CaregiverAuth from "../../screens/CaregiverAuth";
-import EmailVerificationScreen from "../../screens/EmailVerificationScreen";
+import CaregiverProfileComplete from "../../screens/CaregiverProfileComplete";
 import VerificationSuccessScreen from "../../screens/VerificationSuccessScreen";
 import ParentDashboard from "../../screens/ParentDashboard/ParentDashboard";
 import CaregiverDashboard from "../../screens/CaregiverDashboard";
 
+<<<<<<< HEAD
 // Messaging components
 import ChatScreen from "../../components/messaging/ChatScreen";
 import MessagingInterface from "../../components/messaging/MessagingInterface";
 import ParentMessaging from "../../screens/messaging/ParentMessaging";
 import CaregiverMessaging from "../../screens/messaging/CaregiverMessaging";
+=======
+// Auth screen imports
+import ParentAuth from "../../screens/ParentAuth";
+import CaregiverAuth from "../../screens/CaregiverAuth";
+import EmailVerificationScreen from "../../screens/EmailVerificationScreen";
+
+// Profile screen imports
+import ParentProfile from "../../screens/ParentProfile";
+
+// Chat screen imports
+import ChatScreen from "../../screens/ChatScreen";
+import CaregiverReviewsScreen from "../../screens/CaregiverReviewsScreen";
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
 
 // Legacy screen imports (to be migrated)
 import AvailabilityManagementScreen from "../../screens/AvailabilityManagementScreen";
@@ -29,24 +41,22 @@ import ChildrenManagementScreen from "../../screens/ChildrenManagementScreen";
 import EnhancedCaregiverProfileWizard from "../../screens/EnhancedCaregiverProfileWizard";
 import JobPostingScreen from "../../screens/JobPostingScreen";
 import JobSearchScreen from "../../screens/JobSearchScreen";
-import MessagingScreen from "../../screens/MessagingScreen";
-import MessagesScreen from "../../screens/MessagesScreen";
 import OnboardingScreen from "../../screens/OnboardingScreen";
 import PaymentConfirmationScreen from "../../screens/PaymentConfirmationScreen";
 import ProfileScreen from "../../screens/profile/ProfileScreen";
 import EmailVerificationPendingScreen from "../../screens/EmailVerificationPendingScreen";
-import DeepLinkHandler from "../../components/navigation/DeepLinkHandler";
 import DemoScreen from "../../screens/DemoScreen";
 
-import CaregiverProfileComplete from "../../screens/CaregiverProfileComplete";
-import ParentProfile from "../../screens/ParentProfile";
+import CaregiverChat from "../../screens/CaregiverChat";
 
 // Utils
 import { hasSeenOnboarding } from "../../utils/onboarding";
+import DeepLinkHandler from "../../components/navigation/DeepLinkHandler";
 
 const Stack = createNativeStackNavigator();
 
-const AppNavigator = () => {
+// Create a wrapper component that handles auth state
+const AppNavigatorWithAuth = () => {
   const { user, loading } = useAuth();
   const { theme } = useThemeContext();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
@@ -112,6 +122,7 @@ const AppNavigator = () => {
         <Stack.Screen name="CaregiverAuth" component={CaregiverAuth} options={{ title: "Caregiver Login", headerBackTitle: "Back" }} />
         <Stack.Screen name="ParentDashboard" component={ParentDashboard} options={{ headerShown: false }} />
         <Stack.Screen name="CaregiverDashboard" component={CaregiverDashboard} options={{ headerShown: false }} />
+<<<<<<< HEAD
         
         {/* MESSAGING ROUTES */}
         <Stack.Screen 
@@ -144,13 +155,15 @@ const AppNavigator = () => {
         
         <Stack.Screen name="Chat" component={MessagingScreen} options={{ title: "Chat", headerBackTitle: "Back" }} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} options={{ title: "Chat", headerBackTitle: "Back", headerShown: false }} />
+=======
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Edit Profile", headerBackTitle: "Back" }} />
+
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
         <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} options={{ title: "Confirm Payment", headerBackTitle: "Back" }} />
         <Stack.Screen name="JobPosting" component={JobPostingScreen} options={{ title: "Post a Job", headerBackTitle: "Back" }} />
         <Stack.Screen name="JobSearch" component={JobSearchScreen} options={{ title: "Find Jobs", headerBackTitle: "Back" }} />
         <Stack.Screen name="BookingFlow" component={BookingManagementScreen} options={{ title: "Book Caregiver", headerBackTitle: "Back" }} />
         <Stack.Screen name="BookingManagement" component={BookingManagementScreen} options={{ title: "Manage Bookings", headerBackTitle: "Back" }} />
-        <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages", headerBackTitle: "Back", headerShown: false }} />
-        <Stack.Screen name="Messaging" component={MessagingScreen} options={{ title: "Chat", headerBackTitle: "Back" }} />
         <Stack.Screen name="ChildrenManagement" component={ChildrenManagementScreen} options={{ title: "Manage Children", headerBackTitle: "Back" }} />
         <Stack.Screen name="AvailabilityManagement" component={AvailabilityManagementScreen} options={{ title: "Manage Availability", headerBackTitle: "Back" }} />
         <Stack.Screen name="EnhancedCaregiverProfileWizard" component={EnhancedCaregiverProfileWizard} options={{ title: "Complete Your Profile", headerBackTitle: "Back" }} />
@@ -161,9 +174,17 @@ const AppNavigator = () => {
 
         <Stack.Screen name="CaregiverProfileComplete" component={CaregiverProfileComplete} options={{ headerShown: false }} />
         <Stack.Screen name="ParentProfile" component={ParentProfile} options={{ title: "My Profile", headerBackTitle: "Back" }} />
+        <Stack.Screen name="Chat" component={ChatScreen} options={{ title: "Chat" }} />
+        <Stack.Screen name="CaregiverChat" component={CaregiverChat} options={{ title: "Chat with Caregiver" }} />
+        <Stack.Screen name="CaregiverReviews" component={CaregiverReviewsScreen} options={{ title: "Caregiver Reviews" }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
+};
+
+// Main AppNavigator component that doesn't use useAuth directly
+const AppNavigator = () => {
+  return <AppNavigatorWithAuth />;
 };
 
 export default AppNavigator;

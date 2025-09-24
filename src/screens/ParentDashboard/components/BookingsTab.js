@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, FlatList, RefreshControl, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
 import { Calendar, Clock, DollarSign, Filter, Plus } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import BookingItem from './BookingItem';
@@ -19,9 +19,10 @@ const BookingsTab = ({
   onWriteReview,
   onCreateBooking,
   onMessageCaregiver,
-  navigation
+  navigation,
+  loading
 }) => {
-  const getFilteredBookings = () => {
+  const filteredBookings = useMemo(() => {
     if (!bookings || !Array.isArray(bookings)) return [];
     
     const now = new Date();
@@ -62,9 +63,7 @@ const BookingsTab = ({
       default:
         return bookings;
     }
-  };
-
-  const filteredBookings = getFilteredBookings();
+  }, [bookings, bookingsFilter]);
   
   // Calculate booking statistics
   const bookingStats = useMemo(() => {
@@ -101,6 +100,8 @@ const BookingsTab = ({
 
   const handleMessageCaregiver = async (caregiver) => {
     try {
+      console.log('🔍 BookingsTab - Caregiver data for messaging:', caregiver);
+      
       if (!caregiver) {
         Alert.alert('Error', 'Caregiver information not available');
         return;
@@ -109,10 +110,16 @@ const BookingsTab = ({
       const caregiverId = caregiver._id || caregiver.id;
       const caregiverName = caregiver.name || caregiver.firstName || 'Caregiver';
       
+      console.log('🔍 BookingsTab - Extracted caregiver info:', { caregiverId, caregiverName });
+      
       if (onMessageCaregiver) {
-        onMessageCaregiver(caregiver);
-      } else if (navigation) {
-        navigation.navigate('Messaging', {
+        await onMessageCaregiver({
+          _id: caregiverId,
+          name: caregiverName,
+          avatar: caregiver.avatar || caregiver.profileImage
+        });
+      } else {
+        console.log('Starting conversation with caregiver:', {
           recipientId: caregiverId,
           recipientName: caregiverName,
           recipientAvatar: caregiver.avatar || caregiver.profileImage
@@ -183,31 +190,41 @@ const BookingsTab = ({
       { key: 'upcoming', label: 'Upcoming', count: null },
       { key: 'pending', label: 'Pending', count: bookingStats.pending },
       { key: 'confirmed', label: 'Active', count: bookingStats.confirmed },
-      { key: 'completed', label: 'Completed', count: bookingStats.completed }
+      { key: 'completed', label: 'Done', count: bookingStats.completed }
     ];
 
     return (
       <View style={styles.bookingsFilterTabs}>
-        {filterOptions.map((option) => (
-          <TouchableOpacity
-            key={option.key}
-            style={[
-              styles.filterTab,
-              bookingsFilter === option.key && styles.activeFilterTab
-            ]}
-            onPress={() => setBookingsFilter(option.key)}
-          >
-            <Text style={[
-              styles.filterTabText,
-              bookingsFilter === option.key && styles.activeFilterTabText
-            ]}>
-              {option.label}
-              {option.count !== null && option.count > 0 && (
-                <Text style={styles.filterTabCount}> ({option.count})</Text>
-              )}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {filterOptions.map((option) => {
+          const isActive = bookingsFilter === option.key;
+          return (
+            <TouchableOpacity
+              key={option.key}
+              style={[
+                styles.filterTab,
+                isActive && styles.activeFilterTab
+              ]}
+              onPress={() => setBookingsFilter(option.key)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter by ${option.label} bookings`}
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[
+                styles.filterTabText,
+                isActive && styles.activeFilterTabText
+              ]}>
+                {option.label}
+                {option.count !== null && option.count > 0 && (
+                  <Text style={[
+                    styles.filterTabCount,
+                    isActive && { color: colors.textInverse }
+                  ]}> ({option.count})</Text>
+                )}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   };
@@ -253,6 +270,15 @@ const BookingsTab = ({
     );
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading bookings...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.bookingsContent, { flex: 1 }]}>
       <View style={styles.bookingsHeader}>
@@ -276,7 +302,7 @@ const BookingsTab = ({
       <FlatList
         style={{ flex: 1 }}
         data={filteredBookings}
-        keyExtractor={(item) => item._id || item.id || String(Math.random())}
+        keyExtractor={(item, index) => item._id || item.id || `booking-${index}`}
         renderItem={({ item }) => (
           <BookingItem
             item={item}

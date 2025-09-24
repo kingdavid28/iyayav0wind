@@ -994,8 +994,13 @@ exports.sendCustomVerification = async (req, res, next) => {
   try {
     const { email, name, role, uid } = req.body;
     
+<<<<<<< HEAD
     const verifyURL = `https://iyayav0.firebaseapp.com/__/auth/action?mode=verifyEmail&oobCode=${uid}&continueUrl=${encodeURIComponent(`exp://192.168.1.9:8081/--/verify-success?role=${role}`)}`;
     const expoGoURL = `exp://192.168.1.9:8081/--/verify-success?role=${role}`;
+=======
+    const verifyURL = `https://iyayav0.firebaseapp.com/__/auth/action?mode=verifyEmail&oobCode=${encodeURIComponent(uid)}&continueUrl=${encodeURIComponent(`exp://192.168.1.10:8081/--/verify-success?role=${encodeURIComponent(role)}`)}`;
+    const expoGoURL = `exp://192.168.1.10:8081/--/verify-success?role=${role}`;
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
     const customSchemeURL = `iyaya://verify-success?role=${role}`;
     
     const mailOptions = {
@@ -1015,7 +1020,7 @@ exports.sendCustomVerification = async (req, res, next) => {
     <tr>
       <td style="padding: 40px 30px; text-align: center;">
         <h2 style="color: #db2777; margin: 0 0 20px 0;">Welcome to iYaya!</h2>
-        <p style="margin: 0 0 15px 0; color: #333;">Hi ${name},</p>
+        <p style="margin: 0 0 15px 0; color: #333;">Hi ${name.replace(/[<>&"']/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#x27;'})[c])},</p>
         <p style="margin: 0 0 30px 0; color: #666; line-height: 1.5;">Thank you for creating an account with iYaya. Please click the button below to verify your email address and activate your account:</p>
         
         <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">

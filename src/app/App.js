@@ -12,16 +12,19 @@ import PrivacyProvider from '../components/features/privacy/PrivacyManager';
 import ProfileDataProvider from '../components/features/privacy/ProfileDataManager';
 import { ErrorBoundary, LoadingSpinner } from '../shared/ui';
 
+// Auth Context
+import { AuthProvider } from '../contexts/AuthContext';
+
+// Log filter - only show errors and warnings
+import '../utils/logFilter';
+
 // Navigation
 import AppNavigator from './navigation/AppNavigator';
 
 // Utils
 import { hasSeenOnboarding } from '../utils/onboarding';
 
-// Development mode setup
-if (__DEV__) {
-  console.log('🚀 Development mode enabled');
-}
+// Development mode setup - logs suppressed
 
 LogBox.ignoreLogs([
   "AsyncStorage has been extracted",
@@ -63,10 +66,17 @@ export default function App() {
     <ErrorBoundary>
       <SafeAreaProvider>
         <AppProvider>
-          <AppIntegration>
-            <AppNavigator />
-            <StatusBar style="auto" />
-          </AppIntegration>
+          <ProfileDataProvider>
+            <PrivacyProvider>
+              {/* Wrap AppIntegration with AuthProvider */}
+              <AuthProvider>
+                <AppIntegration>
+                  <AppNavigator />
+                  <StatusBar style="auto" />
+                </AppIntegration>
+              </AuthProvider>
+            </PrivacyProvider>
+          </ProfileDataProvider>
         </AppProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

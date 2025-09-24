@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Button, TextInput, useTheme } from "react-native-paper";
 import { useApp } from "../contexts/AppContext";
-import { useAuth } from "../core/contexts/AuthContext";
+import { useAuth } from '../contexts/AuthContext';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { useAuthSubmit } from '../hooks/useAuthSubmit';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';

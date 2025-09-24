@@ -82,10 +82,7 @@ class UserService {
   async getProfile(userId, forceRefresh = false) {
     try {
       // userId is kept for cache key compatibility, but fetching uses auth profile
-      if (!userId) {
-        // Do not block: some flows may not have ID handy; we'll still fetch auth profile
-        logger.warn('getProfile called without userId; proceeding to fetch /auth/profile')
-      }
+      // For current user profile, userId is not required
       
       const cacheKey = `profile:${userId}`
       

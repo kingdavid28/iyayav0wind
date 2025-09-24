@@ -1,58 +1,42 @@
 const express = require('express');
-const { body } = require('express-validator');
-const { rateLimit } = require('express-rate-limit');
 const router = express.Router();
-const { authenticate } = require('../utils/auth');
+const { authenticate } = require('../middleware/auth');
 
-// Rate limiter
-const rateLimiter = (options) => rateLimit(options);
+// Mock payment controller for now
+const paymentController = {
+  processPayment: async (req, res) => {
+    res.json({
+      success: true,
+      message: 'Payment processing not implemented yet',
+      data: { status: 'pending' }
+    });
+  },
+  
+  getPaymentHistory: async (req, res) => {
+    res.json({
+      success: true,
+      data: { payments: [] }
+    });
+  },
+  
+  refundPayment: async (req, res) => {
+    res.json({
+      success: true,
+      message: 'Refund processing not implemented yet'
+    });
+  }
+};
 
-// Apply authentication to all routes
+// All payment routes require authentication
 router.use(authenticate);
 
-// Get payment settings
-router.get('/settings', 
-  rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }),
-  async (req, res) => {
-    try {
-      // Mock response - replace with actual database logic
-      const settings = {
-        defaultPaymentMethod: 'card',
-        autoPayments: false,
-        savePaymentInfo: true,
-        receiveReceipts: true
-      };
-      
-      res.json(settings);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to get payment settings' });
-    }
-  }
-);
+// POST /api/payments/process - Process a payment
+router.post('/process', paymentController.processPayment);
 
-// Update payment settings
-router.put('/settings',
-  rateLimiter({ windowMs: 15 * 60 * 1000, max: 20 }),
-  [
-    body('defaultPaymentMethod').optional().isString(),
-    body('autoPayments').optional().isBoolean(),
-    body('savePaymentInfo').optional().isBoolean(),
-    body('receiveReceipts').optional().isBoolean(),
-  ],
-  async (req, res) => {
-    try {
-      // Mock response - replace with actual database logic
-      const updatedSettings = req.body;
-      
-      res.json({ 
-        success: true, 
-        message: 'Payment settings updated successfully',
-        settings: updatedSettings 
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to update payment settings' });
-    }
-  }
-);
+// GET /api/payments/history - Get payment history
+router.get('/history', paymentController.getPaymentHistory);
+
+// POST /api/payments/:id/refund - Process a refund
+router.post('/:id/refund', paymentController.refundPayment);
 
 module.exports = router;

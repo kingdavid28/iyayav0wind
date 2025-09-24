@@ -8,13 +8,15 @@ import { usePrivacy } from '../../../components/features/privacy/PrivacyManager'
 import PrivacyNotificationModal from '../../../components/features/privacy/PrivacyNotificationModal';
 import { SettingsModal } from '../../../components/ui/modals/SettingsModal';
 import { RequestInfoModal } from '../../../components/ui/modals/RequestInfoModal';
-import { useMessaging } from '../../../contexts/MessagingContext';
+
+// NotificationContext removed - using local state
 import { getCurrentSocketURL } from '../../../config/api';
 
 const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfileEdit, profileName, profileImage, profileContact, profileLocation, setActiveTab }) => {
   // Use real privacy system
   const { pendingRequests, notifications } = usePrivacy();
-  const { unreadCount } = useMessaging();
+
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -101,13 +103,6 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
               onPress={() => setActiveTab('messages')}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={22} color="#db2777" />
-              {unreadCount > 0 && (
-                <View style={headerStyles.notificationBadge}>
-                  <Text style={headerStyles.notificationBadgeText}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Text>
-                </View>
-              )}
             </Pressable>
             
             <Pressable 

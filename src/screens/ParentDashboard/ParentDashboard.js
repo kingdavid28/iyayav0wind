@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 
 // Core imports
-import { useAuth } from '../../core/contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useParentDashboard } from '../../hooks/useParentDashboard';
 
 // API imports
@@ -18,13 +18,22 @@ import { styles } from '../styles/ParentDashboard.styles';
 import PrivacyProvider from '../../components/features/privacy/PrivacyManager';
 import ProfileDataProvider from '../../components/features/privacy/ProfileDataManager';
 
+
+
+
+
 // Component imports
 import Header from './components/Header';
 import NavigationTabs from './components/NavigationTabs';
 import HomeTab from './components/HomeTab';
 import SearchTab from './components/SearchTab';
 import BookingsTab from './components/BookingsTab';
+<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
 import MessagesTab from '../../components/features/messaging/MessagesTab';
+=======
+import MessagesTab from './components/MessagesTab';
+
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
 import PostJobsTab from './components/PostJobsTab';
 import MyJobsTab from './components/MyJobsTab';
 
@@ -63,17 +72,22 @@ const ParentDashboard = () => {
   
   // Custom hook for dashboard data
   const {
-    activeTab, setActiveTab,
+    activeTab, setActiveTab: setActiveTabHook,
     profile,
     jobs, caregivers, bookings, children,
     loading,
     loadProfile, fetchJobs, fetchCaregivers, fetchBookings, fetchChildren
   } = useParentDashboard();
   
+
+
+  const setActiveTab = setActiveTabHook;
+  
   // UI State
   const [refreshing, setRefreshing] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showAllChildren, setShowAllChildren] = useState(false);
+
   
   // Modal states
   const [modals, setModals] = useState({
@@ -156,6 +170,7 @@ const ParentDashboard = () => {
       userId: caregiver.userId || null,
       name: caregiver.name,
       avatar: caregiver.avatar || caregiver.profileImage,
+      profileImage: caregiver.profileImage || caregiver.avatar,
       rating: caregiver.rating,
       reviews: caregiver.reviewCount,
       hourlyRate: caregiver.hourlyRate,
@@ -182,7 +197,7 @@ const ParentDashboard = () => {
     },
     {
       id: 'messages',
-      icon: 'message-circle',
+      icon: 'chatbubble-ellipses',
       title: 'Messages',
       onPress: () => setActiveTab('messages')
     },
@@ -387,38 +402,48 @@ const ParentDashboard = () => {
     navigation.navigate('CaregiverProfile', { caregiverId: caregiver._id });
   };
 
-  const handleMessageCaregiver = async (caregiver) => {
+  const handleMessageCaregiver = useCallback(async (caregiver) => {
+    // Create connection in Firebase before navigating
+    const firebaseMessagingService = (await import('../../services/firebaseMessagingService')).default;
+    
     try {
+<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
       const conversation = await messagingService.startConversation(
         caregiver._id,
         caregiver.name,
         'caregiver',
         `Hi ${caregiver.name}, I'm interested in your services.`
       );
+=======
+      // Ensure connection exists in Firebase
+      await firebaseMessagingService.createConnection(user.uid, caregiver._id || caregiver.id);
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
       
-      navigation.navigate('Messaging', { 
-        recipientId: caregiver._id,
-        recipientName: caregiver.name,
-        recipientAvatar: caregiver.avatar,
-        conversationId: conversation.conversation?.id
-      });
     } catch (error) {
-      console.error('Failed to start conversation:', error);
-      // Fallback to direct navigation
-      navigation.navigate('Messaging', { 
-        recipientId: caregiver._id,
-        recipientName: caregiver.name,
-        recipientAvatar: caregiver.avatar
-      });
+      console.log('Connection setup warning:', error.message);
     }
-  };
+    
+    navigation.navigate('CaregiverChat', {
+      userId: user.uid,
+      caregiverId: caregiver._id || caregiver.id,
+      caregiverName: caregiver.name
+    });
+  }, [navigation, user]);
+
+  const handleViewReviews = useCallback((caregiver) => {
+    navigation.navigate('CaregiverReviews', {
+      userId: user.uid,
+      caregiverId: caregiver._id || caregiver.id
+    });
+  }, [navigation, user]);
 
   const handleBookCaregiver = useCallback((caregiver) => {
     setSelectedCaregiver({
       _id: caregiver._id || caregiver.id,
       id: caregiver.id || caregiver._id,
       name: caregiver.name,
-      avatar: caregiver.avatar,
+      avatar: caregiver.avatar || caregiver.profileImage,
+      profileImage: caregiver.profileImage || caregiver.avatar,
       rating: caregiver.rating,
       reviews: caregiver.reviewCount,
       hourlyRate: caregiver.hourlyRate,
@@ -429,8 +454,6 @@ const ParentDashboard = () => {
 
   // Booking functions
   const handleBookingConfirm = async (bookingData) => {
-    console.log('🔍 Raw booking data received:', bookingData);
-    
     // Validate required fields
     if (!bookingData.caregiverId || !bookingData.date || !bookingData.startTime || !bookingData.endTime) {
       throw new Error('Missing required booking information');
@@ -463,11 +486,16 @@ const ParentDashboard = () => {
       children: selectedChildrenObjects || []
     };
 
-    console.log('📤 Creating booking via consolidated service:', JSON.stringify(payload, null, 2));
+
 
     try {
+<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
       const booking = await bookingsAPI.create(payload);
       console.log('✅ Booking created successfully:', booking);
+=======
+      const booking = await apiService.bookings.create(payload);
+
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
       
       setActiveTab('bookings');
       await fetchBookings();
@@ -476,7 +504,7 @@ const ParentDashboard = () => {
       
       return booking;
     } catch (error) {
-      console.error('❌ Consolidated booking service error:', error);
+
       Alert.alert('Error', error.message || 'Failed to create booking');
       throw error;
     }
@@ -715,7 +743,20 @@ const ParentDashboard = () => {
             caregivers={caregivers || []}
             onBookCaregiver={handleBookCaregiver}
             onMessageCaregiver={handleMessageCaregiver}
+            onViewReviews={handleViewReviews}
             navigation={navigation}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            loading={loading}
+            setActiveTab={setActiveTab}
+          />
+        );
+      case 'messages':
+        return (
+          <MessagesTab
+            navigation={navigation}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
           />
         );
       case 'search':
@@ -733,6 +774,10 @@ const ParentDashboard = () => {
             onViewCaregiver={handleViewCaregiver}
             onSearch={handleSearch}
             onOpenFilter={() => toggleModal('filter', true)}
+<<<<<<< HEAD:src/screens/ParentDashboard/ParentDashboard.js
+=======
+            loading={loading}
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2:src/screens/ParentDashboard/index.js
           />
         );
       case 'bookings':
@@ -753,16 +798,10 @@ const ParentDashboard = () => {
             }}
             onMessageCaregiver={handleMessageCaregiver}
             navigation={navigation}
+            loading={loading}
           />
         );
-      case 'messages':
-        return (
-          <MessagesTab
-            navigation={navigation}
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-          />
-        );
+
       case 'jobs':
         return (
           <PostJobsTab
@@ -779,6 +818,7 @@ const ParentDashboard = () => {
             onEditJob={handleEditJob}
             onDeleteJob={handleDeleteJob}
             onCompleteJob={handleCompleteJob}
+            loading={loading}
           />
         );
       default:
@@ -787,9 +827,9 @@ const ParentDashboard = () => {
   };
 
   return (
-    <PrivacyProvider>
-      <ProfileDataProvider>
-        <View style={styles.container}>
+      <PrivacyProvider>
+        <ProfileDataProvider>
+          <View style={styles.container}>
       <Header 
         navigation={navigation} 
         onProfilePress={() => toggleModal('profile', true)} 
@@ -876,9 +916,9 @@ const ParentDashboard = () => {
         childrenList={children}
         onConfirm={handleBookingConfirm}
       />
-        </View>
-      </ProfileDataProvider>
-    </PrivacyProvider>
+          </View>
+        </ProfileDataProvider>
+      </PrivacyProvider>
   );
 };
 

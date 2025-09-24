@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatAddress } from '../../utils';
+import { getProfileImageUrl } from '../../../utils/imageUtils';
 
 const CaregiverCard = ({ caregiver, onPress, onMessage, onBook, showActions = true }) => {
   const {
@@ -45,7 +46,7 @@ const CaregiverCard = ({ caregiver, onPress, onMessage, onBook, showActions = tr
         <View style={styles.profileSection}>
           <View style={styles.imageContainer}>
             {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              <Image source={{ uri: getProfileImageUrl(caregiver) }} style={styles.profileImage} />
             ) : (
               <View style={styles.placeholderImage}>
                 <Ionicons name="person" size={24} color="#6b7280" />

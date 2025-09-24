@@ -5,41 +5,31 @@ const User = require('../models/User');
 // Debug JWT configuration
 if (!jwtSecret) {
   console.error('❌ JWT_SECRET not configured!');
-} else {
-  console.log('✅ JWT_SECRET loaded:', jwtSecret.substring(0, 10) + '...');
 }
 
 // Authentication middleware: Handles both JWT and Firebase tokens
 const authenticate = async (req, res, next) => {
   try {
-    console.log('🔐 Auth middleware - Headers:', {
-      authorization: req.header('Authorization') ? 'Present' : 'Missing',
-      devBypass: req.header('X-Dev-Bypass'),
-      devRole: req.header('X-Dev-Role'),
-      allowDevBypass: process.env.ALLOW_DEV_BYPASS
-    });
+    // Auth middleware headers check (debug disabled)
 
     // FIRST: Check for dev bypass with X-Dev-Bypass header
     if (process.env.ALLOW_DEV_BYPASS === 'true' && req.header('X-Dev-Bypass') === '1') {
-      console.log('🔧 Dev bypass activated with X-Dev-Bypass header');
       const incoming = (req.header('X-Dev-Role') || 'caregiver').toLowerCase();
-      console.log('🔧 Dev bypass role:', incoming);
       
       // Map app-facing roles to internal roles
       const mapped = incoming === 'caregiver' || incoming === 'provider'
-        ? { role: 'caregiver', userType: 'caregiver' }
-        : { role: 'parent', userType: 'parent' };
+        ? 'caregiver'
+        : 'parent';
       
       req.user = {
         id: 'dev-bypass-uid',
         mongoId: 'dev-bypass-mongo-id',
-        role: mapped.role,
-        userType: mapped.userType,
+        role: mapped,
         email: 'dev-bypass@example.com',
         bypass: true,
       };
       
-      console.log('🔧 Dev bypass user created:', req.user);
+      // Dev bypass user created
       return next();
     }
 
@@ -47,13 +37,12 @@ const authenticate = async (req, res, next) => {
     if (process.env.ALLOW_DEV_BYPASS === 'true') {
       const authHeader = req.header('Authorization');
       if (!authHeader) {
-        console.log('🔧 Dev mode: No auth header, creating mock user');
+        // Dev mode: No auth header, creating mock user
         const devRole = req.header('X-Dev-Role') || 'caregiver';
         req.user = {
           id: 'dev-mock-user',
           mongoId: 'dev-mock-user',
           role: devRole,
-          userType: devRole,
           email: 'dev@example.com',
           mock: true
         };
@@ -65,7 +54,7 @@ const authenticate = async (req, res, next) => {
     const authHeader = req.header('Authorization');
     
     if (!authHeader) {
-      console.log('❌ No authorization header found');
+      // No authorization header found
       return res.status(401).json({
         success: false,
         error: 'Authorization header missing',
@@ -84,12 +73,11 @@ const authenticate = async (req, res, next) => {
 
     // Check for mock token first in development (before JWT verification)
     if (process.env.NODE_ENV === 'development' && token.includes('mock-signature')) {
-      console.log('🔧 Mock token detected, bypassing JWT verification');
+      // Mock token detected, bypassing JWT verification
       req.user = {
         id: 'mock-user-123',
         mongoId: 'mock-user-123',
         role: 'parent',
-        userType: 'parent',
         email: 'mock@example.com',
         mock: true
       };
@@ -102,11 +90,11 @@ const authenticate = async (req, res, next) => {
     if (tokenParts.length === 3) {
       try {
         const header = JSON.parse(Buffer.from(tokenParts[0], 'base64').toString());
-        console.log('🔍 Token header:', header);
+        // Token header decoded
         // Firebase tokens use RS256, our JWT tokens use HS256
         isFirebaseToken = header.alg === 'RS256' || header.typ === 'JWT' && !header.alg;
       } catch (e) {
-        console.log('⚠️ Could not decode token header, assuming Firebase token');
+        // Could not decode token header, assuming Firebase token
         isFirebaseToken = true;
       }
     }
@@ -114,7 +102,7 @@ const authenticate = async (req, res, next) => {
     // Handle Firebase tokens first (most common case)
     if (isFirebaseToken) {
       try {
-        console.log('🔥 Processing Firebase token...');
+        // Processing Firebase token
         // Simple decode without verification (Firebase tokens use RS256)
         const parts = token.split('.');
         if (parts.length === 3) {
@@ -127,24 +115,16 @@ const authenticate = async (req, res, next) => {
             // Add padding if needed
             const paddedPayload = base64 + '='.repeat((4 - base64.length % 4) % 4);
             payload = JSON.parse(Buffer.from(paddedPayload, 'base64').toString());
-            console.log('🔥 Firebase token payload:', {
-              iss: payload.iss,
-              aud: payload.aud,
-              user_id: payload.user_id,
-              sub: payload.sub,
-              exp: payload.exp,
-              iat: payload.iat,
-              email: payload.email
-            });
+            // Firebase token payload decoded
           } catch (decodeError) {
-            console.log('⚠️ Firebase token payload decode failed:', decodeError.message);
+            // Firebase token payload decode failed
             throw decodeError;
           }
           
           // Check if token is expired
           const now = Math.floor(Date.now() / 1000);
           if (payload.exp && payload.exp < now) {
-            console.log('⚠️ Firebase token expired:', new Date(payload.exp * 1000));
+            // Firebase token expired
             throw new Error('Firebase token expired');
           }
           
@@ -152,87 +132,65 @@ const authenticate = async (req, res, next) => {
           const email = payload.email;
           
           if (firebaseUid || email) {
-            console.log('🔍 Looking for Firebase user:', firebaseUid || email);
+            // Looking for Firebase user
             // Find user by Firebase UID or email
             let user = null;
             if (firebaseUid) {
-              console.log('🔍 Searching by firebaseUid:', firebaseUid);
-              user = await User.findOne({ firebaseUid }).select('_id role userType email');
-              console.log('🔍 User found by firebaseUid:', !!user);
+              user = await User.findOne({ firebaseUid }).select('_id role email');
             }
             if (!user && email) {
-              console.log('🔍 Searching by email:', email.toLowerCase());
-              user = await User.findOne({ email: email.toLowerCase() }).select('_id role userType email firebaseUid');
-              console.log('🔍 User found by email:', !!user);
+              user = await User.findOne({ email: email.toLowerCase() }).select('_id role email firebaseUid');
               // Update firebaseUid if found by email but missing firebaseUid
               if (user && !user.firebaseUid && firebaseUid) {
-                console.log('🔧 Updating user with missing firebaseUid');
                 await User.findByIdAndUpdate(user._id, { firebaseUid });
                 user.firebaseUid = firebaseUid;
-                console.log('✅ FirebaseUid updated for user:', user.email);
               }
             }
             
             if (!user) {
-              console.log('❌ Firebase user not found in database:', firebaseUid || email);
+              // Firebase user not found in database
               return res.status(401).json({
                 success: false,
                 error: 'Firebase user not found in database'
               });
             }
 
-            console.log('✅ Firebase user found:', user.email);
-            // Ensure role mapping
-            let mappedRole = user.role || 'parent';
-            let mappedUserType = user.userType || user.role || 'parent';
-            
-            // Handle caregiver role mapping
-            if (mappedRole === 'caregiver' || mappedUserType === 'caregiver') {
-              mappedRole = 'caregiver';
-              mappedUserType = 'caregiver';
-            }
-            
+            // Firebase user found
             req.user = {
               id: user._id.toString(),
               mongoId: user._id,
-              role: mappedRole,
-              userType: mappedUserType,
+              role: user.role || 'parent',
               email: user.email,
               firebaseUid: firebaseUid || user.firebaseUid
             };
             
-            console.log('👤 Authenticated user:', {
-              id: req.user.id,
-              email: req.user.email,
-              role: req.user.role,
-              userType: req.user.userType
-            });
+            // User authenticated
             
             return next();
           } else {
-            console.log('⚠️ No Firebase UID or email found in token payload');
+            // No Firebase UID or email found in token payload
             throw new Error('Invalid Firebase token payload');
           }
         } else {
-          console.log('⚠️ Invalid token format - not 3 parts:', parts.length);
+          // Invalid token format
           throw new Error('Invalid token format');
         }
       } catch (firebaseError) {
-        console.log('❌ Firebase token processing failed:', firebaseError.message);
+        // Firebase token processing failed
         // Don't fall back to JWT if Firebase token processing fails
         throw new Error('Invalid Firebase token');
       }
     } else {
       // Handle JWT tokens (our internal tokens)
       try {
-        console.log('🔑 Processing JWT token...');
+        // Processing JWT token
         // Verify with HS256 algorithm (our JWT tokens)
         const decoded = jwt.verify(token, jwtSecret, {
           algorithms: ['HS256']
         });
 
         // Check if user still exists in database
-        const user = await User.findById(decoded.id).select('role userType email');
+        const user = await User.findById(decoded.id).select('role email');
         
         if (!user) {
           return res.status(401).json({
@@ -241,20 +199,9 @@ const authenticate = async (req, res, next) => {
           });
         }
 
-        // Map JWT token roles to correct userType using actual DB data
-        let userType = user.userType || user.role || 'user';
-        if (user.role === 'caregiver' || user.userType === 'caregiver') {
-          userType = 'caregiver';
-        } else if (user.role === 'client' || user.userType === 'client') {
-          userType = 'parent';
-        } else if (user.role === 'parent' || user.userType === 'parent') {
-          userType = 'parent';
-        }
-
         req.user = {
           id: decoded.id,
-          role: user.role || 'user',
-          userType: userType,
+          role: user.role || 'parent',
           email: user.email
         };
         
@@ -262,16 +209,11 @@ const authenticate = async (req, res, next) => {
           req.user.mongoId = decoded.id;
         }
 
-        console.log('✅ JWT user authenticated:', {
-          id: req.user.id,
-          email: req.user.email,
-          role: req.user.role,
-          userType: req.user.userType
-        });
+        // JWT user authenticated
 
         return next();
       } catch (jwtError) {
-        console.log('❌ JWT verification failed:', jwtError.name, jwtError.message);
+        // JWT verification failed
         throw new Error('Invalid JWT token');
       }
     }

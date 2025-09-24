@@ -295,8 +295,11 @@ export const styles = StyleSheet.create({
   quickActionTile: {
     width: '48%',
     borderRadius: 16,
-    overflow: 'hidden',
     ...shadows.md,
+  },
+  quickActionContent: {
+    overflow: 'hidden',
+    borderRadius: 16,
   },
   quickActionGradient: {
     borderRadius: 16,
@@ -376,8 +379,11 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     marginBottom: 8,
-    overflow: 'hidden',
     ...shadows.md,
+  },
+  promotionCardContent: {
+    overflow: 'hidden',
+    borderRadius: 16,
   },
   promotionHeader: {
     flexDirection: 'row',
@@ -1244,5 +1250,344 @@ export const styles = StyleSheet.create({
   moreCertificationsText: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  // Cover Letter Suggestions Styles
+  suggestedCoverLettersContainer: {
+    flexDirection: 'column',
+    marginBottom: 16,
+    gap: 8,
+  },
+  coverLetterChip: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  coverLetterChipSelected: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
+  },
+  coverLetterChipText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  coverLetterChipTextSelected: {
+    color: '#2563EB',
+    fontWeight: '500',
+  },
+  // Cover Letter Display Styles
+  coverLetterDisplay: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 8,
+  },
+  coverLetterText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  // Notification Styles
+  notificationCard: {
+    marginBottom: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    ...shadows.sm,
+  },
+  notificationContent: {
+    padding: 16,
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  notificationText: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  unreadTitle: {
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  notificationTime: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#3B82F6',
+    marginLeft: 8,
+    marginTop: 4,
+  },
+  // Job Details Modal Styles
+  jobDetailsModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    margin: 20,
+    maxWidth: 320,
+    width: '85%',
+    alignSelf: 'center',
+    ...shadows.lg,
+  },
+  jobDetailsContent: {
+    padding: 20,
+  },
+  jobDetailsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  jobDetailsFamily: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  jobDetailsInfo: {
+    marginBottom: 16,
+  },
+  jobDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  jobDetailsText: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginLeft: 8,
+    flex: 1,
+  },
+  jobDetailsRequirements: {
+    marginBottom: 16,
+  },
+  jobDetailsRequirementsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  jobDetailsRequirementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  jobDetailsRequirementText: {
+    fontSize: 13,
+    color: '#4B5563',
+    marginLeft: 6,
+    flex: 1,
+  },
+  jobDetailsActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    gap: 12,
+  },
+  jobDetailsCloseButton: {
+    flex: 1,
+  },
+  jobDetailsApplyButton: {
+    flex: 1,
+    backgroundColor: '#2563EB',
+  },
+  // Messaging and Reviews Styles
+  messagesContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  chatContainer: {
+    flex: 1,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    marginRight: 16,
+  },
+  chatTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  parentsList: {
+    flex: 1,
+  },
+  parentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  parentInfo: {
+    marginLeft: 12,
+  },
+  parentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  parentStatus: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  messagesList: {
+    flex: 1,
+    padding: 16,
+  },
+  messagesContent: {
+    paddingBottom: 16,
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  currentUserMessage: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#3B82F6',
+  },
+  otherUserMessage: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E5E7EB',
+  },
+  messageText: {
+    fontSize: 16,
+  },
+  currentUserMessageText: {
+    color: '#FFFFFF',
+  },
+  otherUserMessageText: {
+    color: '#374151',
+  },
+  messageTime: {
+    fontSize: 12,
+    marginTop: 4,
+    opacity: 0.7,
+  },
+  currentUserMessageTime: {
+    color: '#FFFFFF',
+    alignSelf: 'flex-end',
+  },
+  otherUserMessageTime: {
+    color: '#6B7280',
+    alignSelf: 'flex-start',
+  },
+  messageInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  messageInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    maxHeight: 100,
+  },
+  sendButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewsContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  reviewsList: {
+    flex: 1,
+  },
+  reviewsContent: {
+    padding: 16,
+  },
+  reviewCard: {
+    marginBottom: 16,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  reviewerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+  },
+  reviewText: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  // Chat card styles
+  chatHeaderCard: {
+    margin: 8,
+    marginBottom: 4,
+    borderRadius: 12,
+  },
+  messagesCard: {
+    flex: 1,
+    margin: 8,
+    marginVertical: 4,
+    borderRadius: 12,
+  },
+  inputCard: {
+    margin: 8,
+    marginTop: 4,
+    borderRadius: 12,
   },
 });

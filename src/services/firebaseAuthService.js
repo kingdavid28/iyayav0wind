@@ -39,11 +39,10 @@ export const firebaseAuthService = {
         birthDate: userData.birthDate,
         phone: userData.phone,
         role: userData.role || 'parent',
-        userType: userData.role || 'parent',
         emailVerified: user.emailVerified
       };
       
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/firebase-sync`, {
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,7 +74,7 @@ export const firebaseAuthService = {
     // Get complete user profile from MongoDB
     let profile = { role: 'parent' };
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/firebase-profile`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

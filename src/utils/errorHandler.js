@@ -27,16 +27,7 @@ class ErrorHandler {
     }
     
     // Enhanced error logging only for valid errors
-    logger.error("Processing error:", {
-      error,
-      type: typeof error,
-      keys: Object.keys(error || {}),
-      string: String(error),
-      message: error?.message,
-      stack: error?.stack,
-      status: error?.status,
-      statusCode: error?.statusCode
-    });
+    logger.error("Processing error:", error);
 
 
     // Determine error type and create standardized error object

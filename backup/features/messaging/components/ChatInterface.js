@@ -12,14 +12,13 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useMessaging } from '../contexts/MessagingContext';
 import { formatDistanceToNow } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
-// Firebase/Firestore removed: chat uses backend API via MessagingContext
 
 const ChatInterface = ({ route }) => {
-  const { userId, jobId } = route.params || {};
+  const { userId, jobId, conversationId } = route.params || {};
   const navigation = useNavigation();
   const { user } = useAuth();
   const {
@@ -29,24 +28,46 @@ const ChatInterface = ({ route }) => {
     sendMessage,
     activeConversation,
     getOrCreateConversation,
+    fetchMessages,
   } = useMessaging();
   
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
   const flatListRef = useRef(null);
-  // Firestore state removed
 
-  // Initialize conversation when component mounts or userId changes
+  // Initialize conversation when component mounts or params change
   useEffect(() => {
-    const init = async () => {
-      if (userId) {
-        await getOrCreateConversation(userId, jobId);
+    const initConversation = async () => {
+      try {
+        if (conversationId) {
+          // If we have a conversation ID, fetch its messages directly
+          await fetchMessages(conversationId);
+        } else if (userId) {
+          // Otherwise, get or create a conversation with the user
+          await getOrCreateConversation(userId, jobId);
+        }
+      } catch (err) {
+        console.error('Error initializing conversation:', err);
       }
     };
-    init();
-  }, [userId, jobId, getOrCreateConversation]);
 
-  // Firestore branch removed; MessagingContext handles fetching and realtime
+    initConversation();
+  }, [userId, jobId, conversationId, getOrCreateConversation, fetchMessages]);
+
+  // Set up navigation header
+  useEffect(() => {
+    if (activeConversation && activeConversation.participants) {
+      const otherParticipant = activeConversation.participants.find(
+        p => p.id !== user.uid
+      );
+      
+      if (otherParticipant) {
+        navigation.setOptions({
+          title: otherParticipant.name || 'Chat',
+        });
+      }
+    }
+  }, [activeConversation, navigation, user.uid]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -56,8 +77,6 @@ const ChatInterface = ({ route }) => {
       }, 100);
     }
   }, [messages]);
-
-  // Unread clear handled by backend; Firestore logic removed
 
   const handleSend = async () => {
     if (!messageText.trim() || sending) return;
@@ -76,13 +95,13 @@ const ChatInterface = ({ route }) => {
 
   const renderMessage = ({ item }) => {
     const isCurrentUser = item.senderId === user.uid;
-    const messageDate = item.createdAt?.toDate ? item.createdAt.toDate() : new Date();
+    const messageDate = item.createdAt?.toDate ? item.createdAt.toDate() : new Date(item.createdAt || Date.now());
     
     return (
       <View
         style={[
-          styles.messageBubble,
-          isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
+          styles.messageContainer,
+          isCurrentUser ? styles.currentUserContainer : styles.otherUserContainer,
         ]}
       >
         {!isCurrentUser && item.sender?.photoURL && (
@@ -91,18 +110,36 @@ const ChatInterface = ({ route }) => {
             style={styles.avatar}
           />
         )}
-        <View style={styles.messageContent}>
-          <Text style={styles.messageText}>{item.content}</Text>
-          <Text style={styles.timestamp}>
+        <View
+          style={[
+            styles.messageBubble,
+            isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
+          ]}
+        >
+          <Text style={[
+            styles.messageText,
+            isCurrentUser && styles.currentUserText
+          ]}>
+            {item.content}
+          </Text>
+          <Text style={[
+            styles.timestamp,
+            isCurrentUser && styles.currentUserTimestamp
+          ]}>
             {formatDistanceToNow(messageDate, { addSuffix: true })}
           </Text>
         </View>
+        {isCurrentUser && item.sender?.photoURL && (
+          <Image
+            source={{ uri: item.sender.photoURL }}
+            style={styles.avatar}
+          />
+        )}
       </View>
     );
   };
 
-  const isLoading = loading && messages.length === 0;
-  if (isLoading) {
+  if (loading && messages.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
@@ -110,11 +147,22 @@ const ChatInterface = ({ route }) => {
     );
   }
 
-  const errMsg = error;
-  if (errMsg) {
+  if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{errMsg}</Text>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => {
+            if (activeConversation?.id) {
+              fetchMessages(activeConversation.id);
+            } else if (userId) {
+              getOrCreateConversation(userId, jobId);
+            }
+          }}
+        >
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -128,7 +176,7 @@ const ChatInterface = ({ route }) => {
       <FlatList
         ref={flatListRef}
         data={messages}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id || `msg-${Date.now()}-${Math.random()}`}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesContainer}
         onContentSizeChange={() =>
@@ -154,7 +202,7 @@ const ChatInterface = ({ route }) => {
           returnKeyType="send"
         />
         <TouchableOpacity
-          style={styles.sendButton}
+          style={[styles.sendButton, (!messageText.trim() || sending) && styles.disabledButton]}
           onPress={handleSend}
           disabled={!messageText.trim() || sending}
         >
@@ -188,10 +236,21 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   messagesContainer: {
     padding: 10,
-    paddingBottom: 60, // Extra space at the bottom for input
+    paddingBottom: 60,
   },
   emptyContainer: {
     flex: 1,
@@ -203,32 +262,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
-  messageBubble: {
-    maxWidth: '80%',
+  messageContainer: {
+    flexDirection: 'row',
     marginVertical: 5,
+    alignItems: 'flex-end',
+  },
+  currentUserContainer: {
+    justifyContent: 'flex-end',
+  },
+  otherUserContainer: {
+    justifyContent: 'flex-start',
+  },
+  messageBubble: {
+    maxWidth: '70%',
     padding: 12,
     borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
   },
   currentUserBubble: {
     backgroundColor: '#007AFF',
-    alignSelf: 'flex-end',
     borderBottomRightRadius: 4,
   },
   otherUserBubble: {
     backgroundColor: '#E5E5EA',
-    alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
   },
   avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    marginRight: 8,
-  },
-  messageContent: {
-    flex: 1,
+    marginHorizontal: 8,
   },
   messageText: {
     fontSize: 16,
@@ -242,6 +304,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(0, 0, 0, 0.5)',
     alignSelf: 'flex-end',
+  },
+  currentUserTimestamp: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -269,6 +334,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
 });
 

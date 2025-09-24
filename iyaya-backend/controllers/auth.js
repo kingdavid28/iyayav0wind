@@ -9,15 +9,11 @@ const { jwtSecret, jwtExpiry, refreshTokenSecret, refreshTokenExpiry } = require
 const fs = require('fs');
 const path = require('path');
 
-// Normalize incoming human-friendly roles to backend-internal roles
-function normalizeIncomingRole(input) {
-  const v = String(input || '').toLowerCase();
-  if (v === 'parent' || v === 'client') return { role: 'parent', userType: 'parent' };
-  if (v === 'caregiver' || v === 'nanny') return { role: 'caregiver', userType: 'caregiver' };
-  // Do NOT allow admin creation via public flows; map to parent
-  if (v === 'admin') return { role: 'parent', userType: 'parent' };
-  // Default to parent for safety
-  return { role: 'parent', userType: 'parent' };
+// Normalize incoming roles - only parent and caregiver allowed
+function normalizeRole(input) {
+  const role = String(input || '').toLowerCase();
+  if (role === 'caregiver') return 'caregiver';
+  return 'parent'; // Default for any other input
 }
 
 // Helper function to generate tokens
@@ -116,7 +112,7 @@ exports.updateProfile = async (req, res, next) => {
       try {
         // Fetch user to verify role
         const current = await User.findById(req.user.id).select('role userType');
-        const isParent = current && (current.role === 'client' || current.role === 'parent' || current.userType === 'client' || current.userType === 'parent');
+        const isParent = current && current.role === 'parent';
         if (!isParent) {
           return res.status(403).json({ success: false, error: 'Only parent users can update children.' });
         }
@@ -188,7 +184,7 @@ exports.updateChildren = async (req, res, next) => {
     }
     // Only allow parents to update children
     const user = await User.findById(req.user.id);
-    if (!user || user.role !== 'client' || user.userType !== 'client') {
+    if (!user || user.role !== 'parent') {
       return res.status(403).json({ success: false, error: 'Only parent users can update children.' });
     }
     user.children = children;
@@ -207,14 +203,14 @@ exports.updateRole = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'role is required' });
     }
 
-    const { role: internalRole, userType } = normalizeIncomingRole(role);
+    const normalizedRole = normalizeRole(role);
 
     // JWT lookup
     let query = { _id: req.user.id };
 
     const user = await User.findOneAndUpdate(
       query,
-      { role: internalRole, userType },
+      { role: normalizedRole },
       { new: true }
     ).select('-password');
 
@@ -224,14 +220,13 @@ exports.updateRole = async (req, res, next) => {
 
     auditService.logSecurityEvent('USER_ROLE_UPDATED', {
       userId: user._id?.toString?.() || req.user.id,
-      newRole: internalRole,
-      newUserType: userType,
+      newRole: normalizedRole,
       via: req.user.firebase ? 'firebase' : 'jwt',
       timestamp: new Date(),
     });
 
     // If moving to caregiver role, make sure a caregiver profile exists with proper name
-    if (internalRole === 'caregiver' && user && user._id) {
+    if (normalizedRole === 'caregiver' && user && user._id) {
       try {
         const existing = await Caregiver.findOne({ userId: user._id }).select('_id');
         if (!existing) {
@@ -285,10 +280,43 @@ exports.updateRole = async (req, res, next) => {
 
 // Get current authenticated user
 const Contract = require('../models/Contract');
+const Notification = require('../models/Notification');
 
-// Helper: check if user is admin
+// Notify parents about new caregiver signup
+const notifyParentsOfNewCaregiver = async (caregiverUser) => {
+  try {
+    // Get all parent users with verified emails
+    const parents = await User.find({ 
+      role: 'parent',
+      'verification.emailVerified': true 
+    }).select('_id name email');
+
+    console.log(`📢 Notifying ${parents.length} parents about new caregiver: ${caregiverUser.name}`);
+
+    // Create in-app notifications for each parent
+    for (const parent of parents) {
+      try {
+        await Notification.create({
+          userId: parent._id,
+          type: 'NEW_CAREGIVER',
+          title: 'New Caregiver Available',
+          message: `${caregiverUser.name} just joined iYaya as a caregiver`,
+          data: { caregiverId: caregiverUser._id }
+        });
+        console.log(`📱 Notification created for parent ${parent.name}`);
+      } catch (error) {
+        console.warn(`Failed to notify parent ${parent._id}:`, error.message);
+      }
+    }
+  } catch (error) {
+    console.error('Error notifying parents of new caregiver:', error);
+    throw error;
+  }
+};
+
+// Helper: check if user is admin (no admin role in simplified system)
 function isAdmin(user) {
-  return user && (user.role === 'admin' || user.userType === 'admin');
+  return false; // No admin role in simplified system
 }
 
 // Helper: check if user has contract with parent (client)
@@ -317,13 +345,7 @@ exports.getCurrentUser = async (req, res, next) => {
     // If self-access (user requesting own profile), return all info
     if (req.user.id === String(user._id)) {
       const obj = user.toObject ? user.toObject() : user;
-      const mappedRole = (obj.role === 'admin' || obj.userType === 'admin')
-        ? 'parent'
-        : (obj.role === 'client' || obj.userType === 'client')
-          ? 'parent'
-          : (obj.role === 'provider' || obj.userType === 'provider')
-            ? 'caregiver'
-            : (obj.role || 'parent');
+      const mappedRole = obj.role === 'caregiver' ? 'caregiver' : 'parent';
       
       // Include email verification status
       const responseObj = {
@@ -354,11 +376,7 @@ exports.getCurrentUser = async (req, res, next) => {
       publicUser.phone = user.phone;
     }
     
-    const mappedRole = (user.role === 'admin' || user.userType === 'admin')
-      ? 'parent'
-      : (user.role === 'client' || user.userType === 'client')
-        ? 'parent'
-        : (user.role || 'parent');
+    const mappedRole = user.role === 'caregiver' ? 'caregiver' : 'parent';
     return res.status(200).json({ ...publicUser, role: mappedRole });
   } catch (err) {
     console.error('Error in getCurrentUser:', err);
@@ -446,17 +464,16 @@ exports.register = async (req, res, next) => {
   console.log('📝 Registration request:', { name, email, role, hasPassword: !!password });
 
   try {
-    // Normalize incoming role to internal values
-    const { role: internalRole, userType } = normalizeIncomingRole(role);
-    console.log('🔄 Normalized role:', { input: role, internal: internalRole, userType });
+    // Normalize incoming role
+    const normalizedRole = normalizeRole(role);
+    console.log('🔄 Normalized role:', { input: role, normalized: normalizedRole });
 
-      // Create user
+    // Create user
     const user = await User.create({
       name,
       email,
       password,
-      role: internalRole,
-      userType,
+      role: normalizedRole,
       firstName: req.body.firstName,
       lastName: req.body.lastName,
       middleInitial: req.body.middleInitial,
@@ -484,7 +501,7 @@ exports.register = async (req, res, next) => {
     }
 
     // If registering as caregiver, auto-create a minimal caregiver profile using real name
-    if (internalRole === 'caregiver') {
+    if (normalizedRole === 'caregiver') {
       try {
         const existing = await Caregiver.findOne({ userId: user._id }).select('_id');
         if (!existing) {
@@ -523,6 +540,13 @@ exports.register = async (req, res, next) => {
             },
             backgroundCheck: { status: 'not_started', provider: 'internal', checkTypes: [] }
           });
+          
+          // Notify parents about new caregiver signup
+          try {
+            await notifyParentsOfNewCaregiver(user);
+          } catch (notifyError) {
+            console.warn('Failed to notify parents of new caregiver:', notifyError.message);
+          }
         }
       } catch (cgErr) {
         // Log but do not block registration
@@ -955,8 +979,7 @@ exports.firebaseSync = async (req, res, next) => {
         middleInitial,
         birthDate,
         phone,
-        role: role || 'parent',
-        userType: role || 'parent',
+        role: normalizeRole(role),
         verification: { emailVerified: emailVerified || false }
       });
       
@@ -1146,8 +1169,7 @@ exports.getFirebaseProfile = async (req, res, next) => {
             middleInitial: user.middleInitial,
             birthDate: user.birthDate,
             phone: user.phone,
-            role: user.role || 'parent',
-            userType: user.userType || 'parent',
+            role: user.role === 'caregiver' ? 'caregiver' : 'parent',
             profileImage: user.profileImage,
             address: user.address,
             location: user.address?.street || user.address,
@@ -1179,10 +1201,45 @@ exports.getFirebaseProfile = async (req, res, next) => {
     }
     
     // Return default profile if user not found
-    res.status(200).json({ role: 'parent', userType: 'parent' });
+    res.status(200).json({ role: 'parent' });
   } catch (err) {
     console.error('Firebase profile error:', err);
     next(new ErrorResponse('Failed to get Firebase profile', 500));
+  }
+};
+
+// Get user profile by Firebase UID (for messaging)
+exports.getUserByFirebaseUid = async (req, res, next) => {
+  try {
+    const { firebaseUid } = req.params;
+    
+    if (!firebaseUid) {
+      return res.status(400).json({ success: false, error: 'Firebase UID is required' });
+    }
+    
+    // Find user by Firebase UID
+    const user = await User.findOne({ firebaseUid }).select('name firstName lastName email profileImage role');
+    
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    // Return basic profile info for messaging
+    const profile = {
+      id: user._id,
+      firebaseUid: user.firebaseUid,
+      name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      profileImage: user.profileImage,
+      role: user.role
+    };
+    
+    res.status(200).json({ success: true, data: profile });
+  } catch (err) {
+    console.error('Get user by Firebase UID error:', err);
+    next(new ErrorResponse('Failed to get user profile', 500));
   }
 };
 
@@ -1204,5 +1261,6 @@ module.exports = {
   resendVerification: exports.resendVerification,
   firebaseSync: exports.firebaseSync,
   getFirebaseProfile: exports.getFirebaseProfile,
-  sendCustomVerification: exports.sendCustomVerification
+  sendCustomVerification: exports.sendCustomVerification,
+  getUserByFirebaseUid: exports.getUserByFirebaseUid
 };

@@ -34,15 +34,10 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['client', 'parent', 'caregiver', 'admin'],
-    default: 'client',
+    enum: ['parent', 'caregiver'],
+    default: 'parent',
     required: true,
     index: true
-  },
-  userType: {
-    type: String,
-    enum: ['client', 'parent', 'caregiver'],
-    required: true
   },
   name: {
     type: String,

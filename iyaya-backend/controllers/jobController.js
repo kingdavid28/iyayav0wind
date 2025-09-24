@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const { validationResult } = require('express-validator');
 const errorHandler = require('../utils/errorHandler');
 const { logger } = require('../utils/logger');
+const socketService = require('../src/core/services/socketService');
 
 // Get all jobs (public listing for caregivers)
 exports.getAllJobs = async (req, res) => {
@@ -133,6 +134,16 @@ exports.createJob = async (req, res) => {
     
     console.log(`✅ Job created by user: ${req.user.id}`);
     console.log('📝 New job saved:', newJob._id);
+    
+    // Send real-time notification to all caregivers
+    socketService.notifyNewJob({
+      jobId: newJob._id,
+      title: newJob.title,
+      clientName: clientName,
+      location: newJob.location,
+      hourlyRate: newJob.hourlyRate,
+      date: newJob.date
+    });
     
     res.status(201).json({
       success: true,

@@ -1,9 +1,31 @@
 // screens/ChildrenManagementScreen.js
 import React, { useState, useEffect } from 'react';
+<<<<<<< HEAD
 import { View, StyleSheet, Alert } from 'react-native';
 import { Button, Text, ActivityIndicator, Card } from 'react-native-paper';
 import { childService } from '../services/childService';
 import { useAuth } from '../core/contexts/AuthContext';
+=======
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
+import profileService from '../services/profileService';
+import { useApi } from '../hooks/useApi';
+import { useAuth } from '../contexts/AuthContext';
+import { styles } from './styles/ChildrenManagementScreen.styles';
+import { validateForm, VALIDATION_RULES } from '../utils/validation';
+import { logger } from '../utils/logger';
+>>>>>>> 01c51a18b080c25cff70a10f3b77e58b50e171e2
 
 const ChildrenManagementScreen = () => {
   const { user } = useAuth();

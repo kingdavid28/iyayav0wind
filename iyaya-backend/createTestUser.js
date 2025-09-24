@@ -16,7 +16,7 @@ const createTestUser = async () => {
     await User.create({
       name: 'Test Parent',
       email: 'test@test.com',
-      password: 'password123',
+      password: 'password123456789',
       role: 'parent',
       userType: 'parent'
     });
@@ -24,7 +24,7 @@ const createTestUser = async () => {
     await User.create({
       name: 'Test Caregiver', 
       email: 'caregiver@test.com',
-      password: 'password123',
+      password: 'password123456789',
       role: 'caregiver',
       userType: 'caregiver'
     });

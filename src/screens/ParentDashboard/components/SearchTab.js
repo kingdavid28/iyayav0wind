@@ -18,7 +18,8 @@ const SearchTab = ({
   onMessageCaregiver,
   onViewCaregiver,
   onSearch,
-  onOpenFilter
+  onOpenFilter,
+  loading = false
 }) => {
   const displayData = searchQuery ? filteredCaregivers : caregivers;
   const showSearchResults = searchQuery && displayData.length > 0;
@@ -64,7 +65,7 @@ const SearchTab = ({
         />
       </View>
       
-      {searchLoading ? (
+      {(searchLoading || loading) ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Searching caregivers...</Text>
@@ -97,7 +98,7 @@ const SearchTab = ({
                 : `${displayData.length} caregivers available`}
             </Text>
           }
-          ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
+
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

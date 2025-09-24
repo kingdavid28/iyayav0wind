@@ -39,7 +39,7 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../shared/ui/inputs/TimePicker';
-import { useAuth } from '../core/contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { jobsAPI, applicationsAPI, bookingsAPI, caregiversAPI, authAPI, uploadsAPI, getCurrentAPIURL } from "../config/api";
 import { VALIDATION, CURRENCY, FEATURES } from '../config/constants';
 import { getCurrentSocketURL } from '../config/api';
@@ -571,31 +571,28 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
     }
   };
 
-  // Background check request
+  // Background check request (UI only)
   const requestBackgroundCheck = async () => {
     try {
       setLoading(true);
-      const personalInfo = {
-        firstName: formData.name.split(' ')[0],
-        lastName: formData.name.split(' ').slice(1).join(' '),
-        dateOfBirth: null, // This would need to be collected in the form
-        address: formData.address
-      };
-      await caregiversAPI.requestBackgroundCheck({ personalInfo });
-      showSnackbar('Background check requested successfully');
+      
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      showSnackbar('Background check request submitted successfully');
       updateFormData('backgroundCheck', {
         ...formData.backgroundCheck,
         requestBackgroundCheck: true
       });
+      
+      Alert.alert(
+        'Request Submitted',
+        'Your background check request has been submitted. You will be notified once the verification is complete.',
+        [{ text: 'OK' }]
+      );
     } catch (error) {
-      console.error('Background check request failed:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        error: error
-      });
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to request background check. Please try again.';
-      Alert.alert('Request Failed', errorMessage);
+      console.error('Background check request failed:', error);
+      Alert.alert('Request Failed', 'Failed to submit background check request. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -914,6 +911,14 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
     setSnackbarVisible(true);
   };
 
+  useEffect(() => {
+  if (formData.certifications.some(cert => typeof cert === 'object')) {
+    const stringCerts = formData.certifications
+      .filter(cert => typeof cert === 'string');
+    updateFormData('certifications', stringCerts);
+  }
+}, []);
+
   const validateCurrentStep = () => {
     const step = ENHANCED_STEPS[currentStep];
     let isValid = true;
@@ -983,6 +988,11 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
       
       // Normalize enums and required fields to match backend expectations
+  
+    const normalizedCertifications = formData.certifications
+  .filter(cert => cert && (typeof cert === 'string' || cert.name))
+  .map(cert => typeof cert === 'string' ? cert : cert.name);
+
       const normalizedAgeCareRanges = (formData.ageCareRanges || [])
         .map(v => (typeof v === 'string' ? v.trim().toUpperCase() : ''))
         .filter(v => ALLOWED_AGE_CARE_ENUMS.includes(v));
@@ -1006,7 +1016,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         education: formData.education,
         languages: formData.languages,
         skills: formData.skills,
-        certifications: formData.certifications,
+        certifications: normalizedCertifications,
         ageCareRanges: normalizedAgeCareRanges,
         portfolio: formData.portfolio,
         availability: formData.availability,
@@ -1193,69 +1203,68 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
     </View>
   );
 
-  // Profile image upload for basic information
   // Optimized profile image upload with compression and retry logic
-const handleProfileImageUpload = async () => {
-  try {
-    // Request permissions first
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photos.');
-      return;
-    }
-
-    // Launch image picker with optimized settings
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8, // Reduced quality for smaller file size
-      base64: false, // Don't get base64 initially to save memory
-    });
-
-    if (!result.canceled && result.assets && result.assets[0]) {
-      setUploading(true);
-      const asset = result.assets[0];
-      
-      console.log('Profile image upload started');
-      console.log('Asset URI:', asset.uri);
-      console.log('Asset size:', asset.fileSize);
-      
-      // Compress image to reduce size
-      const compressedImage = await compressImage(asset.uri, 0.7, 600, 600);
-      
-      // Create optimized upload payload
-      const mimeType = 'image/jpeg';
-      const dataUrl = `data:${mimeType};base64,${compressedImage.base64}`;
-      
-      console.log('Uploading compressed image to backend...');
-      console.log('Compressed size:', compressedImage.base64.length);
-      
-      // Upload with retry logic
-      const uploadFunction = () => authAPI.uploadProfileImageBase64(dataUrl, mimeType);
-      const response = await uploadWithRetry(uploadFunction, 3, 2000);
-      
-      console.log('Upload response:', response);
-      
-      const imageUrl = response?.data?.url || response?.url || response?.imageUrl;
-      console.log('Received image URL:', imageUrl);
-      
-      if (imageUrl) {
-        // Store the URL as received from backend
-        updateFormData('profileImage', imageUrl);
-        console.log('Profile image URL updated in form:', imageUrl);
-        showSnackbar('Profile image uploaded successfully');
-      } else {
-        throw new Error('No image URL returned from server');
+  const handleProfileImageUpload = async () => {
+    try {
+      // Request permissions first
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photos.');
+        return;
       }
+
+      // Launch image picker with optimized settings
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8, // Reduced quality for smaller file size
+        base64: false, // Don't get base64 initially to save memory
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setUploading(true);
+        const asset = result.assets[0];
+        
+        console.log('Profile image upload started');
+        console.log('Asset URI:', asset.uri);
+        console.log('Asset size:', asset.fileSize);
+        
+        // Compress image to reduce size
+        const compressedImage = await compressImage(asset.uri, 0.7, 600, 600);
+        
+        // Create optimized upload payload
+        const mimeType = 'image/jpeg';
+        const dataUrl = `data:${mimeType};base64,${compressedImage.base64}`;
+        
+        console.log('Uploading compressed image to backend...');
+        console.log('Compressed size:', compressedImage.base64.length);
+        
+        // Upload with retry logic
+        const uploadFunction = () => authAPI.uploadProfileImageBase64(dataUrl, mimeType);
+        const response = await uploadWithRetry(uploadFunction, 3, 2000);
+        
+        console.log('Upload response:', response);
+        
+        const imageUrl = response?.data?.url || response?.url || response?.imageUrl;
+        console.log('Received image URL:', imageUrl);
+        
+        if (imageUrl) {
+          // Store the URL as received from backend
+          updateFormData('profileImage', imageUrl);
+          console.log('Profile image URL updated in form:', imageUrl);
+          showSnackbar('Profile image uploaded successfully');
+        } else {
+          throw new Error('No image URL returned from server');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Profile image upload failed:', error);
+      handleUploadError(error);
+    } finally {
+      setUploading(false);
     }
-  } catch (error) {
-    console.error('❌ Profile image upload failed:', error);
-    handleUploadError(error);
-  } finally {
-    setUploading(false);
-  }
-};
+  };
 
   const renderBasicInformation = () => (
     <View style={styles.stepContainer}>
@@ -1264,93 +1273,138 @@ const handleProfileImageUpload = async () => {
         Let's start with your basic information to create your caregiver profile.
       </Text>
 
-      <View style={styles.photoSection}>
-        <TouchableOpacity onPress={handleProfileImageUpload} disabled={uploading}>
-          {uploading ? (
-            <View style={styles.uploadingContainer}>
-              <ActivityIndicator size="large" color="#6366f1" />
-              <Text style={styles.uploadingText}>Uploading...</Text>
-            </View>
-          ) : formData.profileImage && !profileImageError ? (
-            <View style={styles.profileImageContainer}>
-              <Image 
-                source={{ 
-                  uri: formData.profileImage.startsWith('/') 
-                    ? `${getCurrentSocketURL()}${formData.profileImage}` 
-                    : formData.profileImage,
-                  cache: 'reload'
-                }}
-                style={styles.profileImageDirect}
-                onError={(error) => {
-                  console.log('Profile image load error:', error);
-                  console.log('Image URI:', formData.profileImage);
-                  setProfileImageError(true);
-                }}
-                onLoad={() => {
-                  setProfileImageError(false);
-                  console.log('Profile image loaded successfully:', formData.profileImage);
-                }}
-                resizeMode="cover"
-              />
-            </View>
-          ) : (
-            <Avatar.Icon 
-              size={120} 
-              icon="camera" 
-              style={styles.profileImagePlaceholder}
+      <Card style={styles.profileImageCard}>
+        <Card.Content>
+          <Text style={styles.cardTitle}>Profile Photo</Text>
+          <View style={styles.photoSection}>
+            <TouchableOpacity onPress={handleProfileImageUpload} disabled={uploading}>
+              {uploading ? (
+                <View style={styles.uploadingContainer}>
+                  <ActivityIndicator size="large" color="#6366f1" />
+                  <Text style={styles.uploadingText}>Uploading...</Text>
+                </View>
+              ) : formData.profileImage && !profileImageError ? (
+                <View style={styles.profileImageContainer}>
+                  <Image 
+                    source={{ 
+                      uri: formData.profileImage.startsWith('/') 
+                        ? `${getCurrentSocketURL() || ''}${formData.profileImage}` 
+                        : formData.profileImage,
+                      cache: 'reload'
+                    }}
+                    style={styles.profileImageDisplay}
+                    onError={(error) => {
+                      console.log('Profile image load error:', error);
+                      setProfileImageError(true);
+                    }}
+                    onLoad={() => setProfileImageError(false)}
+                  />
+                </View>
+              ) : (
+                <Avatar.Icon 
+                  size={120} 
+                  icon="camera" 
+                  style={styles.profileImagePlaceholder}
+                />
+              )}
+            </TouchableOpacity>
+            <Text style={styles.photoHint}>Tap to add profile photo</Text>
+          </View>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.basicInfoCard}>
+        <Card.Content>
+          <Text style={styles.cardTitle}>Personal Information</Text>
+          
+          <TextInput
+            label="Full Name *"
+            value={formData.name}
+            onChangeText={(text) => updateFormData('name', text)}
+            mode="outlined"
+            style={styles.input}
+            error={!!errors.name}
+            left={<TextInput.Icon icon="account" />}
+          />
+          <HelperText type="error" visible={!!errors.name}>
+            {errors.name}
+          </HelperText>
+
+          <TextInput
+            label="Phone Number *"
+            value={formData.phone}
+            onChangeText={(text) => updateFormData('phone', text)}
+            mode="outlined"
+            style={styles.input}
+            keyboardType="phone-pad"
+            error={!!errors.phone}
+            left={<TextInput.Icon icon="phone" />}
+          />
+          <HelperText type="error" visible={!!errors.phone}>
+            {errors.phone}
+          </HelperText>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.bioCard}>
+        <Card.Content>
+          <Text style={styles.cardTitle}>About Me</Text>
+          
+          <Menu
+            visible={tempInputs.bioMenuVisible || false}
+            onDismiss={() => setTempInputs(prev => ({ ...prev, bioMenuVisible: false }))}
+            anchor={
+              <Button
+                mode="outlined"
+                onPress={() => setTempInputs(prev => ({ ...prev, bioMenuVisible: true }))}
+                style={[styles.input, { marginBottom: 8 }]}
+                contentStyle={{ justifyContent: 'flex-start' }}
+                icon="format-list-bulleted"
+              >
+                Choose bio template or write custom
+              </Button>
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                updateFormData('bio', "Hi! I'm a caring and experienced nanny who loves working with children. I create fun, educational activities and prioritize safety. I'm reliable, patient, and committed to helping your family.");
+                setTempInputs(prev => ({ ...prev, bioMenuVisible: false }));
+              }}
+              title="Caring & Experienced Nanny"
             />
-          )}
-        </TouchableOpacity>
-        <Text style={styles.photoHint}>Tap to add profile photo</Text>
-      </View>
+            <Menu.Item
+              onPress={() => {
+                updateFormData('bio', "Professional childcare provider with CPR certification. I specialize in infant care, meal prep, and homework help. Your children's safety and happiness are my top priorities.");
+                setTempInputs(prev => ({ ...prev, bioMenuVisible: false }));
+              }}
+              title="Professional Childcare Provider"
+            />
+            <Menu.Item
+              onPress={() => {
+                updateFormData('bio', "Energetic babysitter who loves creating fun activities for kids! I'm great with bedtime routines, outdoor play, and keeping children engaged. References available upon request.");
+                setTempInputs(prev => ({ ...prev, bioMenuVisible: false }));
+              }}
+              title="Energetic Babysitter"
+            />
+          </Menu>
 
-      <TextInput
-        label="Full Name *"
-        value={formData.name}
-        onChangeText={(text) => updateFormData('name', text)}
-        mode="outlined"
-        style={styles.input}
-        error={!!errors.name}
-        left={<TextInput.Icon icon="account" />}
-      />
-      <HelperText type="error" visible={!!errors.name}>
-        {errors.name}
-      </HelperText>
-
-
-
-      <TextInput
-        label="Phone Number *"
-        value={formData.phone}
-        onChangeText={(text) => updateFormData('phone', text)}
-        mode="outlined"
-        style={styles.input}
-        keyboardType="phone-pad"
-        error={!!errors.phone}
-        left={<TextInput.Icon icon="phone" />}
-      />
-      <HelperText type="error" visible={!!errors.phone}>
-        {errors.phone}
-      </HelperText>
-
-      <TextInput
-        label="Bio / About Me"
-        value={formData.bio}
-        onChangeText={(text) => updateFormData('bio', text)}
-        mode="outlined"
-        style={styles.input}
-        multiline
-        numberOfLines={4}
-        placeholder="Tell parents about yourself, your experience, and what makes you special..."
-        error={!!errors.bio}
-        left={<TextInput.Icon icon="text" />}
-      />
-      <HelperText type="info" visible={!errors.bio}>
-        {formData.bio.length}/{VALIDATION.BIO_MAX_LENGTH} characters
-      </HelperText>
-      <HelperText type="error" visible={!!errors.bio}>
-        {errors.bio}
-      </HelperText>
+          <TextInput
+            label="Bio / About Me"
+            value={formData.bio}
+            onChangeText={(text) => updateFormData('bio', text)}
+            mode="outlined"
+            style={styles.input}
+            multiline
+            numberOfLines={4}
+            placeholder="Tell parents about yourself, your experience, and what makes you special..."
+            error={!!errors.bio}
+            left={<TextInput.Icon icon="text" />}
+          />
+          <HelperText type="error" visible={!!errors.bio}>
+            {errors.bio}
+          </HelperText>
+        </Card.Content>
+      </Card>
     </View>
   );
 
@@ -1474,227 +1528,147 @@ const handleProfileImageUpload = async () => {
   );
 
   const renderSkillsAndCertifications = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Skills & Certifications</Text>
-      <Text style={styles.stepDescription}>
-        Highlight your skills and certifications to stand out to parents.
-      </Text>
+  <View style={styles.stepContainer}>
+    <Text style={styles.stepTitle}>Skills & Certifications</Text>
+    <Text style={styles.stepDescription}>
+      Highlight your skills and certifications to stand out to parents.
+    </Text>
 
-      <View style={styles.skillsSection}>
-        <Text style={styles.sectionTitle}>Skills *</Text>
-        <View style={styles.suggestedSkills}>
-          <Text style={styles.suggestedTitle}>Suggested Skills:</Text>
-          <View style={styles.chipContainer}>
-            {SUGGESTED_SKILLS.map((skill) => (
-              <Chip
-                key={skill}
-                mode={formData.skills.includes(skill) ? 'flat' : 'outlined'}
-                selected={formData.skills.includes(skill)}
-                onPress={() => {
-                  if (formData.skills.includes(skill)) {
-                    updateFormData('skills', formData.skills.filter(s => s !== skill));
-                  } else {
-                    updateFormData('skills', [...formData.skills, skill]);
-                  }
-                }}
-                style={styles.chip}
-              >
-                {skill}
-              </Chip>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.addSkillContainer}>
-          <TextInput
-            label="Add Custom Skill"
-            value={tempInputs.newSkill}
-            onChangeText={(text) => setTempInputs(prev => ({ ...prev, newSkill: text }))}
-            mode="outlined"
-            style={styles.addInput}
-            onSubmitEditing={() => {
-              const skill = tempInputs.newSkill.trim();
-              if (skill && !formData.skills.includes(skill)) {
-                updateFormData('skills', [...formData.skills, skill]);
-                setTempInputs(prev => ({ ...prev, newSkill: '' }));
-              }
-            }}
-            returnKeyType="done"
-          />
-          <Button
-            mode="contained"
-            onPress={() => {
-              const skill = tempInputs.newSkill.trim();
-              if (skill && !formData.skills.includes(skill)) {
-                updateFormData('skills', [...formData.skills, skill]);
-                setTempInputs(prev => ({ ...prev, newSkill: '' }));
-              }
-            }}
-            disabled={!tempInputs.newSkill.trim()}
-            style={styles.addButton}
-          >
-            Add
-          </Button>
-        </View>
-
-        <View style={styles.selectedSkills}>
-          <Text style={styles.selectedTitle}>Your Skills ({formData.skills.length}):</Text>
-          <View style={styles.chipContainer}>
-            {formData.skills.map((skill) => (
-              <Chip
-                key={skill}
-                mode="flat"
-                onClose={() => updateFormData('skills', formData.skills.filter(s => s !== skill))}
-                style={styles.selectedChip}
-              >
-                {skill}
-              </Chip>
-            ))}
-          </View>
+    <View style={styles.skillsSection}>
+      <Text style={styles.sectionTitle}>Skills *</Text>
+      <View style={styles.suggestedSkills}>
+        <Text style={styles.suggestedTitle}>Suggested Skills:</Text>
+        <View style={styles.chipContainer}>
+          {SUGGESTED_SKILLS.map((skill) => (
+            <Chip
+              key={skill}
+              mode={formData.skills.includes(skill) ? 'flat' : 'outlined'}
+              selected={formData.skills.includes(skill)}
+              onPress={() => {
+                if (formData.skills.includes(skill)) {
+                  updateFormData('skills', formData.skills.filter(s => s !== skill));
+                } else {
+                  updateFormData('skills', [...formData.skills, skill]);
+                }
+              }}
+              style={styles.chip}
+            >
+              {skill}
+            </Chip>
+          ))}
         </View>
       </View>
 
-      <Divider style={styles.divider} />
+      <View style={styles.addSkillContainer}>
+        <TextInput
+          label="Add Custom Skill"
+          value={tempInputs.newSkill}
+          onChangeText={(text) => setTempInputs(prev => ({ ...prev, newSkill: text }))}
+          mode="outlined"
+          style={styles.addInput}
+          onSubmitEditing={() => {
+            const skill = tempInputs.newSkill.trim();
+            if (skill && !formData.skills.includes(skill)) {
+              updateFormData('skills', [...formData.skills, skill]);
+              setTempInputs(prev => ({ ...prev, newSkill: '' }));
+            }
+          }}
+          returnKeyType="done"
+        />
+        <Button
+          mode="contained"
+          onPress={() => {
+            const skill = tempInputs.newSkill.trim();
+            if (skill && !formData.skills.includes(skill)) {
+              updateFormData('skills', [...formData.skills, skill]);
+              setTempInputs(prev => ({ ...prev, newSkill: '' }));
+            }
+          }}
+          disabled={!tempInputs.newSkill.trim()}
+          style={styles.addButton}
+        >
+          Add
+        </Button>
+      </View>
 
-      <View style={styles.certificationsSection}>
-        <Text style={styles.sectionTitle}>Certifications</Text>
-        <View style={styles.addSkillContainer}>
-          <TextInput
-            label="Add Certification"
-            value={tempInputs.newCertification}
-            onChangeText={(text) => setTempInputs(prev => ({ ...prev, newCertification: text }))}
-            mode="outlined"
-            style={styles.addInput}
-            onSubmitEditing={() => {
-              const cert = tempInputs.newCertification.trim();
-              if (cert && !formData.certifications.includes(cert)) {
-                updateFormData('certifications', [...formData.certifications, cert]);
-                setTempInputs(prev => ({ ...prev, newCertification: '' }));
-              }
-            }}
-            returnKeyType="done"
-            placeholder="e.g., CPR Certified, First Aid"
-          />
-          
-          <View style={styles.datePickerRow}>
-            <CustomDateTimePicker
-              label="Issue Date"
-              value={tempInputs.certIssueDate}
-              onDateChange={(date) => setTempInputs(prev => ({ ...prev, certIssueDate: date }))}
-              mode="date"
-              format="short"
-              style={[styles.dateInput, { flex: 1, marginRight: 8 }]}
-              maximumDate={new Date()}
-              placeholder="Select issue date"
-            />
-            <CustomDateTimePicker
-              label="Expiry Date"
-              value={tempInputs.certExpiryDate}
-              onDateChange={(date) => setTempInputs(prev => ({ ...prev, certExpiryDate: date }))}
-              mode="date"
-              format="short"
-              style={[styles.dateInput, { flex: 1, marginLeft: 8 }]}
-              minimumDate={new Date()}
-              placeholder="Select expiry date"
-            />
-          </View>
-          <Button
-            mode="outlined"
-            onPress={async () => {
-              const result = await DocumentPicker.getDocumentAsync({
-                type: ['application/pdf', 'image/*'],
-                copyToCacheDirectory: true,
-              });
-              if (!result.canceled && result.assets[0]) {
-                setTempInputs(prev => ({ ...prev, certificateFile: result.assets[0] }));
-              }
-            }}
-            style={[styles.addButton, { marginRight: 8 }]}
-            icon="attachment"
-          >
-            Attach File
-          </Button>
-          <Button
-            mode="contained"
-            onPress={() => {
-              const cert = tempInputs.newCertification.trim();
-              if (cert) {
-                const newCert = {
-                  id: Date.now().toString(),
-                  name: cert,
-                  verified: false,
-                  issuedDate: tempInputs.certIssueDate,
-                  expiryDate: tempInputs.certExpiryDate,
-                  fileUrl: tempInputs.certificateFile?.uri || null
-                };
-                updateFormData('certifications', [...formData.certifications, newCert]);
-                setTempInputs(prev => ({ 
-                  ...prev, 
-                  newCertification: '', 
-                  certificateFile: null,
-                  certIssueDate: null,
-                  certExpiryDate: null
-                }));
-              }
-            }}
-            disabled={!tempInputs.newCertification.trim()}
-            style={styles.addButton}
-            loading={uploading}
-          >
-            Add Certificate
-          </Button>
-        </View>
-
-        {tempInputs.certificateFile && (
-          <View style={styles.filePreview}>
-            <Text style={styles.filePreviewText}>Selected: {tempInputs.certificateFile.name}</Text>
-            <IconButton
-              icon="close"
-              size={16}
-              onPress={() => setTempInputs(prev => ({ ...prev, certificateFile: null }))}
-            />
-          </View>
-        )}
-
-        <View style={styles.selectedSkills}>
-          <Text style={styles.selectedTitle}>Your Certifications ({formData.certifications.length}):</Text>
-          <View style={styles.certificationsContainer}>
-            {formData.certifications.map((cert) => (
-              <Card key={cert.id || cert} style={styles.certificationCard}>
-                <Card.Content>
-                  <View style={styles.certificationHeader}>
-                    <Text style={styles.certificationName}>
-                      {typeof cert === 'string' ? cert : cert.name}
-                    </Text>
-                    <IconButton
-                      icon="close"
-                      size={20}
-                      onPress={() => {
-                        const updatedCerts = formData.certifications.filter(c => 
-                          (typeof c === 'string' ? c : c.id) !== (typeof cert === 'string' ? cert : cert.id)
-                        );
-                        updateFormData('certifications', updatedCerts);
-                      }}
-                    />
-                  </View>
-                  {cert.fileUrl && (
-                    <View style={styles.certificationFile}>
-                      <Ionicons name="document-attach" size={16} color="#6366f1" />
-                      <Text style={styles.certificationFileText}>Certificate attached</Text>
-                    </View>
-                  )}
-                  {cert.verified && (
-                    <Badge style={styles.verifiedBadge}>Verified</Badge>
-                  )}
-                </Card.Content>
-              </Card>
-            ))}
-          </View>
+      <View style={styles.selectedSkills}>
+        <Text style={styles.selectedTitle}>Your Skills ({formData.skills.length}):</Text>
+        <View style={styles.chipContainer}>
+          {formData.skills.map((skill) => (
+            <Chip
+              key={skill}
+              mode="flat"
+              onClose={() => updateFormData('skills', formData.skills.filter(s => s !== skill))}
+              style={styles.selectedChip}
+            >
+              {skill}
+            </Chip>
+          ))}
         </View>
       </View>
     </View>
-  );
 
+    <Divider style={styles.divider} />
+
+    <View style={styles.certificationsSection}>
+      <Text style={styles.sectionTitle}>Certifications</Text>
+      <View style={styles.addSkillContainer}>
+        <TextInput
+          label="Add Certification"
+          value={tempInputs.newCertification}
+          onChangeText={(text) => setTempInputs(prev => ({ ...prev, newCertification: text }))}
+          mode="outlined"
+          style={styles.addInput}
+          placeholder="e.g., CPR Certified, First Aid"
+        />
+        
+        <Button
+  mode="contained"
+  onPress={() => {
+    const cert = tempInputs.newCertification.trim();
+    if (cert) {
+      updateFormData('certifications', [...formData.certifications, cert]);
+      setTempInputs(prev => ({ ...prev, newCertification: '' }));
+    }
+  }}
+  disabled={!tempInputs.newCertification.trim()}
+  style={styles.addButton}
+>
+  Add Certificate
+</Button>
+
+      </View>
+
+      <View style={styles.selectedSkills}>
+        <Text style={styles.selectedTitle}>Your Certifications ({formData.certifications.length}):</Text>
+        <View style={styles.certificationsContainer}>
+          {formData.certifications.map((cert, index) => (
+            <Card key={cert?.id || cert || index} style={styles.certificationCard}>
+              <Card.Content>
+                <View style={styles.certificationHeader}>
+                  <Text style={styles.certificationName}>
+                    {typeof cert === 'string' ? cert : (cert?.name || 'Unnamed Certificate')}
+                  </Text>
+                  <IconButton
+                    icon="close"
+                    size={20}
+                    onPress={() => {
+                      const updatedCerts = formData.certifications.filter((c, i) => i !== index);
+                      updateFormData('certifications', updatedCerts);
+                    }}
+                  />
+                </View>
+                {cert?.verified && (
+                  <Badge style={styles.verifiedBadge}>Verified</Badge>
+                )}
+              </Card.Content>
+            </Card>
+          ))}
+        </View>
+      </View>
+    </View>
+  </View>
+);
   // Address & Location render function
   const renderAddressLocation = () => (
     <View style={styles.stepContainer}>

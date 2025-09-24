@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ProfileImage from '../../../components/ui/feedback/ProfileImage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getCurrentSocketURL } from '../../../config/api';
-import { useAuth } from '../../../core/contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { calculateAge } from '../../../utils/dateUtils';
 import { __DEV__ } from '../../../config/constants';
 import { useNavigation } from '@react-navigation/native';
@@ -63,7 +63,7 @@ const CaregiverProfileSection = ({ profile, activeTab }) => {
               {user?.phone ? (
                 <Text style={styles.profileDetailText}>📱 {user.phone}</Text>
               ) : null}
-              <Text style={styles.profileDetailText}>📍 {profile?.location || user?.address?.street || 'Location not set'}</Text>
+              <Text style={styles.profileDetailText}>📍 {profile?.location || (profile?.address ? `${profile.address.city || ''}${profile.address.city && profile.address.province ? ', ' : ''}${profile.address.province || ''}` : user?.address?.street || 'Location not set')}</Text>
               {profile?.hourlyRate ? (
                 <Text style={styles.profileDetailText}>💰 ₱{profile.hourlyRate}/hr</Text>
               ) : null}
