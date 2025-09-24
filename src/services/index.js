@@ -475,9 +475,11 @@ class EnhancedAPIService {
 
     apply: (applicationData) => {
       this.clearCache('applications');
+      // POST requests should not retry on duplicate key errors
       return this.request('/applications', {
         method: 'POST',
-        body: applicationData
+        body: applicationData,
+        retries: 0 // No retries for application creation to avoid duplicate errors
       });
     },
 
@@ -513,9 +515,11 @@ class EnhancedAPIService {
 
     create: (bookingData) => {
       this.clearCache('bookings');
+      // POST requests should not retry on duplicate key errors
       return this.request('/bookings', {
         method: 'POST',
-        body: bookingData
+        body: bookingData,
+        retries: 0 // No retries for booking creation to avoid duplicate errors
       });
     },
 

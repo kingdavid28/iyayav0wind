@@ -1,5 +1,5 @@
 // firebaseRealtimeService.js - Firebase for real-time features only
-import { getFirebaseDatabase, getFirebaseAuth, ref, onValue, off, push, set, query, orderByChild, onAuthStateChanged, signInAnonymously } from '../config/firebase';
+import { getFirebaseDatabase, getAuthSync, ref, onValue, off, push, set, query, orderByChild, onAuthStateChanged, signInAnonymously } from '../config/firebase';
 
 class FirebaseRealtimeService {
   constructor() {
@@ -9,8 +9,11 @@ class FirebaseRealtimeService {
   }
 
   async initializeRealtimeAuth() {
-    return new Promise(async (resolve, reject) => {
-      const auth = await getFirebaseAuth();
+    return new Promise((resolve, reject) => {
+      // Get auth synchronously first
+      const auth = getAuthSync();
+
+      // Set up auth state listener
       onAuthStateChanged(auth, async (user) => {
         if (user) {
           this.currentUser = user;
@@ -18,6 +21,7 @@ class FirebaseRealtimeService {
           resolve(user);
         } else {
           try {
+            // Only sign in anonymously if no user exists
             const result = await signInAnonymously(auth);
             this.currentUser = result.user;
             this.notifyAuthStateChange(true);
