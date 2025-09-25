@@ -37,7 +37,7 @@ import CustomDateTimePicker from '../../../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../../../shared/ui/inputs/TimePicker';
 import { formatAddress } from '../../../utils/addressUtils';
 import { getCurrentDeviceLocation, searchLocation } from '../../../utils/locationUtils';
-import { getImageUrl } from '../../../utils/imageUtils';
+import { getImageSource } from '../../../utils/imageUtils';
 
 const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visible }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -429,9 +429,9 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
       {/* Caregiver Info */}
       <View style={styles.caregiverSummary}>
         <View style={styles.caregiverHeader}>
-          {getImageUrl(caregiver?.avatar || caregiver?.profileImage) ? (
+          {caregiver?.avatar || caregiver?.profileImage ? (
             <Image 
-              source={{ uri: getImageUrl(caregiver.avatar || caregiver.profileImage) }} 
+              source={getImageSource(caregiver.avatar || caregiver.profileImage)}
               style={styles.avatar}
             />
           ) : (
@@ -468,9 +468,9 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <View style={styles.caregiverAvatar}>
-                {getImageUrl(caregiver?.avatar || caregiver?.profileImage) ? (
+                {caregiver?.avatar || caregiver?.profileImage ? (
                   <Image 
-                    source={{ uri: getImageUrl(caregiver.avatar || caregiver.profileImage) }} 
+                    source={getImageSource(caregiver.avatar || caregiver.profileImage)}
                     style={styles.avatarImage} 
                   />
                 ) : (

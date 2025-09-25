@@ -210,7 +210,7 @@ const ParentProfile = ({ navigation }) => {
   // Helper function to get properly formatted image URL
   const getImageUrl = useCallback((imageUrl) => {
     if (!imageUrl || imageUrl.trim() === '' || imageUrl === 'null') {
-      return '';
+      return null;
     }
     
     // Handle base64 data URLs
@@ -226,9 +226,9 @@ const ParentProfile = ({ navigation }) => {
     // Handle relative URLs - prepend base URL
     const baseUrl = getCurrentAPIURL().replace('/api', '');
     if (imageUrl.startsWith('/')) {
-      return `${baseUrl}${imageUrl}`;
+      return `${baseUrl}${imageUrl}`.replace(/([^:])\/\//g, '$1/');
     } else {
-      return `${baseUrl}/uploads/${imageUrl}`;
+      return `${baseUrl}/uploads/${imageUrl}`.replace(/([^:])\/\//g, '$1/');
     }
   }, []);
 
@@ -286,6 +286,7 @@ const ParentProfile = ({ navigation }) => {
             size={100}
             style={styles.avatar}
             defaultIconSize={50}
+            borderColor="#3b82f6"
           />
           <View style={styles.headerInfo}>
             <Text style={styles.name}>{safeText(profile.name || user?.name, 'No name')}</Text>

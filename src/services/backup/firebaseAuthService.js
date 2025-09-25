@@ -6,25 +6,26 @@ import {
   sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
-import { auth } from '../../config/firebase';
+import { getFirebaseAuth } from '../../config/firebase';
 
 export const firebaseAuthService = {
   async signup(userData) {
     try {
       const { email, password, name, role } = userData;
-      
+
+      const auth = await getFirebaseAuth();
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+
       await updateProfile(user, { displayName: name });
-      
+
       // Send Firebase verification email
       await sendEmailVerification(user);
     } catch (error) {
       console.error('Firebase signup error:', error);
       throw error;
     }
-    
+
     // Sync complete profile with MongoDB
     try {
       const token = await user.getIdToken();
@@ -41,7 +42,7 @@ export const firebaseAuthService = {
         userType: role || 'parent',
         emailVerified: user.emailVerified
       };
-      
+
       await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/firebase-sync`, {
         method: 'POST',
         headers: {
@@ -53,7 +54,7 @@ export const firebaseAuthService = {
     } catch (error) {
       console.warn('Failed to sync with MongoDB:', error.message);
     }
-    
+
     return {
       success: true,
       requiresVerification: !user.emailVerified,
@@ -62,15 +63,16 @@ export const firebaseAuthService = {
   },
 
   async login(email, password) {
+    const auth = await getFirebaseAuth();
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    
+
     if (!user.emailVerified) {
       throw new Error('Please verify your email before logging in.');
     }
-    
+
     const token = await user.getIdToken();
-    
+
     // Get complete user profile from MongoDB
     let profile = { role: 'parent' };
     try {
@@ -85,7 +87,7 @@ export const firebaseAuthService = {
     } catch (error) {
       console.warn('Failed to get MongoDB profile:', error.message);
     }
-    
+
     return {
       success: true,
       token,
@@ -106,6 +108,7 @@ export const firebaseAuthService = {
 
   async signOut() {
     try {
+      const auth = await getFirebaseAuth();
       await signOut(auth);
     } catch (error) {
       console.error('Firebase signOut error:', error);
@@ -115,6 +118,7 @@ export const firebaseAuthService = {
 
   async resetPassword(email) {
     try {
+      const auth = await getFirebaseAuth();
       await sendPasswordResetEmail(auth, email);
       return {
         success: true,
@@ -127,10 +131,10 @@ export const firebaseAuthService = {
   },
 
   getCurrentUser() {
-    return auth.currentUser;
+    return getFirebaseAuth().then(auth => auth.currentUser);
   },
 
   onAuthStateChanged(callback) {
-    return auth.onAuthStateChanged(callback);
+    return getFirebaseAuth().then(auth => auth.onAuthStateChanged(callback));
   }
 };

@@ -10,7 +10,8 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  Alert
 } from 'react-native';
 import { Button, TextInput, useTheme } from "react-native-paper";
 import { useApp } from "../contexts/AppContext";
@@ -18,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAuthForm } from '../hooks/useAuthForm';
 import { useAuthSubmit } from '../hooks/useAuthSubmit';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
+import FacebookSignInButton from '../components/auth/FacebookSignInButton';
 
 const ParentAuth = ({ navigation, route }) => {
   const theme = useTheme();
@@ -276,6 +278,34 @@ const ParentAuth = ({ navigation, route }) => {
                   {mode === 'signup' ? 'Create Account' : mode === 'reset' ? 'Send Reset Link' : 'Sign In'}
                 </Button>
 
+                {/* Social Login Options */}
+                {mode !== 'reset' && (
+                  <>
+                    <View style={styles.divider}>
+                      <View style={styles.dividerLine} />
+                      <Text style={styles.dividerText}>or</Text>
+                      <View style={styles.dividerLine} />
+                    </View>
+
+                    <FacebookSignInButton
+                      userRole="parent"
+                      onSuccess={(result) => {
+                        console.log('Facebook sign-in successful:', result);
+                        // Navigation will be handled by the auth context
+                      }}
+                      onError={(error) => {
+                        console.error('Facebook sign-in error:', error);
+                        Alert.alert(
+                          'Facebook Sign-In Failed',
+                          error.message || 'Unable to sign in with Facebook. Please try again.',
+                          [{ text: 'OK' }]
+                        );
+                      }}
+                      style={styles.facebookButton}
+                    />
+                  </>
+                )}
+
                 {/* Footer links */}
                 {mode !== 'reset' ? (
                   <>
@@ -466,6 +496,24 @@ const styles = StyleSheet.create({
     color: '#db2777',
     marginBottom: 12,
     fontStyle: 'italic',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  facebookButton: {
+    marginTop: 8,
   },
 });
 

@@ -83,6 +83,23 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: undefined
   },
+  // Authentication provider information
+  authProvider: {
+    type: String,
+    enum: ['local', 'firebase', 'facebook', 'google'],
+    default: 'local'
+  },
+  // Social media provider IDs
+  facebookId: {
+    type: String,
+    sparse: true,
+    index: true
+  },
+  googleId: {
+    type: String,
+    sparse: true,
+    index: true
+  },
   // Optional address for client users
   address: {
     street: { type: String },

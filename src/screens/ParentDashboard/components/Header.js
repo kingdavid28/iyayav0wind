@@ -71,7 +71,13 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
                     <Image 
                       source={imageSource}
                       style={headerStyles.profileImage}
-                      onError={(error) => console.log('Image load error:', error)}
+                      onError={(error) => {
+                        // Reduce log noise - only log actual errors, not missing files
+                        const errorMessage = error?.nativeEvent?.error || error;
+                        if (errorMessage && !errorMessage.includes("couldn't be opened because there is no such file")) {
+                          console.warn('Failed to load profile image:', errorMessage);
+                        }
+                      }}
                       resizeMode="cover"
                       defaultSource={Platform.OS === 'ios' ? 
                         require('../../../../assets/icon.png') : 

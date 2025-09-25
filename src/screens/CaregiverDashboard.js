@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
 import React, { useCallback, useEffect, useState } from "react"
-import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from "react-native"
+import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, FlatList } from "react-native"
 import { Button, Card, Chip, Searchbar } from "react-native-paper"
 import Toast from "../components/ui/feedback/Toast"
 import { bookingsAPI, applicationsAPI, caregiversAPI, authAPI } from "../services/index"
@@ -12,7 +12,6 @@ import { useAuth } from "../contexts/AuthContext"
 import { usePrivacy } from '../components/features/privacy/PrivacyManager';
 import { SettingsModal } from "../components/ui/modals/SettingsModal"
 import { RequestInfoModal } from "../components/ui/modals/RequestInfoModal"
-
 
 import { formatAddress } from "../utils/addressUtils"
 import { calculateAge } from "../utils/dateUtils"
@@ -271,7 +270,7 @@ function BookingCard({ booking, onMessage, onViewDetails, onConfirmAttendance })
   )
 }
 
-export default function CaregiverDashboard({ onLogout, route }) {
+function CaregiverDashboard({ onLogout, route }) {
   const navigation = useNavigation()
   const { user, signOut } = useAuth()
   const { width } = Dimensions.get("window");
@@ -317,7 +316,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
   const [newMessage, setNewMessage] = useState('');
   const [reviews, setReviews] = useState([]);
   const [chatActive, setChatActive] = useState(false);
-
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
   const showToast = (message, type = 'success') => setToast({ visible: true, message, type })
@@ -383,8 +381,13 @@ export default function CaregiverDashboard({ onLogout, route }) {
 
     // Check if Firebase is available
     const checkFirebaseAvailability = () => {
-      const { database: db, ref, onValue, query, orderByChild } = require('../config/firebase');
-      return !!(db && onValue && ref && query && orderByChild);
+      try {
+        const { database: db, ref, onValue, query, orderByChild } = require('../config/firebase');
+        return !!(db && onValue && ref && query && orderByChild);
+      } catch (error) {
+        console.warn('Firebase not available:', error);
+        return false;
+      }
     };
 
     if (!checkFirebaseAvailability()) {
@@ -428,14 +431,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
     setEditProfileModalVisible(true)
   }
 
-  // Remove duplicate focus effect since it's handled in the hook
-  // useFocusEffect(
-  //   useCallback(() => {
-  //     console.log('🔄 CaregiverDashboard focused - loading profile');
-  //     loadProfile();
-  //   }, [loadProfile])
-  // );
-
   useEffect(() => {
     if (route?.params?.refreshProfile) {
       console.log('🔄 CaregiverDashboard - Force refresh triggered by route params');
@@ -446,8 +441,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
       }, 100);
     }
   }, [route?.params?.refreshProfile]);
-
-  const refreshApplications = fetchApplications;
 
   const handleJobApplication = (job) => {
     setSelectedJob(job)
@@ -465,8 +458,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
     setShowApplicationDetails(true)
   }
 
-
-  
   const handleMessageFamily = async (application) => {
     Alert.alert('Feature Unavailable', 'Messaging feature has been removed.');
     setShowApplicationDetails(false);
@@ -572,6 +563,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
   };
 
   const handleApplicationSubmit = async ({ jobId, jobTitle, family, coverLetter, proposedRate }) => {
+    // Fix: Add missing apiService import or use applicationsAPI directly
     if (applications.some(app => app.jobId === jobId)) {
       showToast('You have already applied to this job', 'error');
       return;
@@ -583,7 +575,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
       setApplicationSubmitting(true)
 
       console.log('Submitting application with jobId:', jobId);
-      const response = await apiService.applications.apply({
+      const response = await applicationsAPI.apply({
         jobId: jobId,
         coverLetter: coverLetter || '',
         proposedRate: proposedRate ? Number(proposedRate) : undefined,
@@ -658,9 +650,9 @@ export default function CaregiverDashboard({ onLogout, route }) {
         rate: Number.isFinite(numericRate) ? numericRate : undefined,
         experience: profileExperience,
         previousVersion: {
-          name: profile.name,
-          hourlyRate: profile.hourlyRate,
-          experience: profile.experience,
+          name: profile?.name,
+          hourlyRate: profile?.hourlyRate,
+          experience: profile?.experience,
           updatedAt: new Date().toISOString()
         }
       }
@@ -741,132 +733,30 @@ export default function CaregiverDashboard({ onLogout, route }) {
     />
   )
 
-
-  
-  const renderHeader = () => {
+  const renderTopNav = () => {
     const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
     const pendingRequestsCount = pendingRequests?.length || 0;
-    const totalPrivacyNotifications = unreadNotifications + pendingRequestsCount;
+    const totalUnread = unreadNotifications + pendingRequestsCount;
+    
+    const tabs = [
+      { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
+      { id: 'jobs', label: 'Jobs', icon: 'briefcase' },
+      { id: 'applications', label: 'Applications', icon: 'document-text' },
+      { id: 'bookings', label: 'Bookings', icon: 'calendar' },
+      { id: 'messages', label: 'Messages', icon: 'chatbubbles' },
+      { id: 'reviews', label: 'Reviews', icon: 'star' },
+      { 
+        id: 'notifications', 
+        label: 'Notifications', 
+        icon: 'notifications',
+        badgeCount: totalUnread
+      },
+    ];
     
     return (
-      <View style={styles.parentLikeHeaderContainer}>
-        <LinearGradient
-          colors={["#5bbafa", "#b672ff"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.parentLikeHeaderGradient}
-        >
-          <View style={styles.headerTop}>
-            <View style={[styles.logoContainer, { flexDirection: 'column', alignItems: 'center' }]}>
-              <Image source={require('../../assets/icon.png')} style={[styles.logoImage, { marginBottom: 6 }]} />
-              
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>I am a Caregiver</Text>
-              </View>
-            </View>
-            <View style={styles.headerActions}>
-
-              
-              <Pressable 
-                style={[styles.headerButton, { position: 'relative' }]} 
-                onPress={() => setShowNotifications(true)}
-              >
-                <Ionicons name="shield-outline" size={22} color="#FFFFFF" />
-                {totalPrivacyNotifications > 0 && (
-                  <View style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -4,
-                    backgroundColor: '#ef4444',
-                    borderRadius: 10,
-                    minWidth: 20,
-                    height: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 2,
-                    borderColor: '#fff',
-                  }}>
-                    <Text style={{
-                      color: '#fff',
-                      fontSize: 10,
-                      fontWeight: '600',
-                    }}>
-                      {totalPrivacyNotifications > 99 ? '99+' : totalPrivacyNotifications}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
-              
-              <Pressable 
-                style={styles.headerButton} 
-                onPress={() => setShowRequestModal(true)}
-              >
-                <Ionicons name="mail-outline" size={22} color="#FFFFFF" />
-              </Pressable>
-              
-              <Pressable 
-                style={styles.headerButton} 
-                onPress={() => setShowSettings(true)}
-              >
-                <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
-              </Pressable>
-              
-              <Pressable 
-                style={styles.headerButton} 
-                onPress={() => {
-                  try {
-                    navigation.navigate('CaregiverProfileComplete', { 
-                      profile: profile 
-                    });
-                  } catch (error) {
-                    console.error('Profile navigation error:', error);
-                    Alert.alert('Navigation Error', 'Failed to open profile. Please try again.');
-                  }
-                }}
-              >
-                <Ionicons name="person-outline" size={22} color="#FFFFFF" />
-              </Pressable>
-              
-              <Pressable 
-                style={styles.headerButton} 
-                onPress={async () => {
-                  try {
-                    console.log('🚪 Caregiver logout initiated...');
-                    if (onLogout) {
-                      console.log('Using onLogout prop');
-                      await onLogout();
-                    } else {
-                      console.log('Using signOut from AuthContext');
-                      await signOut();
-                    }
-                    console.log('✅ Logout completed');
-                  } catch (error) {
-                    console.error('❌ Logout error:', error);
-                    Alert.alert('Logout Error', 'Failed to logout. Please try again.');
-                  }
-                }}
-              >
-                <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
-              </Pressable>
-            </View>
-          </View>
-        </LinearGradient>
-      </View>
-    )
-  }
-
-  const renderTopNav = () => (
-    <View style={styles.navContainer}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
-        {[
-          { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
-          { id: 'jobs', label: 'Jobs', icon: 'briefcase' },
-          { id: 'applications', label: 'Applications', icon: 'document-text' },
-          { id: 'bookings', label: 'Bookings', icon: 'calendar' },
-          { id: 'messages', label: 'Messages', icon: 'chatbubbles' },
-          { id: 'reviews', label: 'Reviews', icon: 'star' },
-          { id: 'notifications', label: 'Notifications', icon: 'notifications' },
-        ].map((tab) => {
+      <View style={styles.navContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navScroll}>
+          {tabs.map((tab) => {
           const active = activeTab === tab.id
           const onPress = () => {
             setActiveTab(tab.id)
@@ -886,7 +776,16 @@ export default function CaregiverDashboard({ onLogout, route }) {
                 active ? styles.navTabActive : null,
               ]}
             >
-              <Ionicons name={tab.icon} size={18} color={iconColor} />
+              <View style={{ position: 'relative' }}>
+                <Ionicons name={tab.icon} size={18} color={iconColor} />
+                {tab.badgeCount > 0 && tab.id === 'notifications' && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {tab.badgeCount > 9 ? '9+' : tab.badgeCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.navTabText, active ? styles.navTabTextActive : null]}>
                 {tab.label}
               </Text>
@@ -897,6 +796,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
       </ScrollView>
     </View>
   );
+}
 
   const renderMessagesTab = () => (
     <View style={styles.messagesContainer}>
@@ -1007,6 +907,107 @@ export default function CaregiverDashboard({ onLogout, route }) {
       )}
     </View>
   );
+
+  const renderHeader = () => {
+    const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
+    const pendingRequestsCount = pendingRequests?.length || 0;
+    const totalUnread = unreadNotifications + pendingRequestsCount;
+    
+    return (
+      <View style={styles.parentLikeHeaderContainer}>
+        <LinearGradient
+          colors={["#5bbafa", "#b672ff"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.parentLikeHeaderGradient}
+        >
+          <View style={styles.headerTop}>
+            <View style={[styles.logoContainer, { flexDirection: 'column', alignItems: 'center' }]}>
+              <Image source={require('../../assets/icon.png')} style={[styles.logoImage, { marginBottom: 6 }]} />
+              
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>I am a Caregiver</Text>
+              </View>
+            </View>
+            <View style={styles.headerActions}>
+              <Pressable 
+                style={styles.headerButton}
+                onPress={() => setActiveTab('messages')}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.headerButton, { position: 'relative' }]} 
+                onPress={() => setShowNotifications(true)}
+              >
+                <Ionicons name="shield-outline" size={22} color="#FFFFFF" />
+                {totalUnread > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {totalUnread > 9 ? '9+' : totalUnread}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+              
+              <Pressable 
+                style={styles.headerButton} 
+                onPress={() => setShowRequestModal(true)}
+              >
+                <Ionicons name="mail-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              
+              <Pressable 
+                style={styles.headerButton} 
+                onPress={() => setShowSettings(true)}
+              >
+                <Ionicons name="settings-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              
+              <Pressable 
+                style={styles.headerButton} 
+                onPress={() => {
+                  try {
+                    navigation.navigate('CaregiverProfileComplete', { 
+                      profile: profile 
+                    });
+                  } catch (error) {
+                    console.error('Profile navigation error:', error);
+                    Alert.alert('Navigation Error', 'Failed to open profile. Please try again.');
+                  }
+                }}
+              >
+                <Ionicons name="person-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              
+              <Pressable 
+                style={styles.headerButton} 
+                onPress={async () => {
+                  try {
+                    console.log('🚪 Caregiver logout initiated...');
+                    if (onLogout) {
+                      console.log('Using onLogout prop');
+                      await onLogout();
+                    } else {
+                      console.log('Using signOut from AuthContext');
+                      await signOut();
+                    }
+                    console.log('✅ Logout completed');
+                  } catch (error) {
+                    console.error('❌ Logout error:', error);
+                    Alert.alert('Logout Error', 'Failed to logout. Please try again.');
+                  }
+                }}
+              >
+                <Ionicons name="log-out-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    )
+  }
 
   return (
       <View style={styles.container}>
@@ -1351,8 +1352,6 @@ export default function CaregiverDashboard({ onLogout, route }) {
             </ScrollView>
           )
         )}
-
-
 
         {activeTab === "bookings" && (
           <ScrollView style={styles.content}>
@@ -1810,5 +1809,7 @@ export default function CaregiverDashboard({ onLogout, route }) {
         colors={{ primary: '#3B82F6' }}
       />
       </View>
-  )
+  );
 }
+
+export default CaregiverDashboard;

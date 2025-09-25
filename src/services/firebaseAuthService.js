@@ -8,13 +8,19 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 
-// Import safety functions for Firebase initialization
-import { getAuthSync, initializeFirebase } from '../config/firebase';
+// Import safety functions for Firebase initialization - FIXED: Only initialize once
+import { getAuthSync, getFirebaseAuth, initializeFirebase } from '../config/firebase';
+
+// Global flag to prevent multiple initializations
+let isInitialized = false;
 
 export const refreshToken = async () => {
   try {
-    // Ensure Firebase is initialized
-    await initializeFirebase();
+    // Only initialize once
+    if (!isInitialized) {
+      await initializeFirebase();
+      isInitialized = true;
+    }
 
     const auth = getAuthSync();
     const user = auth.currentUser;
@@ -61,8 +67,11 @@ export const firebaseAuthService = {
     try {
       const { email, password, name, role } = userData;
 
-      // Ensure Firebase is initialized
-      await initializeFirebase();
+      // Only initialize once
+      if (!isInitialized) {
+        await initializeFirebase();
+        isInitialized = true;
+      }
       const auth = getAuthSync();
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -114,8 +123,11 @@ export const firebaseAuthService = {
 
   async login(email, password) {
     try {
-      // Ensure Firebase is initialized
-      await initializeFirebase();
+      // Only initialize once
+      if (!isInitialized) {
+        await initializeFirebase();
+        isInitialized = true;
+      }
       const auth = getAuthSync();
 
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -166,8 +178,11 @@ export const firebaseAuthService = {
 
   async signOut() {
     try {
-      // Ensure Firebase is initialized
-      await initializeFirebase();
+      // Only initialize once
+      if (!isInitialized) {
+        await initializeFirebase();
+        isInitialized = true;
+      }
       const auth = getAuthSync();
 
       await signOut(auth);
@@ -179,8 +194,11 @@ export const firebaseAuthService = {
 
   async resetPassword(email) {
     try {
-      // Ensure Firebase is initialized
-      await initializeFirebase();
+      // Only initialize once
+      if (!isInitialized) {
+        await initializeFirebase();
+        isInitialized = true;
+      }
       const auth = getAuthSync();
 
       await sendPasswordResetEmail(auth, email);

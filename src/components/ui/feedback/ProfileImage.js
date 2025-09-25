@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { User } from 'lucide-react-native';
-import { getImageUrl } from '../../../utils/imageUtils';
+import { getImageSource } from '../../../utils/imageUtils';
 
 const ProfileImage = ({ 
   imageUrl, 
@@ -23,8 +23,8 @@ const ProfileImage = ({
       return { uri: imageUrl };
     }
     
-    const finalUrl = getImageUrl(imageUrl);
-    return finalUrl ? { uri: finalUrl } : null;
+    // Use getImageSource which handles both local and remote URLs
+    return getImageSource(imageUrl);
   }, [imageUrl, imageError]);
   const imageSize = { width: size, height: size, borderRadius: size / 2 };
 
@@ -34,7 +34,14 @@ const ProfileImage = ({
         <Image 
           source={imageSource}
           style={[styles.image, imageSize]}
-          onError={() => setImageError(true)}
+          onError={(error) => {
+            // Reduce log noise - only log actual errors, not missing files
+            const errorMessage = error?.nativeEvent?.error || error;
+            if (errorMessage && !errorMessage.includes("couldn't be opened because there is no such file")) {
+              console.warn('Failed to load profile image:', errorMessage);
+            }
+            setImageError(true);
+          }}
           resizeMode="cover"
         />
       ) : (

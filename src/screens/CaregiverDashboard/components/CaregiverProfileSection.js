@@ -48,9 +48,11 @@ const CaregiverProfileSection = ({ profile, activeTab }) => {
           </TouchableOpacity>
           <View style={styles.leftSection}>
             <ProfileImage 
-              imageUrl={profile?.imageUrl || profile?.profileImage || profile?.image || profile?.photoUrl}
+              imageUrl={profile?.imageUrl || profile?.profileImage || profile?.image || profile?.photoUrl || user?.profileImage || user?.avatar}
               size={80}
               style={styles.profileImageContainer}
+              borderColor="#3b82f6"
+              defaultIconSize={40}
             />
             <Text style={styles.welcomeText}>
               {displayName ? `Welcome back, ${displayName}! 👋` : 'Welcome back! 👋'}

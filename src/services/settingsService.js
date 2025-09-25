@@ -75,25 +75,87 @@ class SettingsService {
 
   // Information Requests
   async getPendingRequests() {
-    return this.makeRequest('/privacy/requests/pending');
+    try {
+      const response = await this.makeRequest('/privacy/requests/pending');
+      return {
+        success: true,
+        data: response.requests || [],
+        requests: response.requests || [] // For backward compatibility
+      };
+    } catch (error) {
+      console.error('Error fetching pending requests:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch pending requests',
+        data: [],
+        requests: []
+      };
+    }
   }
 
   async getSentRequests() {
-    return this.makeRequest('/privacy/requests/sent');
+    try {
+      const response = await this.makeRequest('/api/privacy/requests/sent');
+      return {
+        success: true,
+        data: response.data || [],
+        requests: response.data || [] // For backward compatibility
+      };
+    } catch (error) {
+      console.error('Error fetching sent requests:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch sent requests',
+        data: [],
+        requests: []
+      };
+    }
   }
 
-  async respondToRequest(data) {
-    return this.makeRequest('/privacy/respond', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async respondToRequest({ requestId, approved, sharedFields = [] }) {
+    try {
+      const response = await this.makeRequest(`/privacy/requests/${requestId}/respond`, {
+        method: 'POST',
+        body: JSON.stringify({ approved, sharedFields }),
+      });
+      
+      return {
+        success: true,
+        data: response.data,
+        ...response
+      };
+    } catch (error) {
+      console.error('Error responding to request:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to respond to request'
+      };
+    }
   }
 
-  async requestInformation(data) {
-    return this.makeRequest('/privacy/request', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async requestInformation({ targetUserId, requestedFields, reason }) {
+    try {
+      const response = await this.makeRequest('/api/privacy/request', {
+        method: 'POST',
+        body: JSON.stringify({
+          targetUserId,
+          requestedFields,
+          reason
+        }),
+      });
+      
+      return {
+        success: true,
+        data: response.data,
+        ...response
+      };
+    } catch (error) {
+      console.error('Error creating information request:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to create information request'
+      };
+    }
   }
 
   // Notification Settings

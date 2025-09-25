@@ -5,8 +5,11 @@ import { authAPI } from "../config/api";
 import { STORAGE_KEYS } from "../config/constants";
 import { firebaseAuthService } from "../services/firebaseAuthService";
 
-// Import safety functions for Firebase initialization
+// Import safety functions for Firebase initialization - FIXED: Only initialize once
 import { getAuthSync, initializeFirebase } from '../config/firebase';
+
+// Global flag to prevent multiple initializations across the app
+let globalAuthInitialized = false;
 
 export const AuthContext = createContext();
 
@@ -39,8 +42,11 @@ export const AuthProvider = ({ children }) => {
       try {
         console.log('🔄 Initializing AuthContext with safety checks...');
 
-        // Ensure Firebase is initialized first with safety checks
-        await initializeFirebase();
+        // Only initialize Firebase once globally
+        if (!globalAuthInitialized) {
+          await initializeFirebase();
+          globalAuthInitialized = true;
+        }
 
         // Get auth instance safely
         const auth = getAuthSync();
@@ -160,6 +166,39 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Facebook login method
+  const loginWithFacebook = async (facebookResult) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setHasLoggedOut(false);
+
+      console.log('🔐 Processing Facebook login result:', facebookResult);
+
+      // Store the token if available
+      if (facebookResult?.token) {
+        await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, facebookResult.token);
+        console.log('💾 Facebook token stored successfully');
+      }
+
+      // Normalize and set the user
+      if (facebookResult.user) {
+        const normalizedUser = normalizeUser(facebookResult.user);
+        setUser(normalizedUser);
+        console.log('✅ Facebook user set in context:', normalizedUser);
+      }
+
+      return { success: true, user: facebookResult.user };
+    } catch (err) {
+      console.log('❌ Facebook login error:', err.message);
+      const errorMessage = err?.message || "Facebook login failed";
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signup = async (userData) => {
     try {
       setIsLoading(true);
@@ -260,6 +299,7 @@ export const AuthProvider = ({ children }) => {
     loading: isLoading || !authInitialized, // Include auth initialization state
     error,
     login,
+    loginWithFacebook,
     signup,
     signOut,
     resetPassword,

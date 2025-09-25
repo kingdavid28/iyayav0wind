@@ -5,6 +5,7 @@ import {
   MapPin,
   MessageCircle,
   Star,
+  User,
 } from "lucide-react-native";
 import PropTypes from "prop-types";
 import React, { useEffect, useMemo, useState } from "react";
@@ -12,7 +13,7 @@ import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Card } from '../../../shared/ui';
 
 import { formatAddress } from "../../../utils/addressUtils";
-import { getProfileImageUrl } from "../../../utils/imageUtils";
+import { getImageSource } from "../../../utils/imageUtils";
 import { userService } from "../../../services/userService";
 
 import { bookingService } from "../../../services/bookingService";
@@ -80,11 +81,7 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, onViewReviews,
   const [imageError, setImageError] = useState(false);
 
   // Use centralized image URL handling
-  const avatar = getProfileImageUrl({ 
-    avatar: avatarRaw, 
-    profileImage: caregiver?.profileImage,
-    user: caregiver?.user 
-  });
+  const avatar = avatarRaw || caregiver?.profileImage || caregiver?.user?.profileImage;
 
   const accessibilityLabel = `${name}${specialties.length ? `, ${specialties.join(", ")}` : ""}, ${rating} star rating`;
   const bookButtonLabel = `Book ${name} for a session`;
@@ -112,27 +109,31 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, onViewReviews,
       >
         {avatar && !imageError ? (
           <Image
-            source={{ uri: avatar }}
+            source={getImageSource(avatar)}
             style={[styles.avatarLg, { marginRight: spacing.md }]}
-            accessibilityIgnoresInvertColors
             accessible={false}
-            onError={() => setImageError(true)}
+            onError={(error) => {
+              // Reduce log noise - only log actual errors, not missing files
+              const errorMessage = error?.nativeEvent?.error || error;
+              if (errorMessage && !errorMessage.includes("couldn't be opened because there is no such file")) {
+                console.warn('Failed to load caregiver image:', errorMessage);
+              }
+              setImageError(true);
+            }}
           />
         ) : (
           <View
             style={[
               styles.avatarLg,
               {
+                backgroundColor: colors.gray100,
+                justifyContent: 'center',
+                alignItems: 'center',
                 marginRight: spacing.md,
-                backgroundColor: "#e1e4e8",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 9999,
               },
             ]}
           >
-            {/* Simple placeholder when image fails */}
-            <Text style={{ color: "#6B7280", fontWeight: "600" }}>CG</Text>
+            <User size={32} color={colors.gray500} />
           </View>
         )}
         <View style={{ flex: 1 }}>

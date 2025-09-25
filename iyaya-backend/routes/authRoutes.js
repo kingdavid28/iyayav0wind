@@ -213,6 +213,14 @@ router.post('/login',
   )
 );
 
+// Firebase sync endpoint for social authentication
+router.post('/firebase-sync',
+  authLimiter,
+  authController.firebaseSync || ((req, res) => 
+    res.status(503).json({ error: 'Firebase sync service unavailable' })
+  )
+);
+
 router.post('/logout',
   authLimiter,
   authenticate,
@@ -247,22 +255,6 @@ router.get('/verify-email/:token',
 router.post('/resend-verification',
   authLimiter,
   authController.resendVerification
-);
-
-router.post('/firebase-sync',
-  authController.firebaseSync
-);
-
-router.get('/firebase-profile',
-  authController.getFirebaseProfile
-);
-
-router.put('/firebase-profile',
-  authController.updateProfile
-);
-
-router.post('/send-custom-verification',
-  authController.sendCustomVerification
 );
 
 router.get('/me',

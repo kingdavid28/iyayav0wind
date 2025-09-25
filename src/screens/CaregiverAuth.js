@@ -28,6 +28,7 @@ import { useAuthSubmit } from '../hooks/useAuthSubmit';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../config/constants';
+import FacebookSignInButton from '../components/auth/FacebookSignInButton';
 import { navigateToUserDashboard } from '../utils/navigationUtils';
 
 const CaregiverAuth = ({ navigation }) => {
@@ -353,6 +354,34 @@ const CaregiverAuth = ({ navigation }) => {
                 {mode === 'signup' ? 'Create Account' : mode === 'reset' ? 'Send Reset Link' : 'Sign In'}
               </Button>
 
+              {/* Social Login Options */}
+              {mode !== 'reset' && (
+                <>
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>or</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+
+                  <FacebookSignInButton
+                    userRole="caregiver"
+                    onSuccess={(result) => {
+                      console.log('Facebook sign-in successful:', result);
+                      // Navigation will be handled by the auth context
+                    }}
+                    onError={(error) => {
+                      console.error('Facebook sign-in error:', error);
+                      Alert.alert(
+                        'Facebook Sign-In Failed',
+                        error.message || 'Unable to sign in with Facebook. Please try again.',
+                        [{ text: 'OK' }]
+                      );
+                    }}
+                    style={styles.facebookButton}
+                  />
+                </>
+              )}
+
               {/* Footer links */}
               {mode !== 'reset' ? (
                 <>
@@ -563,6 +592,24 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     marginBottom: 12,
     fontStyle: 'italic',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  facebookButton: {
+    marginTop: 8,
   },
 });
 

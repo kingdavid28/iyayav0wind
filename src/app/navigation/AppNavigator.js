@@ -90,7 +90,7 @@ const AppNavigatorWithAuth = () => {
           showOnboarding
             ? "Onboarding"
             : user && user.emailVerified
-            ? user.role === "caregiver"
+            ? (user.role === "caregiver" || user.caregiverProfile)
               ? "CaregiverDashboard"
               : "ParentDashboard"
             : "Welcome"

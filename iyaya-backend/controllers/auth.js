@@ -39,7 +39,178 @@ const generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
-// Accept base64 image, store to uploads/, update user.profileImage, return URL
+// Firebase user sync endpoint for social authentication
+exports.firebaseSync = async (req, res, next) => {
+  try {
+    const {
+      firebaseUid,
+      email,
+      name,
+      firstName,
+      lastName,
+      profileImage,
+      role = 'parent',
+      authProvider = 'firebase',
+      facebookId,
+      googleId,
+      emailVerified = false
+    } = req.body;
+
+    // Validate required fields
+    if (!firebaseUid || !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Firebase UID and email are required'
+      });
+    }
+
+    // Normalize role
+    const normalizedRole = normalizeRole(role);
+
+    // Check if user already exists by Firebase UID
+    let user = await User.findOne({ firebaseUid });
+
+    if (user) {
+      // Update existing user with new information
+      const updates = {
+        name: name || user.name,
+        firstName: firstName || user.firstName,
+        lastName: lastName || user.lastName,
+        profileImage: profileImage || user.profileImage,
+        authProvider: authProvider || user.authProvider,
+        lastLogin: new Date(),
+        'verification.emailVerified': emailVerified || user.verification.emailVerified
+      };
+
+      // Update social provider IDs if provided
+      if (facebookId) updates.facebookId = facebookId;
+      if (googleId) updates.googleId = googleId;
+
+      // Apply updates
+      Object.assign(user, updates);
+      await user.save();
+
+      console.log('✅ Updated existing Firebase user:', user.email);
+    } else {
+      // Check if user exists by email (for linking accounts)
+      user = await User.findOne({ email });
+
+      if (user) {
+        // Link Firebase to existing account
+        user.firebaseUid = firebaseUid;
+        user.authProvider = authProvider;
+        user.profileImage = profileImage || user.profileImage;
+        user.lastLogin = new Date();
+        user.verification.emailVerified = emailVerified || user.verification.emailVerified;
+
+        // Update social provider IDs if provided
+        if (facebookId) user.facebookId = facebookId;
+        if (googleId) user.googleId = googleId;
+
+        await user.save();
+        console.log('🔗 Linked Firebase to existing user:', user.email);
+      } else {
+        // Create new user
+        const userData = {
+          firebaseUid,
+          email,
+          name: name || `${firstName || ''} ${lastName || ''}`.trim(),
+          firstName,
+          lastName,
+          profileImage,
+          role: normalizedRole,
+          authProvider,
+          verification: {
+            emailVerified: emailVerified || (authProvider === 'facebook'), // Facebook emails are pre-verified
+            token: null,
+            expires: null
+          },
+          lastLogin: new Date()
+        };
+
+        // Add social provider IDs if provided
+        if (facebookId) userData.facebookId = facebookId;
+        if (googleId) userData.googleId = googleId;
+
+        user = new User(userData);
+        await user.save();
+
+        console.log('🆕 Created new Firebase user:', user.email, 'Role:', normalizedRole);
+      }
+    }
+
+    // Generate tokens for the user
+    const tokens = generateTokens(user);
+
+    // Log the authentication event
+    try {
+      await auditService.log({
+        action: 'FIREBASE_SYNC',
+        userId: user._id,
+        details: {
+          authProvider,
+          email: user.email,
+          role: user.role,
+          isNewUser: !user.lastLogin || user.createdAt === user.updatedAt
+        },
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+    } catch (auditError) {
+      console.warn('Failed to log Firebase sync audit:', auditError.message);
+    }
+
+    // Return success response
+    res.status(200).json({
+      success: true,
+      message: 'Firebase user synchronized successfully',
+      user: {
+        id: user._id,
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImage: user.profileImage,
+        role: user.role,
+        authProvider: user.authProvider,
+        facebookId: user.facebookId,
+        googleId: user.googleId,
+        emailVerified: user.verification.emailVerified,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      },
+      tokens
+    });
+
+  } catch (error) {
+    console.error('Firebase sync error:', error);
+    
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        error: `A user with this ${field} already exists`
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error during Firebase sync'
+    });
+  }
+};
 exports.uploadProfileImageBase64 = async (req, res, next) => {
   try {
     const { imageBase64, mimeType } = req.body || {};

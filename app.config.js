@@ -28,9 +28,14 @@ export default {
     web: {
       favicon: "./assets/favicon.png"
     },
-    scheme: "iyaya",
+    scheme: "iyaya-app",
     linking: {
-      prefixes: ["iyaya://", "exp://192.168.1.10:8081/--/"],
+      prefixes: [
+        "iyaya-app://", 
+        "exp://192.168.1.9:8081/--/",
+        "exp://192.168.1.10:8081/--/",
+        "exp://localhost:8081/--/"
+      ],
       config: {
         screens: {
           EmailVerification: {
