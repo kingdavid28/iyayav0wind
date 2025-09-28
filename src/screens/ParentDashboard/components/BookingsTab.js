@@ -305,7 +305,8 @@ const BookingsTab = ({
         keyExtractor={(item, index) => item._id || item.id || `booking-${index}`}
         renderItem={({ item }) => (
           <BookingItem
-            item={item}
+            booking={item}
+            user={item?.caregiverId || item?.caregiver || item?.caregiverProfile || item?.assignedCaregiver}
             onCancelBooking={onCancelBooking}
             onUploadPayment={onUploadPayment}
             onViewBookingDetails={onViewBookingDetails}

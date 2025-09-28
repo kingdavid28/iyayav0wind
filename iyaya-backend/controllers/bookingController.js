@@ -2,18 +2,45 @@ const Booking = require('../models/Booking');
 const User = require('../models/User');
 const Caregiver = require('../models/Caregiver');
 
+const normalizeChildField = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : entry))
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  return value ?? '';
+};
+
+const sanitizeChildren = (children) => {
+  if (!Array.isArray(children)) {
+    return undefined;
+  }
+
+  return children.map((child) => {
+    if (!child || typeof child !== 'object') {
+      return child;
+    }
+
+    return {
+      ...child,
+      preferences: normalizeChildField(child.preferences),
+      allergies: normalizeChildField(child.allergies),
+      specialInstructions: normalizeChildField(child.specialInstructions ?? child.instructions),
+      notes: normalizeChildField(child.notes),
+    };
+  });
+};
+
 // Get user's bookings
 exports.getMyBookings = async (req, res) => {
   try {
     console.log(`getMyBookings called for user: ${req.user.id}, role: ${req.user.role}`);
-    
-    let caregiverProfileId = null;
-    
-    if (req.user.role === 'caregiver') {
-      const caregiverProfile = await Caregiver.findOne({ userId: req.user.id });
-      caregiverProfileId = caregiverProfile ? caregiverProfile._id : null;
-      console.log(`Caregiver ${req.user.id} has profile ID: ${caregiverProfileId}`);
-    }
     
     const searchCriteria = {
       $or: [
@@ -22,15 +49,9 @@ exports.getMyBookings = async (req, res) => {
       ]
     };
     
-    if (caregiverProfileId) {
-      searchCriteria.$or.push({ caregiverId: caregiverProfileId });
-    }
-    
-    console.log(`Search criteria:`, JSON.stringify(searchCriteria));
-    
     const bookings = await Booking.find(searchCriteria)
-    .populate('clientId', 'name email')
-    .sort({ createdAt: -1 });
+      .populate('clientId', 'name email')
+      .sort({ createdAt: -1 });
     
     // Add parentId for messaging purposes
     bookings.forEach(booking => {
@@ -38,11 +59,9 @@ exports.getMyBookings = async (req, res) => {
         booking.parentId = booking.clientId._id || booking.clientId;
       }
     });
-
-    console.log(`Found ${bookings.length} bookings for user: ${req.user.id}`);
     
     // Enhance bookings with caregiver data
-    for (let booking of bookings) {
+    for (const booking of bookings) {
       if (booking.caregiverId) {
         // Try to find caregiver by profile ID first
         let caregiver = await Caregiver.findById(booking.caregiverId).populate('userId', 'name email');
@@ -74,9 +93,21 @@ exports.getMyBookings = async (req, res) => {
       }
     }
     
+    const bookingsWithSanitizedChildren = bookings.map((bookingDoc) => {
+      const sanitizedChildren = sanitizeChildren(bookingDoc.children);
+
+      if (sanitizedChildren !== undefined) {
+        bookingDoc.children = sanitizedChildren;
+      }
+
+      return bookingDoc;
+    });
+
     res.json({
       success: true,
-      bookings: bookings
+      data: {
+        bookings: bookingsWithSanitizedChildren,
+      },
     });
   } catch (error) {
     console.error('Error fetching bookings:', error);
@@ -90,11 +121,19 @@ exports.getMyBookings = async (req, res) => {
 // Create new booking
 exports.createBooking = async (req, res) => {
   try {
-    const newBooking = new Booking({
+    const sanitizedChildren = sanitizeChildren(req.body.children);
+
+    const bookingPayload = {
       ...req.body,
       clientId: req.user.id,
-      status: 'pending'
-    });
+      status: 'pending',
+    };
+
+    if (sanitizedChildren !== undefined) {
+      bookingPayload.children = sanitizedChildren;
+    }
+
+    const newBooking = new Booking(bookingPayload);
     
     await newBooking.save();
     
@@ -113,13 +152,18 @@ exports.createBooking = async (req, res) => {
       }
     }
     
-    console.log(`Booking created by user: ${req.user.id}`);
-    
+    const result = newBooking.toObject();
+    const resultChildren = sanitizeChildren(result.children);
+
+    if (resultChildren !== undefined) {
+      result.children = resultChildren;
+    }
+
     res.status(201).json({
       success: true,
       data: {
-        booking: newBooking
-      }
+        booking: result,
+      },
     });
   } catch (error) {
     console.error('Error creating booking:', error);
@@ -130,32 +174,48 @@ exports.createBooking = async (req, res) => {
   }
 };
 
-// Update booking
 exports.updateBooking = async (req, res) => {
   try {
+    const sanitizedChildren = sanitizeChildren(req.body.children);
+
+    const updatePayload = {
+      ...req.body,
+    };
+
+    if (sanitizedChildren !== undefined) {
+      updatePayload.children = sanitizedChildren;
+    }
+
     const booking = await Booking.findOneAndUpdate(
-      { 
+      {
         _id: req.params.id,
         $or: [
           { clientId: req.user.id },
           { caregiverId: req.user.id }
         ]
       },
-      req.body,
+      updatePayload,
       { new: true, runValidators: true }
     );
-    
+
     if (!booking) {
       return res.status(404).json({
         success: false,
         error: 'Booking not found or not authorized'
       });
     }
-    
+
+    const updated = booking.toObject();
+    const updatedChildren = sanitizeChildren(updated.children);
+
+    if (updatedChildren !== undefined) {
+      updated.children = updatedChildren;
+    }
+
     res.json({
       success: true,
       data: {
-        booking: booking
+        booking: updated,
       }
     });
   } catch (error) {
