@@ -1,44 +1,61 @@
 // src/utils/imageUtils.js
 import { Image } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import { Config } from '../core/config/environment';
 
-/**
- * Get profile image URL with fallback and validation
- * @param {Object} user - User object containing profile image info
- * @returns {string} Image URL or null if no image available
- */
+const apiBaseUrl = Config.API_BASE_URL || '';
+const uploadBaseUrl = apiBaseUrl.replace(/\/api$/, '') || apiBaseUrl;
+
+const buildUploadUrl = (path) => {
+  if (!path) {
+    return null;
+  }
+
+  if (!uploadBaseUrl) {
+    return null;
+  }
+
+  const normalizedPath = path.startsWith('/uploads/')
+    ? path
+    : path.startsWith('/')
+      ? `/uploads${path}`
+      : path.startsWith('uploads/')
+        ? `/${path}`
+        : `/uploads/${path}`;
+
+  return `${uploadBaseUrl}${normalizedPath}`;
+};
+
 export const getProfileImageUrl = (user) => {
   try {
-    let imageUrl = null;
-
-    // If user has a profile image URL
-    if (user?.profileImage) {
-      imageUrl = user.profileImage;
-    }
-    // If user has an avatar URL
-    else if (user?.avatar) {
-      imageUrl = user.avatar;
-    }
-    // If user has a photoURL (Firebase auth)
-    else if (user?.photoURL) {
-      imageUrl = user.photoURL;
+    if (!user) {
+      return null;
     }
 
-    // Validate the image URL
-    if (imageUrl) {
-      // Check if it's a valid URL format
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:')) {
-        return imageUrl;
-      }
-      // If it's a relative path, construct the full URL
-      else if (imageUrl.startsWith('/') || imageUrl.includes('profile_')) {
-        // Don't return relative paths that might not exist
-        console.warn(`Skipping potentially invalid image path: ${imageUrl}`);
-        return null;
-      }
+    const { profileImage, avatar, photoURL, photoUrl } = user;
+    let imageUrl = profileImage || avatar || photoURL || photoUrl || null;
+
+    if (!imageUrl) {
+      return null;
     }
 
-    // Return null if no valid image is available
+    if (typeof imageUrl !== 'string') {
+      console.warn('Invalid image URL provided:', imageUrl);
+      return null;
+    }
+
+    const trimmedUrl = imageUrl.trim();
+
+    if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://') || trimmedUrl.startsWith('data:')) {
+      return trimmedUrl;
+    }
+
+    const resolvedUrl = buildUploadUrl(trimmedUrl);
+    if (resolvedUrl) {
+      return resolvedUrl;
+    }
+
+    console.warn(`Unable to resolve image path: ${trimmedUrl}`);
     return null;
   } catch (error) {
     console.error('Error getting profile image URL:', error);

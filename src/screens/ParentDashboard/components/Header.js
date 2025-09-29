@@ -8,13 +8,15 @@ import { usePrivacy } from '../../../components/features/privacy/PrivacyManager'
 import PrivacyNotificationModal from '../../../components/features/privacy/PrivacyNotificationModal';
 import { SettingsModal } from '../../../components/ui/modals/SettingsModal';
 import { RequestInfoModal } from '../../../components/ui/modals/RequestInfoModal';
+import { useNotifications } from '../../../contexts/NotificationContext';
 
 // NotificationContext removed - using local state
 import { getCurrentSocketURL } from '../../../config/api';
 
 const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfileEdit, profileName, profileImage, profileContact, profileLocation, setActiveTab }) => {
   // Use real privacy system
-  const { pendingRequests, notifications } = usePrivacy();
+  const { pendingRequests } = usePrivacy();
+  const { unreadCount } = useNotifications();
 
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -22,7 +24,6 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
   const [showRequestModal, setShowRequestModal] = useState(false);
   
   // Calculate real notification counts
-  const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
   const pendingRequestsCount = pendingRequests?.length || 0;
   
   // Handle image URI construction
@@ -116,12 +117,12 @@ const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfile
               onPress={() => setShowNotifications(true)}
             >
               <Ionicons name="shield-outline" size={22} color="#db2777" />
-              {(unreadNotifications > 0 || pendingRequestsCount > 0) && (
+              {(unreadCount > 0 || pendingRequestsCount > 0) && (
                 <View style={headerStyles.notificationBadge}>
                   <Text style={headerStyles.notificationBadgeText}>
-                    {unreadNotifications + pendingRequestsCount > 99 ? 
+                    {unreadCount + pendingRequestsCount > 99 ? 
                       '99+' : 
-                      unreadNotifications + pendingRequestsCount
+                      unreadCount + pendingRequestsCount
                     }
                   </Text>
                 </View>

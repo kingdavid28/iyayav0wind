@@ -8,7 +8,7 @@ import Toast from "../components/ui/feedback/Toast"
 import { bookingsAPI, applicationsAPI, caregiversAPI, authAPI } from "../services/index"
 import { getCurrentSocketURL } from '../config/api'
 import { useAuth } from "../contexts/AuthContext"
-
+import { useMessaging } from '../contexts/MessagingContext';
 import { usePrivacy } from '../components/features/privacy/PrivacyManager';
 import { SettingsModal } from "../components/ui/modals/SettingsModal"
 import { RequestInfoModal } from "../components/ui/modals/RequestInfoModal"
@@ -35,7 +35,6 @@ import { styles } from './styles/CaregiverDashboard.styles';
 import { useCaregiverDashboard } from '../hooks/useCaregiverDashboard';
 import CaregiverProfileSection from './CaregiverDashboard/components/CaregiverProfileSection';
 import { PrivacyNotificationModal } from '../components/ui/modals/PrivacyNotificationModal';
-import firebaseMessagingService from '../services/firebaseMessagingService';
 import MessageItemLocal from '../components/messaging/MessageItemLocal';
 import ReviewItemLocal from '../components/messaging/ReviewItemLocal';
 
@@ -340,41 +339,56 @@ function CaregiverDashboard({ onLogout, route }) {
   // Fetch conversations using unified Firebase service
   useEffect(() => {
     if (!user?.id) return;
+  
+    subscribeToConversations(user.id, 'caregiver');
+    return () => subscribeToConversations(null);
+  }, [user?.id, subscribeToConversations]);
 
-    const unsubscribe = firebaseMessagingService.getConversations(user.id, (conversations) => {
-      console.log('📨 Caregiver received conversations:', conversations.length);
-      setParents(conversations.map(conv => ({
+
+  useEffect(() => {
+    if (!conversations?.length) {
+      setParents([]);
+      return;
+    }
+  
+    setParents(
+      conversations.map((conv) => ({
         id: conv.parentId || conv.id,
         name: conv.parentName || conv.caregiverName || 'Parent',
-        profileImage: conv.parentAvatar || conv.caregiverAvatar || null
-      })));
-    }, 'caregiver');
-
-    return () => unsubscribe();
-  }, [user?.id]);
-
+        profileImage: conv.parentAvatar || conv.caregiverAvatar || null,
+        conversationId: conv.conversationId || conv.id,
+      }))
+    );
+  }, [conversations]);
+ 
+ 
   // Fetch messages for selected parent
   useEffect(() => {
     if (!selectedParent || !user?.id) return;
-
-    // Create consistent conversation ID: always use smaller ID first
+  
     const [id1, id2] = [user.id, selectedParent.id].sort();
     const conversationId = `${id1}_${id2}`;
+  
+    setActiveConversationId(conversationId);
+    subscribeToMessages(conversationId, user.id, selectedParent.id);
+    markMessagesAsRead(user.id, selectedParent.id, conversationId).catch(console.error);
+  
+    return () => {
+      setActiveConversationId(null);
+      subscribeToMessages(null);
+    };
+  }, [selectedParent, user?.id, subscribeToMessages, setActiveConversationId, markMessagesAsRead]);
 
-    console.log('📨 Fetching messages for conversation:', {
-      caregiverId: selectedParent.id,
-      userId: user.id,
-      conversationId
-    });
+  useEffect(() => {
+    if (!contextMessages?.length) {
+      setMessages([]);
+      return;
+    }
+  
+    setMessages([...contextMessages].reverse());
+  }, [contextMessages]);
 
-    const unsubscribe = firebaseMessagingService.getMessages(user.id, selectedParent.id, (messagesData) => {
-      console.log('📨 Received messages:', messagesData.length);
-      setMessages(messagesData.reverse()); // Reverse to show latest at bottom
-    }, conversationId);
-
-    return () => unsubscribe();
-  }, [selectedParent, user?.id]);
-
+  
   // Fetch reviews with runtime Firebase check
   useEffect(() => {
     if (!user?.id) return;
@@ -561,6 +575,14 @@ function CaregiverDashboard({ onLogout, route }) {
       showToast('Failed to send message: ' + error.message, 'error');
     }
   };
+  const {
+    conversations,
+    messages: contextMessages,
+    subscribeToConversations,
+    subscribeToMessages,
+    setActiveConversationId,
+    markMessagesAsRead,
+  } = useMessaging();
 
   const handleApplicationSubmit = async ({ jobId, jobTitle, family, coverLetter, proposedRate }) => {
     // Fix: Add missing apiService import or use applicationsAPI directly

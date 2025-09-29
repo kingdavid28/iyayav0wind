@@ -14,9 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from 'react-native-paper';
-import firebaseMessagingService from '../services/firebaseMessagingService';
-import { getFirebaseDatabase } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useMessaging } from '../contexts/MessagingContext';
 
 // MessageItem component with simplified features
 const MessageItem = ({ message, isCurrentUser, onEdit, onDelete, onLongPress }) => {
@@ -112,11 +111,18 @@ const MessageItem = ({ message, isCurrentUser, onEdit, onDelete, onLongPress }) 
 const ChatScreen = ({ route }) => {
   const { userId: routeUserId, userType, targetUserId, targetUserName, targetUserType } = route.params;
   const { user } = useAuth();
+  const {
+    subscribeToMessages,
+    markMessagesAsRead,
+    sendMessage: sendMessageFromContext,
+    setActiveConversationId,
+    messages: contextMessages,
+    messagesLoading
+  } = useMessaging();
 
   // Use route parameter first, then fallback to auth user ID
   const currentUserId = routeUserId || user?.id || user?.uid;
 
-  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [conversationId, setConversationId] = useState(null);
@@ -134,19 +140,17 @@ const ChatScreen = ({ route }) => {
   useEffect(() => {
     if (!currentUserId || !targetUserId || !conversationId) return;
 
-    // Create connection if it doesn't exist
-    firebaseMessagingService.createConnection(currentUserId, targetUserId).catch(console.error);
+    setActiveConversationId(conversationId);
 
-    // Listen to messages using consistent conversation ID
-    const unsubscribe = firebaseMessagingService.getMessages(currentUserId, targetUserId, (messagesData) => {
-      setMessages(messagesData);
-    }, conversationId);
+    subscribeToMessages(conversationId, currentUserId, targetUserId);
 
-    // Mark messages as read when screen is active
-    firebaseMessagingService.markMessagesAsRead(currentUserId, targetUserId, conversationId).catch(console.error);
+    markMessagesAsRead(currentUserId, targetUserId, conversationId).catch(console.error);
 
-    return () => unsubscribe();
-  }, [currentUserId, targetUserId, conversationId]);
+    return () => {
+      setActiveConversationId(null);
+      subscribeToMessages(null);
+    };
+  }, [currentUserId, targetUserId, conversationId, subscribeToMessages, markMessagesAsRead, setActiveConversationId]);
 
   // Send message
   const sendMessage = async () => {
@@ -158,7 +162,7 @@ const ChatScreen = ({ route }) => {
     setIsSending(true);
 
     try {
-      await firebaseMessagingService.sendMessage(currentUserId, targetUserId, messageText, 'text', null, conversationId);
+      await sendMessageFromContext(currentUserId, targetUserId, messageText, 'text', null, conversationId);
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -202,7 +206,7 @@ const ChatScreen = ({ route }) => {
         </View>
 
         <FlatList
-          data={messages}
+          data={contextMessages}
           renderItem={({ item }) => (
             <MessageItem
               message={item}

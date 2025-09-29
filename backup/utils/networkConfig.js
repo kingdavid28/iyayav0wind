@@ -4,16 +4,16 @@ import { Platform } from 'react-native';
  * Helps detect and configure the correct IP address for different network setups
  */
 
-const getCurrentAPIURL = () => 'http://192.168.1.26:3000/api';
+const getCurrentAPIURL = () => 'http://192.168.1.9:5000/api';
 
 export const NetworkConfig = {
   // Common network IP ranges
-  COMMON_IPS: [
-    '192.168.1.26',   // Current working IP
+  COMMON_IPS: [ 
+    '192.168.1.9',   // Current working IP
     '192.168.1.10',   // Alternative
     '192.168.0.10',   // Common home router
     '10.0.0.10',      // Apple/corporate networks
-    '172.16.0.10',    // Corporate VPN
+    '172.16.0.10',    // Corporate VPN    
   ],
 
   // Test if an IP is reachable

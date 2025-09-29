@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
                 }
               });
 
-              let profile = { role: 'parent' };
+              let profile = {};
               if (response.ok) {
                 profile = await response.json();
                 console.log('🔍 Profile data received in auth listener:', profile);
@@ -82,35 +82,33 @@ export const AuthProvider = ({ children }) => {
                 email: user.email,
                 name: user.displayName || profile.name,
                 emailVerified: user.emailVerified,
-                role: profile.role || 'parent',
+                role: profile.role,
                 firstName: profile.firstName,
                 lastName: profile.lastName,
                 middleInitial: profile.middleInitial,
                 birthDate: profile.birthDate,
                 phone: profile.phone,
-                profileImage: profile.profileImage,
-                address: profile.address,
-                children: profile.children,
-                caregiverProfile: profile.caregiverProfile,
-                // Include MongoDB _id if available
-                _id: profile._id
+                ...profile
               });
-
+              
               setUser(normalizedUser);
             } catch (profileError) {
-              console.warn('Failed to get profile:', profileError.message);
+              console.error('❌ Error fetching user profile:', profileError);
+              // Fallback to basic user data if profile fetch fails
               setUser(normalizeUser({
                 id: user.uid,
                 email: user.email,
                 name: user.displayName,
                 emailVerified: user.emailVerified,
-                role: 'parent'
+                role: null
               }));
             }
           } else {
             setUser(null);
             await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+            console.log('🚪 User logged out or email not verified');
           }
+          
           setIsLoading(false);
         });
 

@@ -10,7 +10,7 @@ import { firebaseAuthService } from './firebaseAuthService';
 // Dynamic API URL from environment
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
   ? `${process.env.EXPO_PUBLIC_API_URL}/api`
-  : 'http://192.168.1.10:5000/api';
+  : 'http://192.168.1.9:5000/api';
 
 console.log('🔗 API URL:', API_BASE_URL);
 

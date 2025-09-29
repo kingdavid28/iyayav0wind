@@ -12,7 +12,14 @@ import {
   ensureFirebaseInitialized,
   getDatabaseSafely,
   withFirebaseCheck,
-  safeDatabaseOperation
+  safeDatabaseOperation,
+  // Import the shared helpers
+  createRef,
+  createQuery,
+  safePush,
+  safeSet,
+  safeGet,
+  safeUpdate
 } from '../config/firebase';
 import { getFirebaseDatabase } from '../config/firebase';
 import { Platform } from 'react-native';
@@ -30,49 +37,14 @@ import {
   getMessageLazyLoadingSystem
 } from '../components/messaging/MessagePerformanceSystem';
 
-// Mobile-specific: Create database reference using imported functions
-const createRef = (path) => {
-  // Ensure Firebase is initialized before database operations
-  if (!ensureFirebaseInitialized()) {
-    console.error('❌ Firebase not initialized, cannot create reference');
-    return null;
-  }
+// Remove the local createRef implementation and use the imported one directly
 
-  try {
-    const db = getFirebaseDatabase();
-    return ref(db, path);
-  } catch (error) {
-    console.error('❌ Error creating Firebase reference:', error);
-    return null;
-  }
-};
-
-// Mobile-specific: Create query using imported functions
-const createQuery = (ref, ...queryConstraints) => {
-  // Ensure Firebase is initialized before database operations
-  if (!ensureFirebaseInitialized()) {
-    console.error('❌ Firebase not initialized, cannot create query');
-    return null;
-  }
-
-  if (!ref) {
-    console.error('❌ Cannot create query - reference is null');
-    return null;
-  }
-
-  try {
-    return query(ref, ...queryConstraints);
-  } catch (error) {
-    console.error('❌ Failed to create query:', error);
-    return null;
-  }
-};
+// Remove the local createQuery implementation and use the imported one directly
 
 // Mobile-specific Firebase connection check
 const checkFirebaseConnection = () => {
   console.log('🔍 Checking Firebase connection...');
   console.log('📱 Platform:', Platform.OS);
-  console.log('🔥 Database object:', firebaseDatabase ? 'Available' : 'Not available');
 
   // Ensure Firebase is initialized before connection check
   if (!ensureFirebaseInitialized()) {
@@ -101,32 +73,25 @@ const checkFirebaseConnection = () => {
         return () => {};
       }
 
-      // For mobile platforms, use the imported ref function directly
-      if (ref) {
-        // Try to create a simple test reference instead of .info/connected
-        // .info/connected requires a working Firebase Realtime Database connection
-        const testRef = ref(db, 'test');
+      // Use the imported createRef helper
+      const testRef = createRef('test');
 
-        if (onValue) {
-          const unsubscribe = onValue(testRef, (snapshot) => {
-            console.log('🔥 Firebase basic connection test: SUCCESS');
-            console.log('📊 Test data received:', snapshot.val());
-          }, (error) => {
-            console.error('❌ Firebase connection test failed:', error);
-            console.log('🔍 This might indicate:');
-            console.log('   - Firebase Realtime Database not enabled');
-            console.log('   - Network connectivity issues');
-            console.log('   - Firebase security rules blocking access');
-            console.log('   - Invalid Firebase project configuration');
-          });
+      if (testRef && onValue) {
+        const unsubscribe = onValue(testRef, (snapshot) => {
+          console.log('🔥 Firebase basic connection test: SUCCESS');
+          console.log('📊 Test data received:', snapshot.val());
+        }, (error) => {
+          console.error('❌ Firebase connection test failed:', error);
+          console.log('🔍 This might indicate:');
+          console.log('   - Firebase Realtime Database not enabled');
+          console.log('   - Network connectivity issues');
+          console.log('   - Firebase security rules blocking access');
+          console.log('   - Invalid Firebase project configuration');
+        });
 
-          return unsubscribe;
-        } else {
-          console.warn('⚠️ Firebase onValue method not available for connection check, but main functions are available');
-          return () => {};
-        }
+        return unsubscribe;
       } else {
-        console.error('❌ Firebase ref function not available for connection check');
+        console.warn('⚠️ Firebase onValue method not available for connection check, but main functions are available');
         return () => {};
       }
     } catch (error) {
@@ -146,9 +111,8 @@ const checkFirebaseConnection = () => {
 
 // Example of using the safe database operation wrapper
 const safeCreateConnection = safeDatabaseOperation('Create Connection', async (userId, caregiverId) => {
-  const db = getFirebaseDatabase();
-  const connectionRef = ref(db, `connections/${userId}/${caregiverId}`);
-  await set(connectionRef, {
+  const connectionRef = createRef(`connections/${userId}/${caregiverId}`);
+  await safeSet(connectionRef, {
     createdAt: Date.now(),
     lastActivity: Date.now()
   });
@@ -167,30 +131,10 @@ class FirebaseMessagingService {
         return false;
       }
 
-      // Check if database is available
-      const db = getFirebaseDatabase();
-      if (!db) {
-        console.error('❌ Database is not available for createConnection');
-        return false;
-      }
-
-      // Check if set function is available
-      if (!set) {
-        console.error('❌ Firebase set function is not available');
-        return false;
-      }
-
-      // Check if ref function is available
-      if (!ref) {
-        console.error('❌ Firebase ref function is not available');
-        return false;
-      }
-
-      // Create connection reference with error handling
+      // Use the imported createRef helper
       let connectionRef;
       try {
-        // Use the imported ref function instead of database.ref
-        connectionRef = ref(db, `connections/${userId}/${caregiverId}`);
+        connectionRef = createRef(`connections/${userId}/${caregiverId}`);
 
         if (!connectionRef) {
           console.error('❌ Failed to create connection reference');
@@ -203,9 +147,9 @@ class FirebaseMessagingService {
         return false;
       }
 
-      // Set connection data with error handling
+      // Set connection data with error handling using safeSet
       try {
-        await set(connectionRef, {
+        await safeSet(connectionRef, {
           createdAt: Date.now(),
           lastActivity: Date.now()
         });
@@ -222,9 +166,9 @@ class FirebaseMessagingService {
 
       // Create reverse connection
       try {
-        const reverseConnectionRef = ref(db, `connections/${caregiverId}/${userId}`);
+        const reverseConnectionRef = createRef(`connections/${caregiverId}/${userId}`);
         if (reverseConnectionRef) {
-          await set(reverseConnectionRef, {
+          await safeSet(reverseConnectionRef, {
             createdAt: Date.now(),
             lastActivity: Date.now()
           });
@@ -249,231 +193,219 @@ class FirebaseMessagingService {
   }
 
   // Send message with enhanced status tracking
-  async sendMessage(userId, caregiverId, messageText, messageType = 'text', fileData = null, conversationId = null) {
-    if ((!messageText?.trim() && !fileData) || !userId || !caregiverId) {
-      throw new Error('Invalid message data');
-    }
-
-    try {
-      const messageQueue = getMessageQueue();
-      const finalConversationId = conversationId || (() => {
-        const [id1, id2] = [userId, caregiverId].sort();
-        return `${id1}_${id2}`;
-      })();
-
-      console.log('📨 Enhanced sendMessage with status tracking:', {
-        userId,
-        caregiverId,
-        messageText,
-        conversationId: finalConversationId
-      });
-
-      // Initialize tracking systems
-      const statusManager = getMessageStatusManager();
-      const deliverySystem = getDeliveryConfirmationSystem();
-      const trackingSystem = getMessageTrackingSystem();
-
-      // Ensure connection exists before sending message
-      try {
-        console.log('🔗 Ensuring Firebase connection exists for messaging:', { userId, caregiverId });
-        await this.createConnection(userId, caregiverId);
-        console.log('✅ Firebase connection ensured for messaging');
-      } catch (connectionError) {
-        console.warn('⚠️ Failed to ensure Firebase connection for messaging:', connectionError.message);
-        // Continue with sending message even if connection creation fails
-      }
-
-      // Create message data for both online and offline scenarios
-      const messageData = {
-        conversationId: finalConversationId,
-        userId,
-        caregiverId,
-        messageText: messageText?.trim() || '',
-        messageType,
-        fileData,
-        timestamp: Date.now(),
-      };
-
-      // If offline, queue the message
-      if (!messageQueue.isOnline) {
-        console.log('📱 Device is offline - queuing message');
-        const queuedMessageId = await messageQueue.addMessage(messageData);
-
-        // Track the queued message
-        trackingSystem.trackMessage(finalConversationId, queuedMessageId, MESSAGE_STATUS.QUEUED);
-
-        // Return a mock message ID for UI consistency
-        return {
-          id: queuedMessageId,
-          status: MESSAGE_STATUS.QUEUED,
-          timestamp: Date.now()
-        };
-      }
-
-      // If online, try to send immediately
-      const messageRef = createRef(`messages/${finalConversationId}`);
-      if (!messageRef) {
-        throw new Error('Cannot create message reference');
-      }
-
-      if (!push) {
-        throw new Error('Push function not available');
-      }
-
-      const newMessageRef = push(messageRef);
-
-      const firebaseMessageData = {
-        text: messageData.messageText,
-        senderId: userId,
-        timestamp: messageData.timestamp,
-        status: MESSAGE_STATUS.SENDING,
-        type: messageType,
-        edited: false,
-        editedAt: null,
-        sendingAt: Date.now(),
-        sendingBy: userId
-      };
-
-      if (fileData) {
-        firebaseMessageData.file = {
-          name: fileData.name,
-          size: fileData.size,
-          type: fileData.type,
-          base64: fileData.base64
-        };
-      }
-
-      // Set initial message data
-      await set(newMessageRef, firebaseMessageData);
-
-      // Track the message
-      trackingSystem.trackMessage(finalConversationId, newMessageRef.key, MESSAGE_STATUS.SENDING);
-
-      // Update status to sent
-      await statusManager.updateMessageStatus(
-        finalConversationId,
-        newMessageRef.key,
-        MESSAGE_STATUS.SENT,
-        userId,
-        { timestamp: Date.now() }
-      );
-
-      // Sync status across devices
-      await deliverySystem.syncMessageStatus(finalConversationId, newMessageRef.key, userId, MESSAGE_STATUS.SENT);
-
-      // Start delivery confirmation tracking
-      deliverySystem.startDeliveryTracking(finalConversationId, newMessageRef.key, userId, caregiverId);
-
-      // Update message status to delivered after a delay
-      setTimeout(async () => {
-        try {
-          await statusManager.updateMessageStatus(
-            finalConversationId,
-            newMessageRef.key,
-            MESSAGE_STATUS.DELIVERED,
-            userId,
-            { timestamp: Date.now() }
-          );
-
-          // Sync delivery status
-          await deliverySystem.syncMessageStatus(finalConversationId, newMessageRef.key, userId, MESSAGE_STATUS.DELIVERED);
-        } catch (error) {
-          console.error('❌ Error updating delivery status:', error);
-        }
-      }, 1000);
-
-      // Update connection activity
-      // TODO: Implement updateConnectionActivity method if needed
-      // await this.updateConnectionActivity(userId, caregiverId);
-    } catch (error) {
-      console.error('❌ Enhanced sendMessage error:', error);
-
-      // Use error handler to provide user-friendly error
-      const errorConfig = MessagingErrorHandler.getUserFriendlyError(error);
-      MessagingErrorHandler.logError(error, 'sendMessage');
-
-      throw new Error(errorConfig.message);
-    }
+  // Send message with enhanced status tracking
+async sendMessage(userId, caregiverId, messageText, messageType = 'text', fileData = null, conversationId = null) {
+  if ((!messageText?.trim() && !fileData) || !userId || !caregiverId) {
+    throw new Error('Invalid message data');
   }
 
-  // Get conversations for user with mobile-specific handling
+  try {
+    const messageQueue = getMessageQueue();
+    const finalConversationId = conversationId || (() => {
+      const [id1, id2] = [userId, caregiverId].sort();
+      return `${id1}_${id2}`;
+    })();
+
+    console.log('📨 Enhanced sendMessage with status tracking:', {
+      userId,
+      caregiverId,
+      messageText,
+      conversationId: finalConversationId
+    });
+
+    // Initialize tracking systems
+    const statusManager = getMessageStatusManager();
+    const deliverySystem = getDeliveryConfirmationSystem();
+    const trackingSystem = getMessageTrackingSystem();
+
+    // Ensure connection exists before sending message
+    try {
+      console.log('🔗 Ensuring Firebase connection exists for messaging:', { userId, caregiverId });
+      await this.createConnection(userId, caregiverId);
+      console.log('✅ Firebase connection ensured for messaging');
+    } catch (connectionError) {
+      console.warn('⚠️ Failed to ensure Firebase connection for messaging:', connectionError.message);
+      // Continue with sending message even if connection creation fails
+    }
+
+    // Create message data for both online and offline scenarios
+    const messageData = {
+      conversationId: finalConversationId,
+      userId,
+      caregiverId,
+      messageText: messageText?.trim() || '',
+      messageType,
+      fileData,
+      timestamp: Date.now(),
+    };
+
+    // If offline, queue the message
+    if (!messageQueue.isOnline) {
+      console.log('📱 Device is offline - queuing message');
+      const queuedMessageId = await messageQueue.addMessage(messageData);
+
+      // Track the queued message
+      trackingSystem.trackMessage(finalConversationId, queuedMessageId, MESSAGE_STATUS.QUEUED);
+
+      // Return a mock message ID for UI consistency
+      return {
+        id: queuedMessageId,
+        status: MESSAGE_STATUS.QUEUED,
+        timestamp: Date.now()
+      };
+    }
+
+    // If online, try to send immediately using imported createRef
+    const messagesPath = `messages/${finalConversationId}`;
+    
+    // Define firebaseMessageData before using it
+    const firebaseMessageData = {
+      conversationId: finalConversationId,
+      userId,
+      caregiverId,
+      messageText: messageText?.trim() || '',
+      messageType,
+      timestamp: Date.now(),
+      status: MESSAGE_STATUS.SENDING,
+      type: messageType,
+      edited: false,
+      editedAt: null,
+      sendingAt: Date.now(),
+      sendingBy: userId
+    };
+
+    if (fileData) {
+      firebaseMessageData.file = {
+        name: fileData.name,
+        size: fileData.size,
+        type: fileData.type,
+        base64: fileData.base64
+      };
+    }
+
+    // Use safePush to create the message and get the reference
+    const newMessageRef = await safePush(messagesPath, firebaseMessageData);
+    if (!newMessageRef) {
+      throw new Error('Cannot create message reference');
+    }
+
+    // Track the message
+    trackingSystem.trackMessage(finalConversationId, newMessageRef.key, MESSAGE_STATUS.SENDING);
+
+    // Update status to sent
+    await statusManager.updateMessageStatus(
+      finalConversationId,
+      newMessageRef.key,
+      MESSAGE_STATUS.SENT,
+      userId,
+      { timestamp: Date.now() }
+    );
+
+    // Sync status across devices
+    await deliverySystem.syncMessageStatus(finalConversationId, newMessageRef.key, userId, MESSAGE_STATUS.SENT);
+
+    // Start delivery confirmation tracking
+    deliverySystem.startDeliveryTracking(finalConversationId, newMessageRef.key, userId, caregiverId);
+
+    // Update message status to delivered after a delay
+    setTimeout(async () => {
+      try {
+        await statusManager.updateMessageStatus(
+          finalConversationId,
+          newMessageRef.key,
+          MESSAGE_STATUS.DELIVERED,
+          userId,
+          { timestamp: Date.now() }
+        );
+
+        // Sync delivery status
+        await deliverySystem.syncMessageStatus(finalConversationId, newMessageRef.key, userId, MESSAGE_STATUS.DELIVERED);
+      } catch (error) {
+        console.error('❌ Error updating delivery status:', error);
+      }
+    }, 1000);
+
+    return {
+      id: newMessageRef.key,
+      status: MESSAGE_STATUS.SENT,
+      timestamp: Date.now()
+    };
+  } catch (error) {
+    console.error('❌ Enhanced sendMessage error:', error);
+
+    // Use error handler to provide user-friendly error
+    const errorConfig = MessagingErrorHandler.getUserFriendlyError(error);
+    MessagingErrorHandler.logError(error, 'sendMessage');
+
+    throw new Error(errorConfig.message);
+  }
+}
+
   getConversations(userId, callback, userType = 'parent') {
-    if (!userId) return () => {};
+    if (!userId || typeof callback !== 'function') {
+      console.warn('getConversations called without valid userId or callback');
+      return () => {};
+    }
 
-    const connectionsRef = createRef(`connections/${userId}`);
-
-    if (!connectionsRef) {
-      console.error('❌ Cannot create connections reference');
+    if (!ensureFirebaseInitialized()) {
+      console.warn('Firebase not initialized. Cannot subscribe to conversations.');
       callback([]);
       return () => {};
     }
 
-    console.log('📨 Setting up conversations listener for user:', userId, 'userType:', userType);
+    const connectionsRef = createRef(`connections/${userId}`);
 
-    const handleConnections = async (snapshot) => {
+    if (!connectionsRef || !onValue) {
+      console.warn('Unable to create connections reference for conversations');
+      callback([]);
+      return () => {};
+    }
+
+    const processSnapshot = async (snapshot) => {
       try {
-        const connectionsData = snapshot.val() || {};
+        const connectionsData = snapshot?.val() || {};
         const connectionIds = Object.keys(connectionsData);
 
-        console.log('📨 Found connections:', connectionIds.length);
-
         if (connectionIds.length === 0) {
-          console.log('📨 No connections found');
           callback([]);
           return;
         }
 
-        const conversations = [];
+        const conversationPromises = connectionIds.map((connectionId) =>
+          this.getConversationData(userId, connectionId, userType)
+        );
 
-        for (const connectionId of connectionIds) {
-          try {
-            const conversation = await this.getConversationData(userId, connectionId, userType);
-            if (conversation) {
-              conversations.push(conversation);
-            }
-          } catch (error) {
-            console.error('❌ Error getting conversation for', connectionId, error);
-          }
-        }
-
-        const sortedConversations = conversations.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
-        console.log('📨 Returning conversations:', sortedConversations.length);
-        callback(sortedConversations);
+        const conversationResults = await Promise.all(conversationPromises);
+        callback(conversationResults.filter(Boolean));
       } catch (error) {
-        console.error('❌ Error processing connections:', error);
+        console.error('Error processing conversations snapshot:', error);
         callback([]);
       }
     };
 
-    // Enhanced error handling for mobile
-    try {
-      const unsubscribe = onValue(connectionsRef, handleConnections, (error) => {
-        console.error('❌ Firebase connections listener error:', error);
-        // Retry with delay for mobile stability
-        setTimeout(() => {
-          try {
-            console.log('🔄 Retrying conversations listener');
-            onValue(connectionsRef, handleConnections, (retryError) => {
-              console.error('❌ Retry failed for conversations:', retryError);
-            });
-          } catch (retryError) {
-            console.error('❌ Retry setup failed for conversations:', retryError);
-          }
-        }, 2000);
-      });
+    const unsubscribe = onValue(
+      connectionsRef,
+      (snapshot) => {
+        processSnapshot(snapshot).catch((error) => {
+          console.error('Error handling conversations update:', error);
+          callback([]);
+        });
+      },
+      (error) => {
+        console.error('Firebase conversations listener error:', error);
+        callback([]);
+      }
+    );
 
-      return () => {
-        console.log('📨 Cleaning up conversations listener');
-        try {
+    return () => {
+      try {
+        if (typeof unsubscribe === 'function') {
           unsubscribe();
-        } catch (error) {
-          console.error('❌ Error cleaning up conversations listener:', error);
         }
-      };
-    } catch (error) {
-      console.error('❌ Failed to set up conversations listener:', error);
-      return () => {};
-    }
+      } catch (error) {
+        console.error('Error unsubscribing from conversations:', error);
+      }
+    };
   }
 
   // Get conversation data
@@ -485,7 +417,7 @@ class FirebaseMessagingService {
 
       console.log('📨 Getting conversation data for:', { userId, connectionId, conversationId, userType });
 
-      // Get latest message - try both old and new conversation ID formats
+      // Get latest message - try both old and new conversation ID formats using imported createRef
       const messagesRef = createRef(`messages/${conversationId}`);
       const oldMessagesRef = createRef(`messages/${userId}_${connectionId}`);
 
@@ -496,10 +428,11 @@ class FirebaseMessagingService {
 
       let messageSnapshot = null;
 
-      if (messagesRef && get && orderByChild && limitToLast) {
+      // Use imported createQuery helper
+      if (messagesRef) {
         const messagesQuery = createQuery(messagesRef, orderByChild('timestamp'), limitToLast(1));
         if (messagesQuery) {
-          messageSnapshot = await get(messagesQuery);
+          messageSnapshot = await safeGet(messagesQuery);
         }
       }
 
@@ -507,10 +440,10 @@ class FirebaseMessagingService {
       if (!messageSnapshot || !messageSnapshot.exists()) {
         console.log('📨 No messages found with new format, trying old format');
 
-        if (oldMessagesRef && get && orderByChild && limitToLast) {
+        if (oldMessagesRef) {
           const oldMessagesQuery = createQuery(oldMessagesRef, orderByChild('timestamp'), limitToLast(1));
           if (oldMessagesQuery) {
-            messageSnapshot = await get(oldMessagesQuery);
+            messageSnapshot = await safeGet(oldMessagesQuery);
           }
         }
       }
@@ -522,18 +455,14 @@ class FirebaseMessagingService {
         lastMessage = messageData[messageKey];
       }
 
-      // Get user info for the other party in the conversation
+      // Get user info for the other party in the conversation using imported createRef
       const userRef = createRef(`users/${connectionId}`);
       if (!userRef) {
         console.error('❌ Cannot create user reference');
         return null;
       }
 
-      let userSnapshot = null;
-      if (get) {
-        userSnapshot = await get(userRef);
-      }
-
+      let userSnapshot = await safeGet(userRef);
       const userData = userSnapshot ? (userSnapshot.val() || {}) : {};
 
       // Return conversation data based on user type
@@ -580,6 +509,7 @@ class FirebaseMessagingService {
 
     console.log('📨 Enhanced getMessages with performance optimizations for:', finalConversationId);
 
+    // Use imported createRef helpers
     const messagesRef = createRef(`messages/${finalConversationId}`);
     const oldMessagesRef = createRef(`messages/${userId}_${caregiverId}`);
 
@@ -689,9 +619,9 @@ class FirebaseMessagingService {
     let unsubscribeOld = () => {};
 
     try {
-      // Use connection pooling for better performance
-      const newMessagesQuery = query(messagesRef, orderByChild('timestamp'));
-      const oldMessagesQuery = query(oldMessagesRef, orderByChild('timestamp'));
+      // Use imported createQuery helper with connection pooling for better performance
+      const newMessagesQuery = createQuery(messagesRef, orderByChild('timestamp'));
+      const oldMessagesQuery = createQuery(oldMessagesRef, orderByChild('timestamp'));
 
       if (newMessagesQuery && onValue) {
         unsubscribeNew = onValue(newMessagesQuery, handleNewFormat, (error) => {
@@ -723,6 +653,7 @@ class FirebaseMessagingService {
     };
   }
 
+  // The rest of the methods remain the same as they use the integrated systems
   // Get paginated messages (directly integrated)
   async getPaginatedMessages(conversationId, page = 0, limit = 50) {
     const paginationSystem = getMessagePaginationSystem();
@@ -768,22 +699,16 @@ class FirebaseMessagingService {
       const statusManager = getMessageStatusManager();
       const deliverySystem = getDeliveryConfirmationSystem();
 
-      // Get all unread messages in the conversation
+      // Use imported createRef helper
       const messagesRef = createRef(`messages/${finalConversationId}`);
       if (!messagesRef) {
         console.error('❌ Cannot create messages reference for mark as read');
         return;
       }
 
-      let messagesQuery = null;
-      if (messagesRef && orderByChild && query) {
-        messagesQuery = createQuery(messagesRef, orderByChild('timestamp'));
-      }
-
-      let snapshot = null;
-      if (messagesQuery && get) {
-        snapshot = await get(messagesQuery);
-      }
+      // Use imported createQuery helper
+      let messagesQuery = createQuery(messagesRef, orderByChild('timestamp'));
+      let snapshot = await safeGet(messagesQuery);
 
       if (!snapshot || !snapshot.exists()) {
         console.log('👁️ No messages found to mark as read');

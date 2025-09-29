@@ -76,7 +76,7 @@ export const firebaseAuthService = {
     // Get complete user profile from MongoDB
     let profile = { role: 'parent' };
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.10:5000'}/api/auth/firebase-profile`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/firebase-profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -2,7 +2,7 @@ export const sendCustomVerificationEmail = async (user, role) => {
   try {
     // Get Firebase action link
     const actionCodeSettings = {
-      url: `exp://192.168.1.10:8081/--/verify-success?role=${role}`,
+      url: `exp://192.168.1.9:8081/--/verify-success?role=${role}`,
       handleCodeInApp: true
     };
     

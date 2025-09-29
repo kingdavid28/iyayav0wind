@@ -1,43 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert
+  ActivityIndicator,
 } from 'react-native';
-import { Card } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import firebaseMessagingService from '../../../services/firebaseMessagingService';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useMessaging } from '../../../contexts/MessagingContext';
 
 const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const {
+    conversations,
+    conversationsLoading,
+    subscribeToConversations,
+    markMessagesAsRead,
+  } = useMessaging();
 
   useEffect(() => {
-    loadConversations();
-  }, []);
+    const userIdToUse = user?.id || user?.uid;
+    if (!userIdToUse) return;
 
-  const loadConversations = async () => {
-    try {
-      setLoading(true);
-      // This would typically fetch conversations from Firebase or API
-      // For now, we'll show an empty state
-      setConversations([]);
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRefresh = async () => {
-    if (onRefresh) {
-      await onRefresh();
-    }
-    await loadConversations();
-  };
+    subscribeToConversations(userIdToUse, 'parent');
+    return () => subscribeToConversations(null);
+  }, [user?.id, user?.uid, subscribeToConversations]);
 
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -49,33 +38,61 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
     </View>
   );
 
+  const handleConversationPress = async (conversation) => {
+    const userIdToUse = user?.id || user?.uid;
+    if (!userIdToUse || !conversation?.caregiverId) return;
+
+    const [id1, id2] = [userIdToUse, conversation.caregiverId].sort();
+    const conversationId = `${id1}_${id2}`;
+    await markMessagesAsRead(userIdToUse, conversation.caregiverId, conversationId);
+
+    navigation.navigate('Chat', {
+      userId: userIdToUse,
+      userType: 'parent',
+      targetUserId: conversation.caregiverId,
+      targetUserName: conversation.caregiverName,
+      targetUserType: 'caregiver',
+    });
+  };
+
   const ConversationItem = ({ item }) => (
-    <TouchableOpacity style={styles.conversationItem}>
+    <TouchableOpacity style={styles.conversationItem} onPress={() => handleConversationPress(item)}>
       <View style={styles.avatar}>
         <Ionicons name="person-circle" size={40} color="#3B82F6" />
       </View>
       <View style={styles.conversationInfo}>
-        <Text style={styles.conversationName}>{item.name || 'User'}</Text>
+        <Text style={styles.conversationName}>{item.caregiverName || 'Caregiver'}</Text>
         <Text style={styles.lastMessage}>
           {item.lastMessage || 'No messages yet'}
         </Text>
       </View>
       <Text style={styles.timestamp}>
-        {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : ''}
+        {item.lastMessageTime ? new Date(item.lastMessageTime).toLocaleDateString() : ''}
       </Text>
     </TouchableOpacity>
   );
 
+  const conversationData = useMemo(() => conversations || [], [conversations]);
+
+  if (conversationsLoading && conversationData.length === 0) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading conversations...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={conversations}
+        data={conversationData}
         renderItem={({ item }) => <ConversationItem item={item} />}
         keyExtractor={(item, index) => index.toString()}
-        refreshing={refreshing || loading}
-        onRefresh={handleRefresh}
+        refreshing={refreshing || conversationsLoading}
+        onRefresh={onRefresh}
         ListEmptyComponent={EmptyState}
-        contentContainerStyle={conversations.length === 0 ? styles.emptyList : undefined}
+        contentContainerStyle={conversationData.length === 0 ? styles.emptyList : undefined}
       />
     </View>
   );
@@ -142,6 +159,11 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
   },
 });
 

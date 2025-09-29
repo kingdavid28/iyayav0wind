@@ -13,6 +13,8 @@ import { ErrorBoundary, LoadingSpinner } from '../shared/ui';
 
 // Auth Context
 import { AuthProvider } from '../contexts/AuthContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
+import { MessagingProvider } from '../contexts/MessagingContext';
 
 // Firebase - Direct import for initialization
 import { initializeFirebase, getAuthSync } from '../config/firebase';
@@ -129,10 +131,14 @@ export default function App() {
             <PrivacyProvider>
               {/* Wrap with FirebaseAuthProvider to ensure proper initialization order */}
               <FirebaseAuthProvider>
-                <AppIntegration>
-                  <AppNavigator />
-                  <StatusBar style="auto" />
-                </AppIntegration>
+                <MessagingProvider>
+                  <NotificationProvider>
+                    <AppIntegration>
+                      <AppNavigator />
+                      <StatusBar style="auto" />
+                    </AppIntegration>
+                  </NotificationProvider>
+                </MessagingProvider>
               </FirebaseAuthProvider>
             </PrivacyProvider>
           </ProfileDataProvider>

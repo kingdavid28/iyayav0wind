@@ -24,7 +24,7 @@ const getCSRFToken = async () => {
 
 // Auto-detect API URL based on network
 const detectAPIURL = async () => {
-  const commonIPs = ['192.168.1.26', '192.168.1.10', '192.168.0.10', '10.0.0.10', '172.16.0.10'];
+  const commonIPs = ['192.168.1.26', '192.168.1.10', '192.168.1.9', '192.168.0.10', '10.0.0.10', '172.16.0.10'];
 
   for (const ip of commonIPs) {
     try {

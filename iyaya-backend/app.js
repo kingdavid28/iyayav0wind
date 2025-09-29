@@ -38,7 +38,8 @@ const getExpoGoOrigins = () => {
   const commonIPs = [
     'localhost',
     '127.0.0.1',
-    '192.168.1.10',   // Current network
+    '192.168.1.9', 
+    '192.168.1.10',  // Current network
     '192.168.0.10',   // Common home network  
     '10.0.0.10',      // Another common network
     '172.16.0.10',    // Corporate network
@@ -57,6 +58,7 @@ const getExpoGoOrigins = () => {
   
   // Add Expo Go specific patterns
   origins.push(
+    'exp://192.168.1.9:19000',
     'exp://192.168.1.10:19000',
     'exp://192.168.0.10:19000', 
     'exp://10.0.0.10:19000',

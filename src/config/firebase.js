@@ -27,7 +27,6 @@ const validateFirebaseConfig = () => {
   }
 
   console.log('✅ Firebase configuration loaded successfully');
-  return true;
 };
 
 // State management
@@ -36,6 +35,25 @@ let database = null;
 let auth = null;
 let isInitializing = false;
 let initializationPromise = null;
+
+const ensureDatabaseGuard = (dbInstance) => {
+  if (!dbInstance) {
+    throw new Error('Firebase database instance is not available');
+  }
+  return dbInstance;
+};
+
+const getDatabaseInstanceOrThrow = () => {
+  if (!database) {
+    throw new Error('Firebase database not initialized. Call initializeFirebase() first.');
+  }
+
+  if (typeof database._checkNotDeleted === 'function') {
+    database._checkNotDeleted('firebaseDatabaseAccess');
+  }
+
+  return ensureDatabaseGuard(database);
+};
 
 // Core initialization function
 const initializeFirebaseCore = async () => {
@@ -142,10 +160,10 @@ export const ensureFirebaseInitialized = async () => {
 export const getDatabaseSafely = async () => {
   try {
     const isInitialized = await ensureFirebaseInitialized();
-    if (!isInitialized || !database) {
+    if (!isInitialized) {
       throw new Error('Firebase database not initialized');
     }
-    return database;
+    return getDatabaseInstanceOrThrow();
   } catch (error) {
     console.error('❌ Error getting database safely:', error);
     return null;
@@ -205,7 +223,7 @@ export const getFirebaseDatabase = async () => {
   if (!database) {
     await initializeFirebase();
   }
-  return database;
+  return getDatabaseInstanceOrThrow();
 };
 
 export const getFirebaseAuth = async () => {
@@ -217,10 +235,7 @@ export const getFirebaseAuth = async () => {
 
 // Synchronous getters (use with caution)
 export const getDatabaseSync = () => {
-  if (!database) {
-    throw new Error('Database not initialized. Call initializeFirebase() first.');
-  }
-  return database;
+  return getDatabaseInstanceOrThrow();
 };
 
 export const getAuthSync = () => {
@@ -247,15 +262,10 @@ export const withAuth = async (operation) => {
   return operation(authInstance);
 };
 
-// Safe reference creation - FIXED: Simplified without problematic checks
-export const createRef = async (path) => {
+export const createRef = (path) => {
   try {
-    const db = await getFirebaseDatabase();
-    if (!db) {
-      throw new Error('Database not available for creating reference');
-    }
-
-    const reference = ref(db, path);
+    const dbInstance = getDatabaseInstanceOrThrow();
+    const reference = ref(dbInstance, path);
     console.log(`✅ Reference created for path: ${path}`);
     return reference;
   } catch (error) {
@@ -264,13 +274,76 @@ export const createRef = async (path) => {
   }
 };
 
+export const createQuery = (targetRef, ...constraints) => {
+  try {
+    if (!targetRef) {
+      throw new Error('Target reference is required to create a query');
+    }
+    return query(targetRef, ...constraints);
+  } catch (error) {
+    console.error('❌ Error creating query:', error);
+    return null;
+  }
+};
+
+export const safeSet = async (target, data) => {
+  const dbInstance = await getFirebaseDatabase();
+  if (!dbInstance || typeof dbInstance.ref !== 'function') {
+    throw new Error('Database not available for set');
+  }
+
+  if (typeof dbInstance._checkNotDeleted === 'function') {
+    dbInstance._checkNotDeleted('safeSet');
+  }
+
+  const targetRef = typeof target === 'string' ? ref(dbInstance, target) : target;
+  return set(targetRef, data);
+};
+
+export const safePush = async (target, data) => {
+  const dbInstance = await getFirebaseDatabase();
+  if (!dbInstance || typeof dbInstance.ref !== 'function') {
+    throw new Error('Database not available for push');
+  }
+
+  if (typeof dbInstance._checkNotDeleted === 'function') {
+    dbInstance._checkNotDeleted('safePush');
+  }
+
+  const parentRef = typeof target === 'string' ? ref(dbInstance, target) : target;
+  const newRef = push(parentRef);
+  await set(newRef, data);
+  return newRef;
+};
+
+export const safeGet = async (target) => {
+  const dbInstance = await getFirebaseDatabase();
+  if (!dbInstance || typeof dbInstance.ref !== 'function') {
+    throw new Error('Database not available for get');
+  }
+
+  if (typeof dbInstance._checkNotDeleted === 'function') {
+    dbInstance._checkNotDeleted('safeGet');
+  }
+
+  const targetRef = typeof target === 'string' ? ref(dbInstance, target) : target;
+  return get(targetRef);
+};
+
 export const safeUpdate = async (updates) => {
-  const db = await getFirebaseDatabase();
-  if (!db) {
+  const dbInstance = await getFirebaseDatabase();
+  if (!dbInstance || typeof dbInstance.ref !== 'function') {
     throw new Error('Database not available for update');
   }
-  return update(ref(db), updates);
+
+  if (typeof dbInstance._checkNotDeleted === 'function') {
+    dbInstance._checkNotDeleted('safeUpdate');
+  }
+
+  return update(ref(dbInstance), updates);
 };
+
+export const createConnectionsRef = () => createRef('connections');
 
 export const withFirebaseCheck = async (operation) => {
   try {
@@ -282,26 +355,9 @@ export const withFirebaseCheck = async (operation) => {
   }
 };
 
-// Enhanced safe operations
-export const safeOnValue = async (path, callback, options) => {
-  try {
-    const dbRef = await createRef(path);
-    const unsubscribe = onValue(dbRef, (snapshot) => {
-      callback(snapshot);
-    }, (error) => {
-      throw error;
-    }, options);
-
-    return unsubscribe;
-  } catch (error) {
-    throw error;
-  }
-};
-
 export const safeDatabaseOperation = (operationName, operation) => {
   return async (...args) => {
     console.log(`🔄 Executing ${operationName}...`);
-
     try {
       await ensureFirebaseInitialized();
       const result = await operation(...args);
@@ -312,36 +368,6 @@ export const safeDatabaseOperation = (operationName, operation) => {
       throw error;
     }
   };
-};
-
-export const safePush = async (path, data) => {
-  const dbRef = await createRef(path);
-  const newRef = push(dbRef);
-  await set(newRef, data);
-  return newRef;
-};
-
-export const safeGet = async (path) => {
-  const dbRef = await createRef(path);
-  return get(dbRef);
-};
-
-// Connection reference creator - FIXED: Simplified and safer
-export const createConnectionsRef = async () => {
-  try {
-    console.log('🔄 Creating connections reference...');
-    const isInitialized = await ensureFirebaseInitialized();
-    if (!isInitialized || !database) {
-      throw new Error('Firebase not properly initialized');
-    }
-
-    const connectionsRef = ref(database, 'connections');
-    console.log('✅ Connections reference created successfully');
-    return connectionsRef;
-  } catch (error) {
-    console.error('❌ Error creating connections reference:', error);
-    throw error;
-  }
 };
 
 // Initialize Firebase immediately but don't block exports
@@ -362,16 +388,18 @@ export {
 };
 
 // Export aliases for backward compatibility
-export const firebaseRef = ref;
-export const firebaseOnValue = onValue;
-export const firebaseSet = set;
-export const firebaseGet = get;
-export const firebaseUpdate = update;
-export const firebasePush = push;
-export const firebaseQuery = query;
-export const firebaseOrderByChild = orderByChild;
-export const firebaseLimitToLast = limitToLast;
-export const firebaseEqualTo = equalTo;
+export {
+  ref as firebaseRef,
+  onValue as firebaseOnValue,
+  set as firebaseSet,
+  get as firebaseGet,
+  update as firebaseUpdate,
+  push as firebasePush,
+  query as firebaseQuery,
+  orderByChild as firebaseOrderByChild,
+  limitToLast as firebaseLimitToLast,
+  equalTo as firebaseEqualTo
+};
 
 // Export instances with clear naming
 export const getFirebaseAppInstance = () => app;
@@ -384,7 +412,7 @@ export const isFirebaseInitialized = () => !!(app && database && auth);
 // Start initialization (commented out to prevent auto-init issues)
 // initializeFirebaseAsync();
 
-export default {
+const firebaseHelpers = {
   initializeFirebase,
   ensureFirebaseInitialized,
   getFirebaseApp,
@@ -396,4 +424,15 @@ export default {
   safeUpdate,
   createConnectionsRef,
   isFirebaseInitialized
+};
+
+export default firebaseHelpers;
+
+export const firebaseService = firebaseHelpers;
+
+export const safeDatabaseHelpers = {
+  safePush,
+  safeGet,
+  safeUpdate,
+  createConnectionsRef
 };

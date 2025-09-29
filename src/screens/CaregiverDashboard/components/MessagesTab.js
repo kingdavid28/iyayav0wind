@@ -1,62 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from 'react-native-paper';
 import { useAuth } from '../../../contexts/AuthContext';
-import firebaseMessagingService from '../../../services/firebaseMessagingService';
+import { useMessaging } from '../../../contexts/MessagingContext';
 import { styles } from '../../styles/CaregiverDashboard.styles';
 
 const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { conversations, conversationsLoading, subscribeToConversations, markMessagesAsRead } = useMessaging();
 
   useEffect(() => {
     const userIdToUse = user?.id || user?.uid;
-    if (!userIdToUse) {
-      console.log('❌ MessagesTab: No user ID available:', { user });
-      return;
-    }
+    if (!userIdToUse) return;
 
-    console.log('🔍 MessagesTab: Fetching conversations for caregiver:', userIdToUse);
-
-    setLoading(true);
-    const unsubscribe = firebaseMessagingService.getConversations(userIdToUse, (conversations) => {
-      console.log('📨 MessagesTab: Received conversations:', conversations);
-      setConversations(conversations);
-      setLoading(false);
-    }, 'caregiver'); // Pass 'caregiver' userType
-
-    return () => unsubscribe();
-  }, [user?.id, user?.uid]);
+    subscribeToConversations(userIdToUse, 'caregiver');
+    return () => subscribeToConversations(null);
+  }, [user?.id, user?.uid, subscribeToConversations]);
 
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-
-    if (hours < 1) return 'Just now';
-    if (hours < 24) return `${hours}h ago`;
+    const diffInHours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
     return date.toLocaleDateString();
   };
 
   const handleConversationPress = async (conversation) => {
-    console.log(' MessagesTab: handleConversationPress called with:', {
-      user: user,
-      userId: user?.id || user?.uid,
-      conversation: conversation
-    });
-
-    // Mark messages as read when opening conversation using consistent conversation ID
     const userIdToUse = user?.id || user?.uid;
-    if (userIdToUse && conversation.parentId) {
-      // Create consistent conversation ID
+    if (!userIdToUse) return;
+
+    if (conversation.parentId) {
       const [id1, id2] = [userIdToUse, conversation.parentId].sort();
       const conversationId = `${id1}_${id2}`;
-
-      console.log('👁️ Marking messages as read with conversation ID:', conversationId);
-      await firebaseMessagingService.markMessagesAsRead(userIdToUse, conversation.parentId, conversationId);
+      await markMessagesAsRead(userIdToUse, conversation.parentId, conversationId);
     }
 
     navigation.navigate('Chat', {
@@ -64,7 +51,7 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
       userType: 'caregiver',
       targetUserId: conversation.parentId,
       targetUserName: conversation.parentName,
-      targetUserType: 'parent'
+      targetUserType: 'parent',
     });
   };
 
@@ -74,10 +61,7 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
         <View style={messageStyles.conversationContent}>
           <View style={messageStyles.avatarContainer}>
             {item.parentAvatar ? (
-              <Image
-                source={{ uri: item.parentAvatar }}
-                style={messageStyles.avatar}
-              />
+              <Image source={{ uri: item.parentAvatar }} style={messageStyles.avatar} />
             ) : (
               <View style={messageStyles.defaultAvatar}>
                 <Ionicons name="person" size={24} color="#5bbafa" />
@@ -89,14 +73,12 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
           <View style={messageStyles.messageInfo}>
             <View style={messageStyles.messageHeader}>
               <Text style={messageStyles.parentName}>{item.parentName || 'Parent'}</Text>
-              <Text style={messageStyles.messageTime}>
-                {formatTime(item.lastMessageTime)}
-              </Text>
+              <Text style={messageStyles.messageTime}>{formatTime(item.lastMessageTime)}</Text>
             </View>
             <Text
               style={[
                 messageStyles.lastMessage,
-                !item.isRead && messageStyles.unreadMessage
+                !item.isRead && messageStyles.unreadMessage,
               ]}
               numberOfLines={1}
             >
@@ -104,17 +86,15 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
             </Text>
           </View>
 
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color="#9CA3AF"
-          />
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  if (loading) {
+  const conversationData = useMemo(() => conversations || [], [conversations]);
+
+  if (conversationsLoading && conversationData.length === 0) {
     return (
       <KeyboardAvoidingView
         style={styles.container}
@@ -122,6 +102,7 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
       >
         <Card style={messageStyles.conversationsCard}>
           <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#5bbafa" />
             <Text style={styles.loadingText}>Loading conversations...</Text>
           </View>
         </Card>
@@ -137,12 +118,12 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
     >
       <Card style={messageStyles.conversationsCard}>
         <FlatList
-          data={conversations}
+          data={conversationData}
           renderItem={renderConversationItem}
           keyExtractor={(item) => item.id}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
+              refreshing={refreshing || conversationsLoading}
               onRefresh={onRefresh}
               colors={['#5bbafa']}
               tintColor="#5bbafa"
@@ -157,7 +138,7 @@ const MessagesTab = ({ navigation, refreshing, onRefresh }) => {
               </Text>
             </View>
           }
-          contentContainerStyle={conversations.length === 0 ? { flex: 1 } : null}
+          contentContainerStyle={conversationData.length === 0 ? { flex: 1 } : undefined}
           showsVerticalScrollIndicator={false}
         />
       </Card>
@@ -170,6 +151,12 @@ const messageStyles = {
     flex: 1,
     margin: 8,
     borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   conversationItem: {
     backgroundColor: '#FFFFFF',
