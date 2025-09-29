@@ -1,14 +1,12 @@
 // Service Integration Utilities
 // Provides helper functions for service integration and error handling
 
-import { apiService } from '../services/apiService';
-import { authService } from '../services/authService';
+import { apiService, authService } from '../services/index';
 import { logger } from './logger';
 
 export class ServiceIntegrationError extends Error {
   constructor(message, code, originalError) {
     super(message);
-    this.name = 'ServiceIntegrationError';
     this.code = code;
     this.originalError = originalError;
   }

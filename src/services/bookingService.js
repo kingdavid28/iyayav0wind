@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL } from '../services/index';
 import { getAuthToken } from '../utils/auth';
 import { logger } from '../utils/logger';
 

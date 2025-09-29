@@ -3,7 +3,7 @@ import { View, Text, Platform, TouchableOpacity } from 'react-native';
 import { X, Edit2 } from 'lucide-react-native';
 import ProfileImage from '../../../components/ui/feedback/ProfileImage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getCurrentSocketURL } from '../../../config/api';
+import { getCurrentSocketURL } from '../../../services/index';
 import { useAuth } from '../../../contexts/AuthContext';
 import { calculateAge, formatBirthDate } from '../../../utils/dateUtils';
 

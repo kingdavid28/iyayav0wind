@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Alert } from 'react-native';
-import { caregiversAPI, authAPI, privacyAPI } from '../../../config/api';
+import { caregiversAPI, authAPI, privacyAPI } from '../../../services';
 import { tokenManager } from '../../../utils/tokenManager';
 
 // Helper function to check authentication

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Ale
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { CheckCircle, Upload, XCircle, AlertCircle, Clock, X, Check } from 'lucide-react-native';
-import { bookingsAPI } from '../config/api';
+import { bookingsAPI } from '../services/index';
 
 const PaymentConfirmationScreen = () => {
   const [image, setImage] = useState(null);

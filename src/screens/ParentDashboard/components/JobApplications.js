@@ -23,7 +23,7 @@ import {
   AlertCircle,
   ChevronRight
 } from 'lucide-react-native';
-import { jobsAPI, applicationsAPI } from '../../../config/api';
+import { jobsAPI, applicationsAPI } from '../../../services/index';
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { getProfileImageUrl } from '../../../utils/imageUtils';

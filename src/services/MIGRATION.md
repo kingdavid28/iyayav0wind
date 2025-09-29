@@ -52,7 +52,7 @@ All services have been consolidated into a single, enhanced service layer (`src/
 
 ### Before (Multiple Services):
 ```javascript
-import { authAPI } from '../config/api';
+import { authAPI } from '../services/index';
 import { bookingService } from '../services/bookingService';
 import { messagingService } from '../services/messagingService';
 
@@ -77,7 +77,7 @@ const messages = await apiService.messaging.getConversations();
 All existing imports continue to work:
 ```javascript
 // These still work
-import { authAPI, bookingsAPI, messagingService } from '../config/api';
+import { authAPI, bookingsAPI, messagingService } from '../services/index';
 import { authAPI, bookingsAPI, messagingService } from '../services';
 ```
 

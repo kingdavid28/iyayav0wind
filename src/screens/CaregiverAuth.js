@@ -20,7 +20,7 @@ import { TextInput, Button } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useApp, ACTION_TYPES } from '../contexts/AppContext';
-import { authAPI } from '../config/api';
+import { authAPI } from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { CommonActions, useFocusEffect } from '@react-navigation/native';
 import { useAuthForm } from '../hooks/useAuthForm';

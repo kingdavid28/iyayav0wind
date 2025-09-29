@@ -1,5 +1,5 @@
 // Integrated Service Layer - Combines all services with caching and error handling
-import { apiService } from './apiService';
+import { apiService } from './index';
 import { userService } from './userService';
 import { messagingService } from './messagingService';
 import bookingService from './bookingService';

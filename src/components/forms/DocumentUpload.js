@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Button, Text, IconButton } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadsAPI, authAPI } from '../../config/api';
+import { uploadsAPI, authAPI } from '../../services/index';
 
 // Platform-specific FileSystem import
 const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system/legacy');

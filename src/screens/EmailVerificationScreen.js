@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
-import { authAPI } from '../config/api';
+import { authAPI } from '../services/index';
 import { CommonActions } from '@react-navigation/native';
 
 const EmailVerificationScreen = ({ route, navigation }) => {

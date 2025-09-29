@@ -1,31 +1,38 @@
+// config/constants.js
+
 // Environment detection - handle both Expo and web environments
 let __DEV__ = false;
 try {
   __DEV__ = process.env.NODE_ENV === "development";
 } catch (error) {
-  __DEV__ = true; // Default to development mode
-}
-
-// ⚠️ SECURITY: Never hardcode credentials in source code
-// Use environment variables for all sensitive configuration
-export const FIREBASE_CONFIG = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
-};
-
-// Validate required environment variables
-if (!FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.projectId) {
-  console.error('❌ Missing required Firebase environment variables');
-  console.error('Please set EXPO_PUBLIC_FIREBASE_API_KEY and EXPO_PUBLIC_FIREBASE_PROJECT_ID');
+  // In React Native/Expo, we can check __DEV__ directly
+  if (typeof global.__DEV__ !== "undefined") {
+    __DEV__ = global.__DEV__;
+  } else {
+    __DEV__ = true; // Default to development mode
+  }
 }
 
 export { __DEV__ };
 export const __PROD__ = !__DEV__;
+
+// ⚠️ SECURITY: Never hardcode credentials in source code
+// Use environment variables for all sensitive configuration
+export const FIREBASE_CONFIG = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "",
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || "",
+};
+
+// Validate required environment variables in development
+if (__DEV__ && (!FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.projectId)) {
+  console.warn('⚠️ Missing required Firebase environment variables');
+  console.warn('Please set EXPO_PUBLIC_FIREBASE_API_KEY and EXPO_PUBLIC_FIREBASE_PROJECT_ID');
+}
 
 // Compute a cross-platform API base URL that works for Expo Web, Android emulator, iOS simulator, and physical devices.
 const getBaseHost = () => {
@@ -39,13 +46,14 @@ const getBaseHost = () => {
 
     // 2) Platform-specific defaults
     try {
-      const rn = require("react-native");
-      const platform = rn?.Platform?.OS;
-      if (platform === "android") {
-        return { mode: "android-emulator", url: "http://10.0.2.2:5000" };
+      const { Platform } = require("react-native");
+      if (Platform.OS === "android") {
+        // Android emulator and devices
+        return { mode: "android", url: "http://10.0.2.2:5000" };
       }
-      if (platform === "ios") {
-        return { mode: "ios-simulator", url: "http://localhost:5000" };
+      if (Platform.OS === "ios") {
+        // iOS simulator and devices
+        return { mode: "ios", url: "http://localhost:5000" };
       }
     } catch (_) {
       // Ignore require errors for react-native in web environments
@@ -65,35 +73,71 @@ const getBaseHost = () => {
 };
 
 const baseHost = getBaseHost();
-console.log('🔗 Base host configuration:', baseHost);
+if (__DEV__) {
+  console.log('🔗 Base host configuration:', baseHost);
+}
 
 // API Configuration with enhanced timeout and retry settings
 export const API_CONFIG = {
-  BASE_URL: baseHost.url + "/api", // Use computed baseHost
+  BASE_URL: `${baseHost.url}/api`,
   TIMEOUT: {
-    DEFAULT: 8000, // 8 seconds default
-    AUTH: 12000, // 12 seconds for auth
-    REGISTER: 15000, // 15 seconds for registration
-    UPLOAD: 30000, // 30 seconds for uploads
-    EXTENDED: 20000, // 20 seconds for complex operations
+    DEFAULT: 15000, // 15 seconds default
+    AUTH: 20000, // 20 seconds for auth
+    UPLOAD: 45000, // 45 seconds for uploads
+    DOWNLOAD: 30000, // 30 seconds for downloads
+    HEALTH_CHECK: 5000, // 5 seconds for health checks
   },
   RETRY: {
-    MAX_ATTEMPTS: 2,
+    MAX_ATTEMPTS: 3,
     DELAY: 1000, // Start with 1 second
-    MAX_DELAY: 3000, // Max 3 seconds between retries
-    JITTER: 300,
+    MAX_DELAY: 10000, // Max 10 seconds between retries
+    JITTER: 500,
     STATUS_CODES: [408, 429, 500, 502, 503, 504],
-    METHODS: ["GET", "POST", "PUT", "DELETE"], // Methods to retry
+    METHODS: ["GET", "POST", "PUT", "DELETE"],
   },
   CONNECTION: {
-    CHECK_URL: "/health", // Health check endpoint
-    CHECK_TIMEOUT: 3000, // 3 second timeout for health check
-    CHECK_INTERVAL: 30000, // Check every 30 seconds
-    RECONNECT_ATTEMPTS: 3, // Number of reconnection attempts
+    CHECK_URL: "/health",
+    CHECK_TIMEOUT: 5000,
+    CHECK_INTERVAL: 30000,
+    RECONNECT_ATTEMPTS: 3,
   },
 };
 
-// Add connection states
+// Token Management Configuration
+export const TOKEN_CONFIG = {
+  REFRESH_THRESHOLD: 5 * 60 * 1000, // 5 minutes before expiry
+  MAX_RETRIES: 3,
+  RETRY_DELAY: 1000,
+  AUTO_REFRESH: true,
+};
+
+// Storage Keys - Consolidated and organized
+export const STORAGE_KEYS = {
+  // Authentication
+  AUTH_TOKEN: "@iyaya:auth_token",
+  REFRESH_TOKEN: "@iyaya:refresh_token",
+  TOKEN_EXPIRY: "@iyaya:token_expiry",
+  
+  // User Data
+  USER_PROFILE: "@iyaya:userProfile",
+  USER_EMAIL: "@iyaya:userEmail",
+  USER_PREFERENCES: "@iyaya:userPreferences",
+  
+  // App State
+  ONBOARDING_COMPLETE: "@iyaya:onboardingComplete",
+  THEME_PREFERENCE: "@iyaya:themePreference",
+  LANGUAGE_PREFERENCE: "@iyaya:languagePreference",
+  
+  // Notifications
+  PUSH_TOKEN: "@iyaya:pushToken",
+  NOTIFICATION_SETTINGS: "@iyaya:notificationSettings",
+  
+  // Cache
+  API_CACHE_PREFIX: "@iyaya:cache:",
+  LAST_SYNC_TIMESTAMP: "@iyaya:lastSyncTimestamp",
+};
+
+// Connection States
 export const CONNECTION_STATES = {
   CHECKING: "CHECKING",
   CONNECTED: "CONNECTED",
@@ -101,31 +145,37 @@ export const CONNECTION_STATES = {
   RECONNECTING: "RECONNECTING",
 };
 
-// Update error codes
+// Comprehensive Error Codes
 export const ERROR_CODES = {
+  // Network Errors
   NETWORK_ERROR: "NETWORK_ERROR",
+  TIMEOUT_ERROR: "TIMEOUT_ERROR",
+  CONNECTION_REFUSED: "CONNECTION_REFUSED",
+  NETWORK_REQUEST_FAILED: "NETWORK_REQUEST_FAILED",
+  
+  // Authentication Errors
   AUTH_ERROR: "AUTH_ERROR",
+  UNAUTHORIZED: "UNAUTHORIZED",
+  FORBIDDEN: "FORBIDDEN",
+  TOKEN_EXPIRED: "TOKEN_EXPIRED",
+  INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
+  
+  // Client Errors
   VALIDATION_ERROR: "VALIDATION_ERROR",
-  PERMISSION_ERROR: "PERMISSION_ERROR",
+  NOT_FOUND: "NOT_FOUND",
+  CONFLICT: "CONFLICT",
+  RATE_LIMIT: "RATE_LIMIT",
+  
+  // Server Errors
   SERVER_ERROR: "SERVER_ERROR",
+  SERVICE_UNAVAILABLE: "SERVICE_UNAVAILABLE",
+  BAD_GATEWAY: "BAD_GATEWAY",
+  
+  // Application Errors
   UNKNOWN_ERROR: "UNKNOWN_ERROR",
-  API_TIMEOUT: "API_TIMEOUT",
-  API_CONNECTION: "API_CONNECTION",
-  API_NETWORK: "API_NETWORK",
+  OPERATION_FAILED: "OPERATION_FAILED",
   RETRY_FAILED: "RETRY_FAILED",
   REQUEST_ABORTED: "REQUEST_ABORTED",
-  TIMEOUT: {
-    DEFAULT: "TIMEOUT_ERROR",
-    AUTH: "AUTH_TIMEOUT",
-    NETWORK: "NETWORK_TIMEOUT",
-    SERVER: "SERVER_TIMEOUT",
-  },
-  CONNECTION: {
-    REFUSED: "ECONNREFUSED",
-    RESET: "ECONNRESET",
-    TIMEOUT: "ETIMEDOUT",
-    NETWORK_CHANGED: "NETWORK_CHANGED",
-  },
 };
 
 // Debug configuration
@@ -135,47 +185,64 @@ export const DEBUG_CONFIG = {
   API_LOGGING: __DEV__,
   SHOW_TIMEOUTS: __DEV__,
   RETRY_LOGGING: __DEV__,
+  NETWORK_LOGGING: __DEV__,
 };
 
 // Request priority levels
 export const REQUEST_PRIORITY = {
   HIGH: {
-    timeout: API_CONFIG.TIMEOUT.EXTENDED,
+    timeout: API_CONFIG.TIMEOUT.DEFAULT,
     retries: API_CONFIG.RETRY.MAX_ATTEMPTS,
+    priority: 1,
   },
   NORMAL: {
     timeout: API_CONFIG.TIMEOUT.DEFAULT,
     retries: 2,
+    priority: 2,
   },
   LOW: {
     timeout: API_CONFIG.TIMEOUT.DEFAULT,
     retries: 1,
+    priority: 3,
+  },
+  BACKGROUND: {
+    timeout: API_CONFIG.TIMEOUT.DEFAULT * 2,
+    retries: 0,
+    priority: 4,
   },
 };
 
-// Helper function to calculate retry delay with exponential backoff
-export const calculateRetryDelay = (attempt) => {
-  const baseDelay = API_CONFIG.RETRY.DELAY;
-  const maxDelay = API_CONFIG.RETRY.MAX_DELAY;
-  const jitter = Math.random() * API_CONFIG.RETRY.JITTER;
-
-  const delay = Math.min(baseDelay * Math.pow(2, attempt) + jitter, maxDelay);
-
-  return delay;
-};
-
-// Theme Colors
+// Theme Colors - Consistent design system
 export const COLORS = {
-  primary: "#6366f1",
-  secondary: "#8b5cf6",
-  success: "#10b981",
-  warning: "#f59e0b",
-  error: "#ef4444",
-  info: "#3b82f6",
-  light: "#f8fafc",
-  dark: "#1e293b",
-  background: "#ffffff",
-  text: "#000000",
+  primary: {
+    main: "#6366f1",
+    light: "#818cf8",
+    dark: "#4f46e5",
+    contrast: "#ffffff",
+  },
+  secondary: {
+    main: "#8b5cf6",
+    light: "#a78bfa",
+    dark: "#7c3aed",
+    contrast: "#ffffff",
+  },
+  status: {
+    success: "#10b981",
+    warning: "#f59e0b",
+    error: "#ef4444",
+    info: "#3b82f6",
+  },
+  background: {
+    default: "#ffffff",
+    paper: "#f8fafc",
+    dark: "#1e293b",
+  },
+  text: {
+    primary: "#000000",
+    secondary: "#4b5563",
+    disabled: "#9ca3af",
+    inverse: "#ffffff",
+  },
   gray: {
     50: "#f9fafb",
     100: "#f3f4f6",
@@ -195,32 +262,49 @@ export const APP_CONFIG = {
   NAME: "Iyaya",
   VERSION: "1.0.0",
   BUILD_NUMBER: "1",
+  SUPPORT_EMAIL: "support@iyaya.com",
+  PRIVACY_POLICY_URL: "https://iyaya.com/privacy",
+  TERMS_URL: "https://iyaya.com/terms",
 };
 
 // Feature Flags
 export const FEATURES = {
   PUSH_NOTIFICATIONS: true,
   REAL_TIME_CHAT: true,
-  BACKGROUND_CHECKS: true,
-  PAYMENT_INTEGRATION: false,
+  BACKGROUND_SYNC: true,
+  PAYMENT_INTEGRATION: false, // Disabled until ready
   PROFILE_VERIFICATION: true,
   PORTFOLIO_GALLERY: true,
   AVAILABILITY_CALENDAR: true,
   EMERGENCY_CONTACTS: true,
+  OFFLINE_MODE: true,
+  DARK_MODE: true,
 };
 
 // Validation Rules
 export const VALIDATION = {
   EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  PHONE_REGEX: /^\+?[\d\s\-()]+$/,
-  PASSWORD_MIN_LENGTH: 6,
-  NAME_MIN_LENGTH: 2,
-  BIO_MAX_LENGTH: 500,
-  HOURLY_RATE_MIN: 200,
-  HOURLY_RATE_MAX: 2000,
+  PHONE_REGEX: /^\+?[\d\s\-()]{10,}$/,
+  PASSWORD: {
+    MIN_LENGTH: 8,
+    REQUIRE_UPPERCASE: true,
+    REQUIRE_LOWERCASE: true,
+    REQUIRE_NUMBER: true,
+    REQUIRE_SPECIAL_CHAR: false,
+  },
+  NAME: {
+    MIN_LENGTH: 2,
+    MAX_LENGTH: 50,
+  },
+  BIO: {
+    MAX_LENGTH: 500,
+  },
+  
   // Childcare-specific validation
-  EXPERIENCE_MIN_MONTHS: 6,
-  EXPERIENCE_MAX_YEARS: 50,
+  EXPERIENCE: {
+    MIN_MONTHS: 6,
+    MAX_YEARS: 50,
+  },
   AGE_CARE_RANGES: {
     INFANT: { min: 0, max: 12, label: "Infants (0-12 months)" },
     TODDLER: { min: 13, max: 36, label: "Toddlers (1-3 years)" },
@@ -228,15 +312,18 @@ export const VALIDATION = {
     SCHOOL_AGE: { min: 61, max: 144, label: "School Age (5-12 years)" },
     TEEN: { min: 145, max: 216, label: "Teenagers (12-18 years)" },
   },
-  REQUIRED_CERTIFICATIONS: ["CPR", "First Aid"],
-  PORTFOLIO_MAX_IMAGES: 10,
-  PORTFOLIO_MAX_SIZE_MB: 5,
-  EMERGENCY_CONTACTS_MIN: 1,
-  EMERGENCY_CONTACTS_MAX: 3,
-  TIMEOUTS: {
-    FORM_SUBMIT: 8000, // Form submission timeout
-    FILE_UPLOAD: 30000, // File upload timeout
-    API_RESPONSE: 5000, // API response validation timeout
+  CERTIFICATIONS: {
+    REQUIRED: ["CPR", "First Aid"],
+    OPTIONAL: ["Early Childhood Education", "Child Development"],
+  },
+  PORTFOLIO: {
+    MAX_IMAGES: 10,
+    MAX_SIZE_MB: 5,
+    ALLOWED_TYPES: ["image/jpeg", "image/png", "image/jpg"],
+  },
+  EMERGENCY_CONTACTS: {
+    MIN: 1,
+    MAX: 3,
   },
 };
 
@@ -246,30 +333,63 @@ export const CURRENCY = {
   CODE: "PHP",
   NAME: "Philippine Peso",
   DECIMAL_PLACES: 2,
+  LOCALE: "en-PH",
 };
 
-// Storage Keys
-export const STORAGE_KEYS = {
-  USER_TOKEN: "@iyaya:userToken",
-  USER_PROFILE: "@iyaya:userProfile",
-  ONBOARDING_COMPLETE: "@iyaya:onboardingComplete",
-  PUSH_TOKEN: "@iyaya:pushToken",
-  THEME_PREFERENCE: "@iyaya:themePreference",
-  LANGUAGE_PREFERENCE: "@iyaya:languagePreference",
-  // Keys used by AuthService (ensure they exist to avoid undefined warnings)
-  AUTH_TOKEN: "@auth_token",
-  USER_EMAIL: "@user_email",
-};
-
-// Add network detection
+// Network Configuration
 export const NETWORK = {
-  RETRY_DELAY: 1000, // 1 second between retries
-  MAX_RETRIES: 3, // Maximum retry attempts
-  TIMEOUT_INCREMENT: 1.5, // Increase timeout by 50% each retry
-  CHECK_INTERVAL: 10000, // Check network every 10 seconds
+  RETRY_DELAY: 1000,
+  MAX_RETRIES: 3,
+  TIMEOUT_INCREMENT: 1.5,
+  CHECK_INTERVAL: 10000,
+  OFFLINE_TIMEOUT: 5000,
   CONNECTION_TYPES: {
     WIFI: "WIFI",
     CELLULAR: "CELLULAR",
+    ETHERNET: "ETHERNET",
+    UNKNOWN: "UNKNOWN",
     NONE: "NONE",
   },
+};
+
+// Helper function to calculate retry delay with exponential backoff
+export const calculateRetryDelay = (attempt, customConfig = {}) => {
+  const config = { ...API_CONFIG.RETRY, ...customConfig };
+  const baseDelay = config.DELAY;
+  const maxDelay = config.MAX_DELAY;
+  const jitter = Math.random() * config.JITTER;
+
+  const delay = Math.min(baseDelay * Math.pow(2, attempt) + jitter, maxDelay);
+
+  return Math.floor(delay);
+};
+
+// Platform detection
+export const PLATFORM = {
+  IS_IOS: typeof navigator !== 'undefined' ? /iPad|iPhone|iPod/.test(navigator.userAgent) : false,
+  IS_ANDROID: typeof navigator !== 'undefined' ? /Android/.test(navigator.userAgent) : false,
+  IS_WEB: typeof document !== 'undefined',
+  IS_MOBILE: typeof navigator !== 'undefined' ? /Mobi/.test(navigator.userAgent) : false,
+};
+
+// Export default for easier imports
+export default {
+  __DEV__,
+  __PROD__,
+  FIREBASE_CONFIG,
+  API_CONFIG,
+  TOKEN_CONFIG,
+  STORAGE_KEYS,
+  CONNECTION_STATES,
+  ERROR_CODES,
+  DEBUG_CONFIG,
+  REQUEST_PRIORITY,
+  COLORS,
+  APP_CONFIG,
+  FEATURES,
+  VALIDATION,
+  CURRENCY,
+  NETWORK,
+  PLATFORM,
+  calculateRetryDelay,
 };

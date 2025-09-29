@@ -1,14 +1,28 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { authAPI, api } from "../config/api";
 import { STORAGE_KEYS } from "../config/constants";
 import { logger } from "../utils/logger";
+
+let _apiService = null;
+
+export const initializeAuthService = (apiService) => {
+  _apiService = apiService;
+};
+
+const requireApiService = () => {
+  if (!_apiService) {
+    throw new Error("AuthService not initialized. Call initializeAuthService(apiService) before using authService.");
+  }
+  return _apiService;
+};
+
+const getAuthAPI = () => requireApiService().auth;
 
 class AuthService {
   // Authentication Methods
   async login(email, password) {
     try {
       logger.info("Attempting login for:", email);
-      const res = await authAPI.login({ email, password });
+      const res = await getAuthAPI().login({ email, password });
       const token = res?.token;
       if (!token) throw new Error("Login failed: no token returned");
 
@@ -20,7 +34,7 @@ class AuthService {
       // Fetch profile for downstream consumers
       let profile = null;
       try {
-        profile = await authAPI.getProfile();
+        profile = await getAuthAPI().getProfile();
       } catch (error) {
         console.warn('Profile fetch error:', error);
       }
@@ -35,12 +49,12 @@ class AuthService {
     try {
       const { email } = userData;
       logger.info("Attempting registration for:", email);
-      const res = await authAPI.register(userData);
+      const res = await getAuthAPI().register(userData);
       const token = res?.token;
       if (token) await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
       let profile = null;
       try {
-        profile = await authAPI.getProfile();
+        profile = await getAuthAPI().getProfile();
       } catch (error) {
         console.warn('Profile fetch error:', error);
       }
@@ -87,7 +101,7 @@ class AuthService {
         if (token) {
           let profile = null;
           try {
-            profile = await authAPI.getProfile();
+            profile = await getAuthAPI().getProfile();
           } catch (error) {
             console.warn('Profile fetch error:', error);
           }
@@ -170,7 +184,7 @@ export const authService = new AuthService();
 
 export const login = async (email, password) => {
   try {
-    const response = await authAPI.login({ email, password });
+    const response = await getAuthAPI().login({ email, password });
     return response;
   } catch (error) {
     logger.error("Login failed:", {
@@ -184,7 +198,7 @@ export const login = async (email, password) => {
 
 export const getProfile = async () => {
   try {
-    const response = await api.get("/auth/profile", {
+    const response = await requireApiService().get("/auth/profile", {
       timeout: 60000, // 60 second timeout
       retries: 2, // Allow 2 retries
     });

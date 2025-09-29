@@ -1,4 +1,4 @@
-import { apiService } from './apiService';
+import { apiService } from './index';
 import { isNotification } from '../shared/types/notifications';
 
 const BASE_PATH = '/notifications';
@@ -33,18 +33,16 @@ const mapNotification = (payload) => {
 };
 
 export const fetchNotifications = async (page = 1, limit = 20) => {
-  const response = await apiService.get(`${BASE_PATH}`, {
-    params: { page, limit }
-  });
+  const result = await apiService.notifications.getNotifications({ page, limit });
 
-  const notifications = Array.isArray(response.data?.data)
-    ? response.data.data.map(mapNotification).filter(Boolean)
+  const notifications = Array.isArray(result?.data)
+    ? result.data.map(mapNotification).filter(Boolean)
     : [];
 
   return {
     notifications,
     pagination:
-      response.data?.pagination ||
+      result?.pagination ||
       {
         page,
         limit,
@@ -59,13 +57,12 @@ export const markNotificationAsRead = async (notificationId) => {
     throw new Error('Notification ID is required');
   }
 
-  const response = await apiService.patch(`${BASE_PATH}/${notificationId}/read`);
-  return mapNotification(response.data?.data);
+  const result = await apiService.notifications.markAsRead(notificationId);
+  return mapNotification(result?.data || result);
 };
 
 export const markAllNotificationsAsRead = async () => {
-  const response = await apiService.patch(`${BASE_PATH}/read-all`);
-  return response.data;
+  return apiService.notifications.markAllAsRead();
 };
 
 export default {

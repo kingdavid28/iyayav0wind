@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { profileService } from '../services/profileService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../config/constants';
-import { getCurrentSocketURL } from '../config/api';
+import { getCurrentSocketURL } from '../services/index';
 
 const CaregiverProfileComplete = ({ navigation }) => {
   const { user } = useAuth();

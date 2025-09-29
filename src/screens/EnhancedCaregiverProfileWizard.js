@@ -34,20 +34,32 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
+import * as FileSystem from 'expo-file-system'; // Added missing import
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../shared/ui/inputs/TimePicker';
-import { useAuth } from '../contexts/AuthContext';
-import { jobsAPI, applicationsAPI, bookingsAPI, caregiversAPI, authAPI, uploadsAPI, getCurrentAPIURL } from "../config/api";
-import { VALIDATION, CURRENCY, FEATURES } from '../config/constants';
-import { getCurrentSocketURL } from '../config/api';
+import { getCurrentAPIURL, getCurrentSocketURL, authAPI, uploadsAPI } from '../services';
 import { styles } from './styles/EnhancedCaregiverProfileWizard.styles';
 import { getCurrentDeviceLocation, searchLocation, validateLocation, formatLocationForDisplay } from '../utils/locationUtils';
 import { compressImage, uploadWithRetry, handleUploadError } from '../utils/imageUploadUtils';
 
 const { width } = Dimensions.get('window');
+
+// Add missing validation constants
+const VALIDATION = {
+  NAME_MIN_LENGTH: 2,
+  EXPERIENCE_MAX_YEARS: 50,
+  EMERGENCY_CONTACTS_MIN: 1,
+  EMERGENCY_CONTACTS_MAX: 5,
+  PORTFOLIO_MAX_IMAGES: 20,
+  HOURLY_RATE_MIN: 50,
+  HOURLY_RATE_MAX: 1000,
+};
+
+const CURRENCY = {
+  SYMBOL: '₱',
+};
 
 const ENHANCED_STEPS = [
   { id: 'basic', title: 'Basic Information', icon: 'person-outline' },
@@ -222,6 +234,8 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
     certificateFile: null,
     certIssueDate: null,
     certExpiryDate: null,
+    bioMenuVisible: false,
+    experienceMenuVisible: false,
   });
 
   const [locationLoading, setLocationLoading] = useState(false);
@@ -241,6 +255,22 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         }
         break;
         
+      case 'phone':
+        if (!value || value.trim() === '') {
+          newErrors.phone = 'Phone number is required';
+        } else {
+          delete newErrors.phone;
+        }
+        break;
+        
+      case 'bio':
+        if (!value || value.length < 50) {
+          newErrors.bio = 'Bio must be at least 50 characters';
+        } else {
+          delete newErrors.bio;
+        }
+        break;
+        
       case 'experience.years': {
         const years = parseInt(value);
         if (isNaN(years) || years < 0 || years > VALIDATION.EXPERIENCE_MAX_YEARS) {
@@ -254,11 +284,20 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       case 'experience.description':
         if (!value || value.length < 50) {
           newErrors.experienceDescription = 'Please provide at least 50 characters describing your experience';
-        } else {
           delete newErrors.experienceDescription;
         }
         break;
         
+      case 'hourlyRate': {
+        const rate = parseFloat(value);
+        if (isNaN(rate) || rate < VALIDATION.HOURLY_RATE_MIN || rate > VALIDATION.HOURLY_RATE_MAX) {
+          newErrors.hourlyRate = `Hourly rate must be between ${VALIDATION.HOURLY_RATE_MIN} and ${VALIDATION.HOURLY_RATE_MAX}`;
+        } else {
+          delete newErrors.hourlyRate;
+        }
+        break;
+      }
+
       case 'ageCareRanges':
         if (!value || value.length === 0) {
           newErrors.ageCareRanges = 'Please select at least one age range you can care for';
@@ -272,6 +311,17 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
           newErrors.emergencyContacts = `Please add at least ${VALIDATION.EMERGENCY_CONTACTS_MIN} emergency contact`;
         } else {
           delete newErrors.emergencyContacts;
+        }
+        break;
+        
+      default:
+        // Handle nested fields
+        if (field === 'address') {
+          if (!validateLocation(value)) {
+            newErrors.location = 'Please provide at least city and province information';
+          } else {
+            delete newErrors.location;
+          }
         }
         break;
     }
@@ -312,11 +362,11 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Fixed: use proper MediaTypeOptions
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
-        base64: false, // Don't get base64 initially
+        base64: false,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -380,7 +430,10 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       return;
     }
 
-    const newContact = { ...contact, id: Date.now().toString() };
+    const newContact = { 
+      ...contact, 
+      id: Date.now().toString() 
+    };
     updateFormData('emergencyContacts', [...formData.emergencyContacts, newContact]);
     
     setTempInputs(prev => ({
@@ -484,7 +537,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
 
         // Convert document to base64 for upload
         const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: 'base64',
+          encoding: FileSystem.EncodingType.Base64,
         });
 
         console.log('📄 Uploading document:', documentType.label);
@@ -495,6 +548,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
           folder: 'documents',
           fileName: asset.name
         });
+        
         console.log('📄 Upload response:', response);
         const documentUrl = response?.url;
         
@@ -524,50 +578,6 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       Alert.alert('Upload Failed', error.message || 'Failed to upload document. Please try again.');
     } finally {
       setDocumentUploading(false);
-    }
-  };
-
-  // Certificate upload with file attachment
-  const addCertificationWithFile = async () => {
-    const certName = tempInputs.newCertification.trim();
-    if (!certName) {
-      Alert.alert('Missing Information', 'Please enter a certification name.');
-      return;
-    }
-
-    try {
-      let certificateUrl = null;
-      
-      if (tempInputs.certificateFile) {
-        setUploading(true);
-        const formData = new FormData();
-        formData.append('certificate', tempInputs.certificateFile);
-        formData.append('folder', 'certificates');
-        
-        const response = await uploadsAPI.uploadDocument(formData);
-        certificateUrl = response?.url;
-      }
-
-      const newCertification = {
-        id: Date.now().toString(),
-        name: certName,
-        fileUrl: certificateUrl,
-        uploadedAt: new Date(),
-        verified: false,
-      };
-
-      updateFormData('certifications', [...formData.certifications, newCertification]);
-      setTempInputs(prev => ({ 
-        ...prev, 
-        newCertification: '', 
-        certificateFile: null 
-      }));
-      showSnackbar('Certification added successfully');
-    } catch (error) {
-      console.error('Certificate upload failed:', error);
-      Alert.alert('Upload Failed', 'Failed to upload certificate. Please try again.');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -899,25 +909,26 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         clearTimeout(autoSaveTimer.current);
       }
     };
-  }, [formData, currentStep, user?.id]); // Removed 'touched' dependency
+  }, [formData, currentStep, user?.id, touched]); // Added touched back as it's needed
 
   // Reset profile image error when image URL changes
   useEffect(() => {
     setProfileImageError(false);
   }, [formData.profileImage]);
 
+  // Clean up object certifications on mount
+  useEffect(() => {
+    if (formData.certifications.some(cert => typeof cert === 'object')) {
+      const stringCerts = formData.certifications
+        .filter(cert => typeof cert === 'string');
+      updateFormData('certifications', stringCerts);
+    }
+  }, []);
+
   const showSnackbar = (message) => {
     setSnackbarMessage(message);
     setSnackbarVisible(true);
   };
-
-  useEffect(() => {
-  if (formData.certifications.some(cert => typeof cert === 'object')) {
-    const stringCerts = formData.certifications
-      .filter(cert => typeof cert === 'string');
-    updateFormData('certifications', stringCerts);
-  }
-}, []);
 
   const validateCurrentStep = () => {
     const step = ENHANCED_STEPS[currentStep];
@@ -941,16 +952,19 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
           setErrors(prev => ({ ...prev, location: undefined }));
         }
         break;
+      case 'professional':
+        isValid = validateField('experience.years', formData.experience.years) &&
+                 validateField('experience.description', formData.experience.description) &&
+                 validateField('hourlyRate', formData.hourlyRate);
+        break;
       case 'ageCare':
-        // Skip validation for ageCare step to allow progression
-        isValid = true;
+        isValid = validateField('ageCareRanges', formData.ageCareRanges);
         break;
       case 'emergency':
-        // Skip validation for emergency step to allow progression
-        isValid = true;
+        isValid = validateField('emergencyContacts', formData.emergencyContacts);
         break;
-      case 'professional':
-        // Skip validation for professional step to allow progression
+      default:
+        // For other steps, default to valid
         isValid = true;
         break;
     }
@@ -988,10 +1002,9 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
       
       // Normalize enums and required fields to match backend expectations
-  
-    const normalizedCertifications = formData.certifications
-  .filter(cert => cert && (typeof cert === 'string' || cert.name))
-  .map(cert => typeof cert === 'string' ? cert : cert.name);
+      const normalizedCertifications = formData.certifications
+        .filter(cert => cert && (typeof cert === 'string' || cert.name))
+        .map(cert => typeof cert === 'string' ? cert : cert.name);
 
       const normalizedAgeCareRanges = (formData.ageCareRanges || [])
         .map(v => (typeof v === 'string' ? v.trim().toUpperCase() : ''))
@@ -1139,7 +1152,6 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         showSnackbar(isEdit ? 'Profile updated successfully' : 'Profile created successfully');
         
         // Force refresh the auth context to get updated profile data
-        const { useAuth } = await import('../core/contexts/AuthContext');
         // Trigger a profile refresh in the auth context
         
         setTimeout(() => {
@@ -1215,7 +1227,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
 
       // Launch image picker with optimized settings
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8, // Reduced quality for smaller file size
@@ -1351,7 +1363,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
           <Text style={styles.cardTitle}>About Me</Text>
           
           <Menu
-            visible={tempInputs.bioMenuVisible || false}
+            visible={tempInputs.bioMenuVisible}
             onDismiss={() => setTempInputs(prev => ({ ...prev, bioMenuVisible: false }))}
             anchor={
               <Button
@@ -1443,7 +1455,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
 
       <View>
         <Menu
-          visible={tempInputs.experienceMenuVisible || false}
+          visible={tempInputs.experienceMenuVisible}
           onDismiss={() => setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }))}
           anchor={
             <Button
@@ -1463,7 +1475,6 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
               setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }));
             }}
             title="2+ Years Professional Experience"
-            titleStyle={{ fontSize: 14 }}
           />
           <Menu.Item
             onPress={() => {
@@ -1471,7 +1482,6 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
               setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }));
             }}
             title="5+ Years Nanny & Babysitter"
-            titleStyle={{ fontSize: 14 }}
           />
           <Menu.Item
             onPress={() => {
@@ -1479,7 +1489,6 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
               setTempInputs(prev => ({ ...prev, experienceMenuVisible: false }));
             }}
             title="3+ Years Daycare & Private Homes"
-            titleStyle={{ fontSize: 14 }}
           />
         </Menu>
         
@@ -1528,147 +1537,147 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
   );
 
   const renderSkillsAndCertifications = () => (
-  <View style={styles.stepContainer}>
-    <Text style={styles.stepTitle}>Skills & Certifications</Text>
-    <Text style={styles.stepDescription}>
-      Highlight your skills and certifications to stand out to parents.
-    </Text>
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Skills & Certifications</Text>
+      <Text style={styles.stepDescription}>
+        Highlight your skills and certifications to stand out to parents.
+      </Text>
 
-    <View style={styles.skillsSection}>
-      <Text style={styles.sectionTitle}>Skills *</Text>
-      <View style={styles.suggestedSkills}>
-        <Text style={styles.suggestedTitle}>Suggested Skills:</Text>
-        <View style={styles.chipContainer}>
-          {SUGGESTED_SKILLS.map((skill) => (
-            <Chip
-              key={skill}
-              mode={formData.skills.includes(skill) ? 'flat' : 'outlined'}
-              selected={formData.skills.includes(skill)}
-              onPress={() => {
-                if (formData.skills.includes(skill)) {
-                  updateFormData('skills', formData.skills.filter(s => s !== skill));
-                } else {
-                  updateFormData('skills', [...formData.skills, skill]);
-                }
-              }}
-              style={styles.chip}
-            >
-              {skill}
-            </Chip>
-          ))}
+      <View style={styles.skillsSection}>
+        <Text style={styles.sectionTitle}>Skills *</Text>
+        <View style={styles.suggestedSkills}>
+          <Text style={styles.suggestedTitle}>Suggested Skills:</Text>
+          <View style={styles.chipContainer}>
+            {SUGGESTED_SKILLS.map((skill) => (
+              <Chip
+                key={skill}
+                mode={formData.skills.includes(skill) ? 'flat' : 'outlined'}
+                selected={formData.skills.includes(skill)}
+                onPress={() => {
+                  if (formData.skills.includes(skill)) {
+                    updateFormData('skills', formData.skills.filter(s => s !== skill));
+                  } else {
+                    updateFormData('skills', [...formData.skills, skill]);
+                  }
+                }}
+                style={styles.chip}
+              >
+                {skill}
+              </Chip>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.addSkillContainer}>
+          <TextInput
+            label="Add Custom Skill"
+            value={tempInputs.newSkill}
+            onChangeText={(text) => setTempInputs(prev => ({ ...prev, newSkill: text }))}
+            mode="outlined"
+            style={styles.addInput}
+            onSubmitEditing={() => {
+              const skill = tempInputs.newSkill.trim();
+              if (skill && !formData.skills.includes(skill)) {
+                updateFormData('skills', [...formData.skills, skill]);
+                setTempInputs(prev => ({ ...prev, newSkill: '' }));
+              }
+            }}
+            returnKeyType="done"
+          />
+          <Button
+            mode="contained"
+            onPress={() => {
+              const skill = tempInputs.newSkill.trim();
+              if (skill && !formData.skills.includes(skill)) {
+                updateFormData('skills', [...formData.skills, skill]);
+                setTempInputs(prev => ({ ...prev, newSkill: '' }));
+              }
+            }}
+            disabled={!tempInputs.newSkill.trim()}
+            style={styles.addButton}
+          >
+            Add
+          </Button>
+        </View>
+
+        <View style={styles.selectedSkills}>
+          <Text style={styles.selectedTitle}>Your Skills ({formData.skills.length}):</Text>
+          <View style={styles.chipContainer}>
+            {formData.skills.map((skill) => (
+              <Chip
+                key={skill}
+                mode="flat"
+                onClose={() => updateFormData('skills', formData.skills.filter(s => s !== skill))}
+                style={styles.selectedChip}
+              >
+                {skill}
+              </Chip>
+            ))}
+          </View>
         </View>
       </View>
 
-      <View style={styles.addSkillContainer}>
-        <TextInput
-          label="Add Custom Skill"
-          value={tempInputs.newSkill}
-          onChangeText={(text) => setTempInputs(prev => ({ ...prev, newSkill: text }))}
-          mode="outlined"
-          style={styles.addInput}
-          onSubmitEditing={() => {
-            const skill = tempInputs.newSkill.trim();
-            if (skill && !formData.skills.includes(skill)) {
-              updateFormData('skills', [...formData.skills, skill]);
-              setTempInputs(prev => ({ ...prev, newSkill: '' }));
-            }
-          }}
-          returnKeyType="done"
-        />
-        <Button
-          mode="contained"
-          onPress={() => {
-            const skill = tempInputs.newSkill.trim();
-            if (skill && !formData.skills.includes(skill)) {
-              updateFormData('skills', [...formData.skills, skill]);
-              setTempInputs(prev => ({ ...prev, newSkill: '' }));
-            }
-          }}
-          disabled={!tempInputs.newSkill.trim()}
-          style={styles.addButton}
-        >
-          Add
-        </Button>
-      </View>
+      <Divider style={styles.divider} />
 
-      <View style={styles.selectedSkills}>
-        <Text style={styles.selectedTitle}>Your Skills ({formData.skills.length}):</Text>
-        <View style={styles.chipContainer}>
-          {formData.skills.map((skill) => (
-            <Chip
-              key={skill}
-              mode="flat"
-              onClose={() => updateFormData('skills', formData.skills.filter(s => s !== skill))}
-              style={styles.selectedChip}
-            >
-              {skill}
-            </Chip>
-          ))}
+      <View style={styles.certificationsSection}>
+        <Text style={styles.sectionTitle}>Certifications</Text>
+        <View style={styles.addSkillContainer}>
+          <TextInput
+            label="Add Certification"
+            value={tempInputs.newCertification}
+            onChangeText={(text) => setTempInputs(prev => ({ ...prev, newCertification: text }))}
+            mode="outlined"
+            style={styles.addInput}
+            placeholder="e.g., CPR Certified, First Aid"
+          />
+          
+          <Button
+            mode="contained"
+            onPress={() => {
+              const cert = tempInputs.newCertification.trim();
+              if (cert) {
+                updateFormData('certifications', [...formData.certifications, cert]);
+                setTempInputs(prev => ({ ...prev, newCertification: '' }));
+              }
+            }}
+            disabled={!tempInputs.newCertification.trim()}
+            style={styles.addButton}
+          >
+            Add Certificate
+          </Button>
+        </View>
+
+        <View style={styles.selectedSkills}>
+          <Text style={styles.selectedTitle}>Your Certifications ({formData.certifications.length}):</Text>
+          <View style={styles.certificationsContainer}>
+            {formData.certifications.map((cert, index) => (
+              <Card key={cert?.id || cert || index} style={styles.certificationCard}>
+                <Card.Content>
+                  <View style={styles.certificationHeader}>
+                    <Text style={styles.certificationName}>
+                      {typeof cert === 'string' ? cert : (cert?.name || 'Unnamed Certificate')}
+                    </Text>
+                    <IconButton
+                      icon="close"
+                      size={20}
+                      onPress={() => {
+                        const updatedCerts = formData.certifications.filter((c, i) => i !== index);
+                        updateFormData('certifications', updatedCerts);
+                      }}
+                    />
+                  </View>
+                  {cert?.verified && (
+                    <Badge style={styles.verifiedBadge}>Verified</Badge>
+                  )}
+                </Card.Content>
+              </Card>
+            ))}
+          </View>
         </View>
       </View>
     </View>
+  );
 
-    <Divider style={styles.divider} />
-
-    <View style={styles.certificationsSection}>
-      <Text style={styles.sectionTitle}>Certifications</Text>
-      <View style={styles.addSkillContainer}>
-        <TextInput
-          label="Add Certification"
-          value={tempInputs.newCertification}
-          onChangeText={(text) => setTempInputs(prev => ({ ...prev, newCertification: text }))}
-          mode="outlined"
-          style={styles.addInput}
-          placeholder="e.g., CPR Certified, First Aid"
-        />
-        
-        <Button
-  mode="contained"
-  onPress={() => {
-    const cert = tempInputs.newCertification.trim();
-    if (cert) {
-      updateFormData('certifications', [...formData.certifications, cert]);
-      setTempInputs(prev => ({ ...prev, newCertification: '' }));
-    }
-  }}
-  disabled={!tempInputs.newCertification.trim()}
-  style={styles.addButton}
->
-  Add Certificate
-</Button>
-
-      </View>
-
-      <View style={styles.selectedSkills}>
-        <Text style={styles.selectedTitle}>Your Certifications ({formData.certifications.length}):</Text>
-        <View style={styles.certificationsContainer}>
-          {formData.certifications.map((cert, index) => (
-            <Card key={cert?.id || cert || index} style={styles.certificationCard}>
-              <Card.Content>
-                <View style={styles.certificationHeader}>
-                  <Text style={styles.certificationName}>
-                    {typeof cert === 'string' ? cert : (cert?.name || 'Unnamed Certificate')}
-                  </Text>
-                  <IconButton
-                    icon="close"
-                    size={20}
-                    onPress={() => {
-                      const updatedCerts = formData.certifications.filter((c, i) => i !== index);
-                      updateFormData('certifications', updatedCerts);
-                    }}
-                  />
-                </View>
-                {cert?.verified && (
-                  <Badge style={styles.verifiedBadge}>Verified</Badge>
-                )}
-              </Card.Content>
-            </Card>
-          ))}
-        </View>
-      </View>
-    </View>
-  </View>
-);
   // Address & Location render function
   const renderAddressLocation = () => (
     <View style={styles.stepContainer}>
@@ -1735,7 +1744,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
                   >
                     <Ionicons name="location-outline" size={20} color="#6366f1" />
                     <Text style={styles.searchResultText}>
-                      {result.address.formatted}
+                      {result.address?.formatted || 'Unknown location'}
                     </Text>
                   </TouchableOpacity>
                 ))}

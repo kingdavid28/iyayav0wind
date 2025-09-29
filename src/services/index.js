@@ -6,13 +6,14 @@ import { errorHandler } from '../shared/utils/errorHandler';
 import { tokenManager } from '../utils/tokenManager';
 import { firebaseMessagingService } from './firebaseMessagingService';
 import { firebaseAuthService } from './firebaseAuthService';
+import { initializeAuthService } from './authService';
 
 // Dynamic API URL from environment
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
   ? `${process.env.EXPO_PUBLIC_API_URL}/api`
-  : 'http://192.168.1.9:5000/api';
-
-console.log('🔗 API URL:', API_BASE_URL);
+  : __DEV__
+  ? 'http://localhost:5000/api' // Replace with your machine's LAN IP + backend port during development
+    : 'http://192.168.1.9:5000/api'; // TODO: set to your production API host
 
 // Network monitoring (from apiService.js)
 let isConnected = true;
@@ -929,6 +930,9 @@ class EnhancedAPIService {
 
 // Create singleton instance
 export const apiService = new EnhancedAPIService();
+
+// Initialize dependent services
+initializeAuthService(apiService);
 
 // Export individual services for backward compatibility
 export const authAPI = apiService.auth;

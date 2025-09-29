@@ -11,7 +11,7 @@ import { RequestInfoModal } from '../../../components/ui/modals/RequestInfoModal
 import { useNotifications } from '../../../contexts/NotificationContext';
 
 // NotificationContext removed - using local state
-import { getCurrentSocketURL } from '../../../config/api';
+import { getCurrentSocketURL } from '../../../services/index';
 
 const Header = ({ navigation, onProfilePress, onSignOut, greetingName, onProfileEdit, profileName, profileImage, profileContact, profileLocation, setActiveTab }) => {
   // Use real privacy system

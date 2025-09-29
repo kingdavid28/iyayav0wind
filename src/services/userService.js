@@ -1,4 +1,4 @@
-import { api, authAPI, caregiversAPI } from "../config/api"
+import { api, authAPI, caregiversAPI } from "../services/index"
 import { logger } from "../utils/logger"
 import { validator } from "../utils/validation"
 import { API_CONFIG, VALIDATION } from "../config/constants"

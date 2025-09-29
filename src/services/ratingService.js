@@ -1,4 +1,4 @@
-import { apiService } from './apiService';
+import { apiService } from './index';
 
 class RatingService {
   // Submit a rating for a caregiver

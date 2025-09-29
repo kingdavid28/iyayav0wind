@@ -168,8 +168,20 @@ export const getImageSource = (userOrUrl, options = {}) => {
 
     // Check if first parameter is a user object or a direct URL
     if (typeof userOrUrl === 'string') {
-      // It's a direct URL string
-      imageUrl = userOrUrl;
+      // It's a direct URL string (might be relative)
+      imageUrl = userOrUrl.trim();
+
+      if (
+        imageUrl &&
+        !imageUrl.startsWith('http://') &&
+        !imageUrl.startsWith('https://') &&
+        !imageUrl.startsWith('data:')
+      ) {
+        const resolvedUrl = buildUploadUrl(imageUrl);
+        if (resolvedUrl) {
+          imageUrl = resolvedUrl;
+        }
+      }
     } else if (userOrUrl && typeof userOrUrl === 'object') {
       // It's a user object - get the profile image URL
       imageUrl = getProfileImageUrl(userOrUrl);

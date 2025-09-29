@@ -1,3 +1,4 @@
+const { Types } = require('mongoose');
 const Notification = require('../models/Notification');
 const { authenticate } = require('../middleware/auth');
 
@@ -6,6 +7,19 @@ const getNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
     const { page = 1, limit = 20 } = req.query;
+
+    if (!Types.ObjectId.isValid(userId)) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: 0,
+          pages: 0
+        }
+      });
+    }
 
     const notifications = await Notification.find({ recipient: userId })
       .populate('sender', 'name email')
@@ -41,6 +55,13 @@ const markAsRead = async (req, res) => {
     const { notificationId } = req.params;
     const userId = req.user.id;
 
+    if (!Types.ObjectId.isValid(userId)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Notification not found'
+      });
+    }
+
     const notification = await Notification.findOneAndUpdate(
       { _id: notificationId, recipient: userId },
       { read: true, readAt: new Date() },
@@ -71,6 +92,13 @@ const markAsRead = async (req, res) => {
 const markAllAsRead = async (req, res) => {
   try {
     const userId = req.user.id;
+
+    if (!Types.ObjectId.isValid(userId)) {
+      return res.status(200).json({
+        success: true,
+        message: 'All notifications marked as read'
+      });
+    }
 
     await Notification.updateMany(
       { recipient: userId, read: false },

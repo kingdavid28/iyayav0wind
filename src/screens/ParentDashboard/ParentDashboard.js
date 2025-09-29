@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useParentDashboard } from '../../hooks/useParentDashboard';
 
 // API imports
-import { childrenAPI, authAPI, bookingsAPI, jobsAPI, messagingService } from '../../config/api';
+import { childrenAPI, authAPI, bookingsAPI, jobsAPI, messagingService } from '../../services/index';
 
 // Utility imports
 import { applyFilters, countActiveFilters } from '../../utils/caregiverUtils';

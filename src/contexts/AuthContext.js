@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { authAPI } from "../config/api";
+import { authAPI } from '../services';
 import { STORAGE_KEYS } from "../config/constants";
 import { firebaseAuthService } from "../services/firebaseAuthService";
 

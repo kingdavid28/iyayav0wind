@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Ale
 import * as ImagePicker from 'expo-image-picker';
 import { CheckCircle, Upload, XCircle, AlertCircle, Clock, X } from 'lucide-react-native';
 import { ModalWrapper } from '../../../shared/ui';
-import { bookingsAPI } from '../../../config/api';
+import { bookingsAPI } from '../../../services/index';
 import RatingSystem from '../../../components/ui/feedback/RatingSystem';
 import ratingService from '../../../services/ratingService';
 import { getPaymentActions, calculateDeposit, calculateRemainingPayment } from '../../../utils/paymentUtils';

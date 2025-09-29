@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Alert, Modal, TouchableOpacity, Image } f
 import { Text, Card, Avatar, Button, Divider, ActivityIndicator, TextInput } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { authAPI, getCurrentAPIURL } from '../config/api';
+import { authAPI, getCurrentAPIURL } from '../services/index';
 import { useAuth } from '../contexts/AuthContext';
 import ProfileImage from '../components/ui/feedback/ProfileImage';
 

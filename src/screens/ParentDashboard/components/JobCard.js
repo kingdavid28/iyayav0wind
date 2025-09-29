@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Calendar, MapPin, Clock, DollarSign, Users, Edit2, Trash2, Clock as ClockIcon, Check } from 'lucide-react-native';
 import { StatusBadge } from '../../../shared/ui';
-import { jobsAPI } from '../../../config/api';
+import { jobsAPI } from '../../../services/index';
 import { useNavigation } from '@react-navigation/native';
 
 const JobCard = ({ job, onPress, onUpdate }) => {

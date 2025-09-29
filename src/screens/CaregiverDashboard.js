@@ -1,12 +1,11 @@
 import { Ionicons } from '@expo/vector-icons'
-import { useFocusEffect, useNavigation } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
 import React, { useCallback, useEffect, useState } from "react"
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, FlatList } from "react-native"
 import { Button, Card, Chip, Searchbar } from "react-native-paper"
+import { useNavigation } from '@react-navigation/native'
 import Toast from "../components/ui/feedback/Toast"
-import { bookingsAPI, applicationsAPI, caregiversAPI, authAPI } from "../services/index"
-import { getCurrentSocketURL } from '../config/api'
+import { bookingsAPI, applicationsAPI, caregiversAPI, authAPI, getCurrentSocketURL, firebaseMessagingService } from "../services"
 import { useAuth } from "../contexts/AuthContext"
 import { useMessaging } from '../contexts/MessagingContext';
 import { usePrivacy } from '../components/features/privacy/PrivacyManager';
@@ -179,7 +178,6 @@ function ApplicationCard({ application, onViewDetails, onMessage }) {
 }
 
 function BookingCard({ booking, onMessage, onViewDetails, onConfirmAttendance }) {
-
   const handleLocationPress = () => {
     if (booking.location) {
       const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.location)}`;
@@ -263,13 +261,13 @@ function BookingCard({ booking, onMessage, onViewDetails, onConfirmAttendance })
               Message
             </Button>
           )}
-        </View>
-      </Card.Content>
-    </Card>
-  )
+      </View>
+    </Card.Content>
+  </Card>
+  );
 }
 
-function CaregiverDashboard({ onLogout, route }) {
+function CaregiverDashboard({ route }) {
   const navigation = useNavigation()
   const { user, signOut } = useAuth()
   const { width } = Dimensions.get("window");
@@ -388,7 +386,7 @@ function CaregiverDashboard({ onLogout, route }) {
     setMessages([...contextMessages].reverse());
   }, [contextMessages]);
 
-  
+
   // Fetch reviews with runtime Firebase check
   useEffect(() => {
     if (!user?.id) return;

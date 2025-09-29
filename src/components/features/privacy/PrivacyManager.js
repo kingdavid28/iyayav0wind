@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Alert } from 'react-native';
-import { privacyAPI } from '../../../config/api';
+import { privacyAPI } from '../../../services';
 import { getFilteredProfileData } from './ProfileDataManager';
 import { tokenManager } from '../../../utils/tokenManager';
 
