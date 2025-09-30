@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, formatDistanceToNow } from 'date-fns';
-import { parseDate, buildSchedule } from '../../../utils/dateUtils';
+import { parseDate, buildSchedule, to12h } from '../../../utils/dateUtils';
 import { getProfileImageUrl } from '../../../utils/imageUtils';
 
 const DEFAULT_CURRENCY = '₱';
@@ -45,19 +45,30 @@ const BookingItem = ({
   const reviewsCount = user?.reviewsCount || user?.reviewCount || user?.ratingsCount;
   const childrenCount = Array.isArray(booking?.children)
     ? booking.children.length
-    : Number(booking?.children || booking?.childrenCount || 0);
-  const costAmount = booking?.totalCost || booking?.amount || booking?.rate || 0;
-  const paymentStatus = (booking?.paymentStatus || booking?.payment_state || '').toLowerCase();
-  const hasPaymentProof = Boolean(booking?.paymentProof);
-  const bookingId = booking?._id || booking?.id || 'N/A';
+    : Number(booking?.childrenCount || booking?.childCount || booking?.children || 0);
+  const costAmount = [
+    booking?.totalCost,
+    booking?.amount,
+    booking?.pricing?.total,
+    booking?.rate,
+    booking?.price
+  ].find((value) => typeof value === 'number') || 0;
+  const paymentStatus = (booking?.paymentStatus || booking?.payment_state || booking?.paymentStatusLabel || '').toLowerCase();
+  const hasPaymentProof = Boolean(booking?.paymentProof || booking?.paymentProofUrl || booking?.payment?.proof);
+  const bookingId = booking?.bookingCode || booking?.reference || booking?._id || booking?.id || booking?.bookingId || 'N/A';
+  const locationText = booking?.location || booking?.address || booking?.venue || booking?.meetingPoint;
+  const notesText = booking?.notes || booking?.instructions || booking?.additionalNotes;
 
   const scheduleInfo = useMemo(() => {
-    const startDate = booking?.date || booking?.dateTime || booking?.startDate;
-    const startTime = booking?.startTime || booking?.start_time || booking?.time?.split(' - ')[0];
-    const endTime = booking?.endTime || booking?.end_time || booking?.time?.split(' - ')[1];
+    const dateString = booking?.date || booking?.startDate || booking?.scheduledDate || booking?.dateTime;
+    const rawStart = booking?.startTime || booking?.start_time || booking?.time?.split(' - ')[0] || booking?.scheduledStart;
+    const rawEnd = booking?.endTime || booking?.end_time || booking?.time?.split(' - ')[1] || booking?.scheduledEnd;
 
-    const friendlySchedule = buildSchedule(startDate, startTime, endTime);
-    const parsedStartDate = parseDate(startDate) || (startDate ? new Date(startDate) : null);
+    const startTime = to12h(rawStart);
+    const endTime = to12h(rawEnd);
+
+    const friendlySchedule = buildSchedule(dateString, startTime, endTime);
+    const parsedStartDate = parseDate(dateString);
     const relativeTime = parsedStartDate
       ? formatDistanceToNow(parsedStartDate, { addSuffix: true })
       : null;
@@ -74,7 +85,10 @@ const BookingItem = ({
     booking?.start_time,
     booking?.time,
     booking?.endTime,
-    booking?.end_time
+    booking?.end_time,
+    booking?.scheduledDate,
+    booking?.scheduledStart,
+    booking?.scheduledEnd
   ]);
 
   const getSafeImageUrl = () => {
@@ -274,7 +288,7 @@ const BookingItem = ({
   const paymentStatusText = hasPaymentProof
     ? 'Payment submitted'
     : paymentStatus
-      ? paymentStatus.replace('_', ' ')
+      ? paymentStatus.replace(/_/g, ' ')
       : 'Awaiting proof';
 
   const paymentStatusColor = getPaymentStatusColor(paymentStatus || (hasPaymentProof ? 'paid' : 'pending'));
@@ -351,7 +365,7 @@ const BookingItem = ({
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Schedule</Text>
             <Text style={styles.infoValue} numberOfLines={1}>
-              {scheduleInfo.friendlySchedule || formatDate(booking?.dateTime) || 'Schedule pending'}
+              {scheduleInfo.friendlySchedule || formatDate(booking?.date || booking?.dateTime || booking?.startDate) || 'Schedule pending'}
             </Text>
             {scheduleInfo.relativeTime && (
               <Text style={styles.infoMeta}>{scheduleInfo.relativeTime}</Text>
@@ -359,13 +373,13 @@ const BookingItem = ({
           </View>
         </View>
 
-        {booking?.location && (
+        {locationText && (
           <View style={styles.infoRow}>
             <Ionicons name="location-outline" size={18} color="#F97316" />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Location</Text>
               <Text style={styles.infoValue} numberOfLines={2}>
-                {booking.location}
+                {locationText}
               </Text>
             </View>
           </View>
@@ -383,10 +397,10 @@ const BookingItem = ({
           </View>
         )}
 
-        {booking?.notes && (
+        {notesText && (
           <View style={styles.notesContainer}>
             <Text style={styles.notesLabel}>Notes</Text>
-            <Text style={styles.notes}>{booking.notes}</Text>
+            <Text style={styles.notes}>{notesText}</Text>
           </View>
         )}
 
@@ -482,7 +496,7 @@ const styles = StyleSheet.create({
   },
   imageSection: {
     position: 'relative',
-    marginRight: 16,
+    marginRight: 10,
   },
   profileImage: {
     width: 70,
@@ -493,7 +507,7 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   statusBadge: {
-    position: 'absolute',
+    position: 'relative',
     top: -4,
     right: -4,
     paddingHorizontal: 8,
@@ -518,8 +532,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     marginBottom: 6,
   },
   name: {

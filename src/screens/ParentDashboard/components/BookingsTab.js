@@ -330,12 +330,54 @@ const BookingsTab = ({
     );
   }
 
-  const getCaregiverFromBooking = (booking) => {
-    return booking?.caregiverId || 
-           booking?.caregiver || 
-           booking?.caregiverProfile || 
-           booking?.assignedCaregiver || 
-           {};
+  const getCaregiverFromBooking = (booking = {}) => {
+    if (!booking) {
+      return {};
+    }
+
+    const {
+      caregiver,
+      caregiverProfile,
+      assignedCaregiver,
+      caregiverId,
+      caregiverName,
+      caregiverFullName,
+      caregiverProfileImage,
+      caregiverAvatar,
+      caregiverImage,
+      caregiverRating,
+      caregiverReviewsCount,
+      caregiverReviewCount
+    } = booking;
+
+    const resolvedObject = [caregiver, caregiverProfile, assignedCaregiver]
+      .find((candidate) => candidate && typeof candidate === 'object');
+
+    if (resolvedObject) {
+      return {
+        ...resolvedObject,
+        _id: resolvedObject._id || resolvedObject.id || caregiverId,
+        id: resolvedObject.id || resolvedObject._id || caregiverId,
+        name: resolvedObject.name || resolvedObject.displayName || caregiverName || caregiverFullName || 'Caregiver',
+        profileImage: resolvedObject.profileImage || resolvedObject.avatar || caregiverProfileImage || caregiverAvatar || caregiverImage || resolvedObject.photoURL,
+        avatar: resolvedObject.avatar || resolvedObject.profileImage || caregiverAvatar || caregiverProfileImage || caregiverImage || resolvedObject.photoURL,
+        rating: resolvedObject.rating ?? caregiverRating,
+        reviewCount: resolvedObject.reviewCount ?? resolvedObject.reviewsCount ?? caregiverReviewsCount ?? caregiverReviewCount
+      };
+    }
+
+    const fallbackId = caregiverId || (typeof caregiver === 'string' ? caregiver : undefined);
+    const fallbackImage = caregiverProfileImage || caregiverAvatar || caregiverImage;
+
+    return {
+      _id: fallbackId,
+      id: fallbackId,
+      name: caregiverName || caregiverFullName || 'Caregiver',
+      profileImage: fallbackImage,
+      avatar: fallbackImage,
+      rating: caregiverRating,
+      reviewCount: caregiverReviewsCount ?? caregiverReviewCount
+    };
   };
 
   return (

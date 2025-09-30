@@ -99,36 +99,64 @@ const HomeTab = ({
             </View>
           ) : (
             <View style={styles.childrenList}>
-              {(showAllChildren ? children : children.slice(0, 3)).map((child, index) => (
-                <View key={child._id || child.id || index} style={styles.childItemCard}>
-                  <View style={styles.topRightButtons}>
-                    <TouchableOpacity 
-                      style={styles.editButtonX} 
-                      onPress={() => onEditChild(child)}
-                    >
-                      <Text style={styles.editButtonXText}>✎</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.deleteButtonX} 
-                      onPress={() => onDeleteChild(child)}
-                    >
-                      <Text style={styles.deleteButtonXText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.childContentLeft}>
-                    <View style={styles.childIcon}>
-                      <Text style={{ fontSize: 20, color: '#db2777' }}>👶</Text>
-                    </View>
-                    <View style={styles.childInfo}>
-                      <Text style={styles.childName}>{child.name}</Text>
-                      <Text style={styles.childDetails}>Age: {child.age} years old</Text>
-                      {child.allergies && (
-                        <Text style={styles.childAllergies}>⚠️ {child.allergies}</Text>
+              {(showAllChildren ? children : children.slice(0, 3)).map((child, index) => {
+                const childId = child?._id || child?.id || index;
+                const fullName = child?.name || [child?.firstName, child?.lastName].filter(Boolean).join(' ') || 'Child';
+                const ageValue = child?.age ?? child?.calculatedAge ?? null;
+                const birthDate = child?.birthDate || child?.dateOfBirth;
+                const allergies = Array.isArray(child?.allergies)
+                  ? child.allergies.filter(Boolean).join(', ')
+                  : child?.allergies;
+                const specialInstructions = child?.specialNeeds || child?.notes || child?.instructions;
+                const preferences = child?.preferences || child?.favoriteActivities;
+
+                return (
+                  <View key={childId} style={styles.childItemCard}>
+                    <View style={styles.topRightButtons}>
+                      {onEditChild && (
+                        <TouchableOpacity 
+                          style={styles.editButtonX} 
+                          onPress={() => onEditChild(child)}
+                        >
+                          <Text style={styles.editButtonXText}>✎</Text>
+                        </TouchableOpacity>
+                      )}
+                      {onDeleteChild && (
+                        <TouchableOpacity 
+                          style={styles.deleteButtonX} 
+                          onPress={() => onDeleteChild(child)}
+                        >
+                          <Text style={styles.deleteButtonXText}>×</Text>
+                        </TouchableOpacity>
                       )}
                     </View>
+                    <View style={styles.childContentLeft}>
+                      <View style={styles.childIcon}>
+                        <Text style={{ fontSize: 20, color: '#db2777' }}>👶</Text>
+                      </View>
+                      <View style={styles.childInfo}>
+                        <Text style={styles.childName}>{fullName}</Text>
+                        {ageValue != null ? (
+                          <Text style={styles.childDetails}>Age: {ageValue} years</Text>
+                        ) : birthDate ? (
+                          <Text style={styles.childDetails}>Birth date: {birthDate}</Text>
+                        ) : (
+                          <Text style={styles.childDetails}>Age: Not available</Text>
+                        )}
+                        {preferences ? (
+                          <Text style={styles.childDetailLine}>Loves: {preferences}</Text>
+                        ) : null}
+                        {specialInstructions ? (
+                          <Text style={styles.childDetailLine}>Notes: {specialInstructions}</Text>
+                        ) : null}
+                        {allergies ? (
+                          <Text style={styles.childAllergies}>⚠️ Allergies: {allergies}</Text>
+                        ) : null}
+                      </View>
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
           

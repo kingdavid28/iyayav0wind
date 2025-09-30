@@ -1740,12 +1740,6 @@ statNumber: {
   marginTop: 4,
   textAlign: 'center',
 },
-filterTabCount: {
-  fontSize: 11,
-  fontWeight: '500',
-  opacity: 0.8,
-},
-
 statusBadgeText: {
   fontSize: 12,
   fontWeight: '600',
