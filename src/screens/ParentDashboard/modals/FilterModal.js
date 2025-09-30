@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Switch,
+  Platform,
 } from 'react-native';
 import { Slider } from '@miblanchard/react-native-slider';
 import { X, RotateCcw } from 'lucide-react-native';
@@ -99,7 +100,13 @@ const FilterModal = ({ visible, onClose, filters = {}, onApplyFilters }) => {
   };
 
   return (
-    <ModalWrapper visible={visible} onClose={onClose} animationType="slide">
+    <ModalWrapper
+      visible={visible}
+      onClose={onClose}
+      animationType="slide"
+      overlayStyle={modalStyles.bottomOverlay}
+      style={modalStyles.bottomContent}
+    >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -310,7 +317,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
-    flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
   },
   header: {
     flexDirection: 'row',
@@ -502,6 +511,23 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 4,
     lineHeight: 20,
+  },
+});
+
+const modalStyles = StyleSheet.create({
+  bottomOverlay: {
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    paddingHorizontal: 0,
+  },
+  bottomContent: {
+    width: '100%',
+    maxWidth: undefined,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 0,
   },
 });
 

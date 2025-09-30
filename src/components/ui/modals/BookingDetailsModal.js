@@ -1,7 +1,10 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, Linking, Alert, Platform, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, Alert, Platform, StyleSheet, Dimensions } from 'react-native';
 import { Calendar, Clock, DollarSign, MapPin, Phone, Mail, MessageCircle, Navigation, Star, Baby, AlertCircle, CheckCircle, X } from 'lucide-react-native';
 import PropTypes from 'prop-types';
+import { colors, spacing, typography } from '../../../screens/styles/ParentDashboard.styles';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 // Simple i18n helper - replace with proper i18n library in production
 const t = (key) => {
@@ -27,10 +30,10 @@ const t = (key) => {
     'emergency.name': 'Name',
     'emergency.relation': 'Relation',
     'emergency.phone': 'Phone',
-    'actions.message': 'Message Family',
-    'actions.directions': 'Get Directions',
-    'actions.complete': 'Mark Complete',
-    'actions.cancel': 'Cancel Booking',
+    'actions.message': 'Message',
+    'actions.directions': 'Directions',
+    'actions.complete': 'Complete',
+    'actions.cancel': 'Cancel',
     'alerts.completed': 'Booking Completed',
     'alerts.completed.message': 'The booking has been marked as complete',
     'alerts.cancelled': 'Booking Cancelled',
@@ -52,14 +55,14 @@ const t = (key) => {
  * @param {Function} props.onCompleteBooking - Called to mark booking as complete
  * @param {Function} props.onCancelBooking - Called to cancel booking
  */
-export function BookingDetailsModal({ 
-  visible, 
-  booking, 
-  onClose, 
-  onMessage, 
-  onGetDirections, 
+export function BookingDetailsModal({
+  visible,
+  booking,
+  onClose,
+  onMessage,
+  onGetDirections,
   onCompleteBooking,
-  onCancelBooking 
+  onCancelBooking
 }) {
   if (!visible || !booking) return null;
 
@@ -95,262 +98,234 @@ export function BookingDetailsModal({
     }
   };
 
-  const getStatusColors = (status) => {
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-        return { bg: 'bg-green-100', border: 'border-green-200', text: 'text-green-800' };
-      case 'pending':
-        return { bg: 'bg-yellow-100', border: 'border-yellow-200', text: 'text-yellow-800' };
-      case 'completed':
-        return { bg: 'bg-blue-100', border: 'border-blue-200', text: 'text-blue-800' };
-      case 'cancelled':
-        return { bg: 'bg-red-100', border: 'border-red-200', text: 'text-red-800' };
-      default:
-        return { bg: 'bg-gray-100', border: 'border-gray-200', text: 'text-gray-800' };
-    }
+  const statusStyles = {
+    confirmed: { backgroundColor: '#DCFCE7', borderColor: '#A7F3D0', color: '#166534' },
+    pending: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', color: '#B45309' },
+    pending_confirmation: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', color: '#B45309' },
+    completed: { backgroundColor: '#DBEAFE', borderColor: '#BFDBFE', color: '#1D4ED8' },
+    cancelled: { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5', color: '#B91C1C' },
+    in_progress: { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD', color: '#0C4A6E' },
+    default: { backgroundColor: '#E5E7EB', borderColor: '#D1D5DB', color: '#374151' }
   };
 
-  const statusColors = getStatusColors(enhancedBooking.status);
+  const statusKey = (enhancedBooking.status || '').toLowerCase();
+  const statusColor = statusStyles[statusKey] || statusStyles.default;
 
   return (
-    <View className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <View className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden" style={styles.card}>
-        {/* Header */}
-        <View className="flex flex-row items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-          <View className="flex flex-row items-center">
-            <View className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-              <Calendar size={24} color="#3b82f6" />
+    <View style={styles.overlay}>
+      <View style={[styles.modalCard, styles.card]}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.headerIconWrap}>
+              <Calendar size={24} color={colors.primary || '#3b82f6'} />
             </View>
             <View>
-              <Text className="text-xl font-bold text-gray-800">{t('booking.details')}</Text>
-              <Text className="text-sm text-gray-600">{enhancedBooking.family}</Text>
+              <Text style={styles.headerTitle}>{t('booking.details')}</Text>
+              {!!enhancedBooking.family && (
+                <Text style={styles.headerSubtitle}>{enhancedBooking.family}</Text>
+              )}
             </View>
           </View>
-          
-          <View className="flex flex-row items-center gap-3">
-            <View className={`px-3 py-1.5 rounded-full border ${statusColors.bg} ${statusColors.border}`}>
-              <Text className={`text-sm font-semibold ${statusColors.text}`}>
-                {enhancedBooking.status.charAt(0).toUpperCase() + enhancedBooking.status.slice(1)}
+          <View style={styles.headerRight}>
+            <View
+              style={[styles.statusPill, {
+                backgroundColor: statusColor.backgroundColor,
+                borderColor: statusColor.borderColor
+              }]}
+            >
+              <Text style={[styles.statusPillText, { color: statusColor.color }]}>
+                {statusKey ? statusKey.replace('_', ' ') : 'scheduled'}
               </Text>
             </View>
-            
-            <Pressable onPress={onClose}>
-              <X size={24} color="#9ca3af" />
+            <Pressable onPress={onClose} hitSlop={12} style={styles.closeButton}>
+              <X size={22} color={colors?.textSecondary || '#6B7280'} />
             </Pressable>
           </View>
         </View>
 
-        <ScrollView style={{ maxHeight: 'calc(90vh - 140px)' }}>
-          <View className="p-6 gap-6">
-            {/* Booking Overview */}
-            <View className="bg-gray-50 rounded-xl p-4">
-              <Text className="text-lg font-bold text-gray-800 mb-4">Booking Overview</Text>
-              <View className="flex flex-row flex-wrap gap-4">
-                <View className="flex flex-row items-center">
-                  <Calendar size={20} color="#6b7280" className="mr-2" />
-                  <View>
-                    <Text className="text-sm text-gray-600">Date</Text>
-                    <Text className="font-semibold text-gray-800">{enhancedBooking.date}</Text>
-                  </View>
+        <ScrollView 
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('booking.overview')}</Text>
+            <View style={styles.infoGrid}>
+              <View style={styles.infoItem}>
+                <Calendar size={18} color="#6B7280" />
+                <View style={styles.infoTextWrap}>
+                  <Text style={styles.infoLabel}>{t('booking.date')}</Text>
+                  <Text style={styles.infoValue}>{enhancedBooking.date}</Text>
                 </View>
-                <View className="flex flex-row items-center">
-                  <Clock size={20} color="#6b7280" className="mr-2" />
-                  <View>
-                    <Text className="text-sm text-gray-600">Time</Text>
-                    <Text className="font-semibold text-gray-800">{enhancedBooking.time}</Text>
-                  </View>
+              </View>
+              <View style={styles.infoItem}>
+                <Clock size={18} color="#6B7280" />
+                <View style={styles.infoTextWrap}>
+                  <Text style={styles.infoLabel}>{t('booking.time')}</Text>
+                  <Text style={styles.infoValue}>{enhancedBooking.time}</Text>
                 </View>
-                <View className="flex flex-row items-center">
-                  <DollarSign size={20} color="#6b7280" className="mr-2" />
-                  <View>
-                    <Text className="text-sm text-gray-600">Rate</Text>
-                    <Text className="font-semibold text-blue-600">${enhancedBooking.hourlyRate}/hr</Text>
-                  </View>
+              </View>
+              <View style={styles.infoItem}>
+                <DollarSign size={18} color="#6B7280" />
+                <View style={styles.infoTextWrap}>
+                  <Text style={styles.infoLabel}>{t('booking.rate')}</Text>
+                  <Text style={[styles.infoValue, styles.highlightText]}>₱{enhancedBooking.hourlyRate}/hr</Text>
                 </View>
-                <View className="flex flex-row items-center">
-                  <Star size={20} color="#6b7280" className="mr-2" />
-                  <View>
-                    <Text className="text-sm text-gray-600">Total</Text>
-                    <Text className="font-semibold text-green-600">${enhancedBooking.totalAmount}</Text>
-                  </View>
+              </View>
+              <View style={styles.infoItem}>
+                <Star size={18} color="#6B7280" />
+                <View style={styles.infoTextWrap}>
+                  <Text style={styles.infoLabel}>{t('booking.total')}</Text>
+                  <Text style={[styles.infoValue, styles.successText]}>₱{enhancedBooking.totalAmount}</Text>
                 </View>
               </View>
             </View>
+          </View>
 
-            {/* Location & Contact */}
-            <View className="bg-white border border-gray-200 rounded-xl p-4">
-              <Text className="text-lg font-bold text-gray-800 mb-4">Location & Contact</Text>
-              <View className="gap-3">
-                <View className="flex flex-row items-start">
-                  <MapPin size={20} color="#6b7280" className="mr-3 mt-0.5" />
-                  <View>
-                    <Text className="font-semibold text-gray-800">{enhancedBooking.location}</Text>
-                    <Text className="text-sm text-gray-600">{enhancedBooking.address}</Text>
-                  </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('location.contact')}</Text>
+            <View style={styles.locationContainer}>
+              <View style={styles.locationRow}>
+                <MapPin size={18} color="#4B5563" />
+                <View style={styles.locationTextWrap}>
+                  <Text style={styles.locationTitle}>{enhancedBooking.location}</Text>
+                  <Text style={styles.locationSubtitle}>{enhancedBooking.address}</Text>
                 </View>
-                {/* Phone - only show if present, else show privacy placeholder */}
-                {enhancedBooking.contactPhone ? (
-                  <View className="flex flex-row items-center">
-                    <Phone size={20} color="#6b7280" className="mr-3" />
-                    <View>
-                      <Text className="text-sm text-gray-600">Phone</Text>
-                      <Text className="font-semibold text-gray-800">{enhancedBooking.contactPhone}</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View className="flex flex-row items-center">
-                    <Phone size={20} color="#6b7280" className="mr-3" />
-                    <View>
-                      <Text className="text-sm text-gray-600">Phone</Text>
-                      <Text style={{ color: '#9ca3af', fontStyle: 'italic' }}>Contact info hidden for privacy</Text>
-                    </View>
-                  </View>
-                )}
-                {/* Email - only show if present, else show privacy placeholder */}
-                {enhancedBooking.contactEmail ? (
-                  <View className="flex flex-row items-center">
-                    <Mail size={20} color="#6b7280" className="mr-3" />
-                    <View>
-                      <Text className="text-sm text-gray-600">Email</Text>
-                      <Text className="font-semibold text-gray-800">{enhancedBooking.contactEmail}</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View className="flex flex-row items-center">
-                    <Mail size={20} color="#6b7280" className="mr-3" />
-                    <View>
-                      <Text className="text-sm text-gray-600">Email</Text>
-                      <Text style={{ color: '#9ca3af', fontStyle: 'italic' }}>Contact info hidden for privacy</Text>
-                    </View>
-                  </View>
-                )}
+              </View>
+              <View style={styles.contactRow}>
+                <Phone size={18} color="#4B5563" />
+                <Text style={styles.contactLabel}>Phone</Text>
+                <Text style={styles.contactValue}>
+                  {enhancedBooking.contactPhone || t('contact.hidden')}
+                </Text>
+              </View>
+              <View style={styles.contactRow}>
+                <Mail size={18} color="#4B5563" />
+                <Text style={styles.contactLabel}>Email</Text>
+                <Text style={styles.contactValue}>
+                  {enhancedBooking.contactEmail || t('contact.hidden')}
+                </Text>
               </View>
             </View>
+          </View>
 
-            {/* Children Details */}
-            <View className="bg-white border border-gray-200 rounded-xl p-4">
-              <View className="flex flex-row items-center">
-                <Baby size={20} color="#6b7280" className="mr-2" />
-                <Text className="text-lg font-bold text-gray-800">Children Details</Text>
-              </View>
-              <View className="gap-4 mt-4">
-                {enhancedBooking.childrenDetails.map((child, index) => (
-                  <View key={index} className="bg-blue-50 rounded-lg p-4">
-                    <View className="flex flex-row items-center justify-between mb-2">
-                      <Text className="font-semibold text-gray-800">{child.name}</Text>
-                      <Text className="text-sm text-gray-600">Age {child.age}</Text>
-                    </View>
-                    
-                    <View className="gap-2">
-                      <View>
-                        <Text className="font-medium text-gray-700">Preferences: </Text>
-                        <Text className="text-gray-600">{child.preferences}</Text>
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Baby size={18} color="#4B5563" />
+              <Text style={styles.sectionTitle}>{t('children.details')}</Text>
+            </View>
+            <View style={styles.childrenList}>
+              {enhancedBooking.childrenDetails.map((child, index) => (
+                <View key={index} style={styles.childCard}>
+                  <View style={styles.childHeader}>
+                    <Text style={styles.childName}>{child.name}</Text>
+                    <Text style={styles.childMeta}>{child.age ? `Age ${child.age}` : 'Age n/a'}</Text>
+                  </View>
+                  <View style={styles.childBody}>
+                    <Text style={styles.childLabel}>{t('children.preferences')}</Text>
+                    <Text style={styles.childValue}>{child.preferences || 'No preferences listed'}</Text>
+                    <Text style={styles.childLabel}>{t('children.instructions')}</Text>
+                    <Text style={styles.childValue}>{child.specialInstructions || 'None'}</Text>
+                    {child.allergies && child.allergies !== 'None' && (
+                      <View style={styles.childAlertRow}>
+                        <AlertCircle size={16} color="#DC2626" />
+                        <Text style={styles.childAlertText}>{`${t('children.allergies')}: ${child.allergies}`}</Text>
                       </View>
-                      <View>
-                        <Text className="font-medium text-gray-700">Special Instructions: </Text>
-                        <Text className="text-gray-600">{child.specialInstructions}</Text>
-                      </View>
-                      {child.allergies && child.allergies !== 'None' && (
-                        <View className="flex flex-row items-center">
-                          <AlertCircle size={16} color="#ef4444" className="mr-1" />
-                          <Text className="font-medium text-red-700">Allergies: </Text>
-                          <Text className="text-red-600 ml-1">{child.allergies}</Text>
-                        </View>
-                      )}
-                    </View>
+                    )}
                   </View>
-                ))}
-              </View>
+                </View>
+              ))}
             </View>
+          </View>
 
-            {/* Requirements */}
-            <View className="bg-white border border-gray-200 rounded-xl p-4">
-              <Text className="text-lg font-bold text-gray-800 mb-4">Requirements</Text>
-              <View className="flex flex-row flex-wrap gap-2">
-                {enhancedBooking.requirements.map((req, index) => (
-                  <View key={index} className="px-3 py-1 bg-green-100 rounded-full flex flex-row items-center">
-                    <CheckCircle size={12} color="#16a34a" className="mr-1" />
-                    <Text className="text-green-700 text-sm font-medium">{req}</Text>
-                  </View>
-                ))}
-              </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('requirements')}</Text>
+            <View style={styles.chipWrap}>
+              {enhancedBooking.requirements.map((req, index) => (
+                <View key={index} style={styles.chip}>
+                  <CheckCircle size={14} color="#15803D" />
+                  <Text style={styles.chipText}>{req}</Text>
+                </View>
+              ))}
             </View>
+          </View>
 
-            {/* Special Notes */}
-            {enhancedBooking.notes && (
-              <View className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                <Text className="text-lg font-bold text-gray-800 mb-2">Special Notes</Text>
-                <Text className="text-gray-700">{enhancedBooking.notes}</Text>
-              </View>
-            )}
+          {enhancedBooking.notes && (
+            <View style={[styles.section, styles.notesSection]}>
+              <Text style={styles.sectionTitle}>{t('notes.special')}</Text>
+              <Text style={styles.notesText}>{enhancedBooking.notes}</Text>
+            </View>
+          )}
 
-            {/* Emergency Contact */}
-            <View className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <View className="flex flex-row items-center">
-                <AlertCircle size={20} color="#dc2626" className="mr-2" />
-                <Text className="text-lg font-bold text-gray-800">Emergency Contact</Text>
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <AlertCircle size={18} color="#B91C1C" />
+              <Text style={styles.sectionTitle}>{t('emergency.contact')}</Text>
+            </View>
+            <View style={styles.emergencyList}>
+              <View style={styles.emergencyRow}>
+                <Text style={styles.emergencyLabel}>{t('emergency.name')}</Text>
+                <Text style={styles.emergencyValue}>{enhancedBooking.emergencyContact.name}</Text>
               </View>
-              <View className="gap-2 mt-4">
-                <View>
-                  <Text className="font-medium text-gray-700">Name: </Text>
-                  <Text className="text-gray-800">{enhancedBooking.emergencyContact.name}</Text>
-                </View>
-                <View>
-                  <Text className="font-medium text-gray-700">Relation: </Text>
-                  <Text className="text-gray-800">{enhancedBooking.emergencyContact.relation}</Text>
-                </View>
-                <View>
-                  <Text className="font-medium text-gray-700">Phone: </Text>
-                  <Text className="text-gray-800 font-semibold">{enhancedBooking.emergencyContact.phone}</Text>
-                </View>
+              <View style={styles.emergencyRow}>
+                <Text style={styles.emergencyLabel}>{t('emergency.relation')}</Text>
+                <Text style={styles.emergencyValue}>{enhancedBooking.emergencyContact.relation}</Text>
+              </View>
+              <View style={styles.emergencyRow}>
+                <Text style={styles.emergencyLabel}>{t('emergency.phone')}</Text>
+                <Text style={[styles.emergencyValue, styles.emergencyHighlight]}>
+                  {enhancedBooking.emergencyContact.phone}
+                </Text>
               </View>
             </View>
           </View>
         </ScrollView>
 
-        {/* Footer Actions */}
-        <View className="flex flex-row flex-wrap gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <View style={styles.footer}>
           <Pressable
             onPress={onMessage}
-            className="flex-1 min-w-[120px] px-4 py-3 bg-blue-100 rounded-lg flex flex-row items-center justify-center"
+            style={[styles.footerButton, styles.secondaryButton]}
+            accessibilityRole="button"
           >
-            <MessageCircle size={16} color="#3b82f6" className="mr-2" />
-            <Text className="text-blue-700 font-semibold">{t('actions.message')}</Text>
+            <MessageCircle size={16} color="#1D4ED8" />
+            <Text style={styles.secondaryButtonText}>{t('actions.message')}</Text>
           </Pressable>
-          
+
           <Pressable
             onPress={() => {
               Linking.openURL(`https://maps.google.com/?q=${enhancedBooking.address}`);
               onGetDirections?.();
             }}
-            className="flex-1 min-w-[120px] px-4 py-3 bg-green-100 rounded-lg flex flex-row items-center justify-center"
+            style={[styles.footerButton, styles.secondaryButton]}
+            accessibilityRole="button"
           >
-            <Navigation size={16} color="#16a34a" className="mr-2" />
-            <Text className="text-green-700 font-semibold">{t('actions.directions')}</Text>
+            <Navigation size={16} color="#047857" />
+            <Text style={styles.secondaryButtonText}>{t('actions.directions')}</Text>
           </Pressable>
 
           {enhancedBooking.status === 'confirmed' && (
             <Pressable
               onPress={() => {
-                Alert.alert("Booking Completed", "The booking has been marked as complete");
+                Alert.alert(t('alerts.completed'), t('alerts.completed.message'));
                 onCompleteBooking?.();
               }}
-              className="flex-1 min-w-[120px] px-4 py-3 bg-blue-600 rounded-lg flex flex-row items-center justify-center"
+              style={[styles.footerButton, styles.primaryButton]}
+              accessibilityRole="button"
             >
-              <CheckCircle size={16} color="#ffffff" className="mr-2" />
-              <Text className="text-white font-semibold">{t('actions.complete')}</Text>
+              <CheckCircle size={16} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>{t('actions.complete')}</Text>
             </Pressable>
           )}
 
           {(enhancedBooking.status === 'pending_confirmation' || enhancedBooking.status === 'confirmed') && (
             <Pressable
               onPress={() => {
-                Alert.alert("Booking Cancelled", "The booking has been cancelled");
+                Alert.alert(t('alerts.cancelled'), t('alerts.cancelled.message'));
                 onCancelBooking?.();
               }}
-              className="px-4 py-3 bg-red-100 rounded-lg flex flex-row items-center justify-center"
+              style={[styles.footerButton, styles.destructiveButton]}
+              accessibilityRole="button"
             >
-              <Text className="text-red-700 font-semibold">{t('actions.cancel')}</Text>
+              <Text style={styles.destructiveButtonText}>{t('actions.cancel')}</Text>
             </Pressable>
           )}
         </View>
@@ -402,21 +377,350 @@ BookingDetailsModal.defaultProps = {
 };
 
 const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(17, 24, 39, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 640,
+    height: Platform.OS === 'web' ? 'auto' : screenHeight * 0.5, // 50% height for mobile
+    maxHeight: Platform.OS === 'web' ? '80%' : screenHeight * 0.5,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    overflow: 'hidden',
+  },
   card: Platform.select({
     web: {
-      boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+      boxShadow: '0 20px 45px rgba(15, 23, 42, 0.18)',
     },
     ios: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.12,
-      shadowRadius: 12,
+      shadowColor: '#0f172a',
+      shadowOffset: { width: 0, height: 16 },
+      shadowOpacity: 0.2,
+      shadowRadius: 24,
     },
     android: {
-      elevation: 8,
+      elevation: 12,
     },
     default: {},
   }),
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    flex: 1,
+  },
+  headerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    ...typography.h2,
+    color: colors.text,
+    fontSize: 18,
+  },
+  headerSubtitle: {
+    ...typography.subtitle2,
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontSize: 14,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  statusPillText: {
+    ...typography.subtitle2,
+    textTransform: 'capitalize',
+    fontSize: 12,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.backgroundLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contentContainer: {
+    paddingBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  section: {
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: {
+    ...typography.subtitle1,
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  infoItem: {
+    width: '48%',
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  infoTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  infoLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  infoValue: {
+    ...typography.subtitle2,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  highlightText: {
+    color: colors.accent,
+    fontWeight: '700',
+  },
+  successText: {
+    color: colors.success,
+    fontWeight: '700',
+  },
+  locationContainer: {
+    gap: spacing.sm,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+  },
+  locationTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  locationTitle: {
+    ...typography.subtitle1,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  locationSubtitle: {
+    ...typography.body1,
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  contactLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+    minWidth: 40,
+  },
+  contactValue: {
+    ...typography.body1,
+    color: colors.text,
+    flexShrink: 1,
+    fontSize: 13,
+  },
+  childrenList: {
+    gap: spacing.sm,
+  },
+  childCard: {
+    padding: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    gap: spacing.xs,
+  },
+  childHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  childName: {
+    ...typography.subtitle1,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  childMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  childBody: {
+    gap: 4,
+  },
+  childLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  childValue: {
+    ...typography.body1,
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  childAlertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 2,
+  },
+  childAlertText: {
+    ...typography.caption,
+    color: colors.error,
+    fontSize: 11,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: colors.primaryLight,
+  },
+  chipText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  notesSection: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    padding: spacing.sm,
+  },
+  notesText: {
+    ...typography.body1,
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  emergencyList: {
+    gap: spacing.xs,
+  },
+  emergencyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  emergencyLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  emergencyValue: {
+    ...typography.body1,
+    color: colors.text,
+    fontSize: 13,
+  },
+  emergencyHighlight: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    flexWrap: 'wrap',
+  },
+  footerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.sm,
+    minHeight: 40,
+    flex: 1,
+    minWidth: '23%',
+  },
+  primaryButton: {
+    backgroundColor: colors.primary,
+  },
+  primaryButtonText: {
+    ...typography.button,
+    color: colors.textInverse,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primary + '20',
+  },
+  secondaryButtonText: {
+    ...typography.button,
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  destructiveButton: {
+    backgroundColor: colors.error + '15',
+    borderWidth: 1,
+    borderColor: colors.error + '30',
+  },
+  destructiveButtonText: {
+    ...typography.button,
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });
 
 export default BookingDetailsModal;

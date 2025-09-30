@@ -834,8 +834,20 @@ class EnhancedAPIService {
       return this.request(`/ratings/caregiver/${caregiverId}?page=${page}&limit=${limit}`);
     },
 
+    getParentRatings: (parentId, page = 1, limit = 10) => {
+      return this.request(`/ratings/parent/${parentId}?page=${page}&limit=${limit}`);
+    },
+
     getRatingSummary: (userId, role = 'caregiver') => {
       return this.request(`/ratings/summary/${userId}?role=${role}`);
+    },
+
+    canRate: (bookingId) => {
+      return this.request(`/ratings/can-rate/${bookingId}`);
+    },
+
+    getBookingRating: (bookingId) => {
+      return this.request(`/ratings/booking/${bookingId}`);
     }
   };
 

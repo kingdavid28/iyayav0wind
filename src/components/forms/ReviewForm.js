@@ -3,7 +3,7 @@ import { View, StyleSheet, Image, TouchableOpacity, ScrollView, Alert, Platform 
 import { Text, TextInput, Button, useTheme, IconButton } from 'react-native-paper';
 import { Rating } from 'react-native-ratings';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadsAPI } from '../../../services/index';
+import { uploadsAPI } from '../../services';
 
 // Platform-specific FileSystem import
 const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system/legacy');

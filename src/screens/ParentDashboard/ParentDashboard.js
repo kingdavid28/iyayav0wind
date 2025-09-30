@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Alert } from 'react-native';
+import { View, Alert, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { usePrivacy } from '../../components/features/privacy/PrivacyManager';
@@ -13,7 +13,9 @@ import { childrenAPI, authAPI, bookingsAPI, jobsAPI, messagingService } from '..
 
 // Utility imports
 import { applyFilters, countActiveFilters } from '../../utils/caregiverUtils';
-import { styles } from '../styles/ParentDashboard.styles';
+import { parseDate } from '../../utils/dateUtils';
+import { BOOKING_STATUSES } from '../../constants/bookingStatuses';
+import { styles, colors } from '../styles/ParentDashboard.styles';
 
 // Privacy components
 import PrivacyProvider from '../../components/features/privacy/PrivacyManager';
@@ -37,6 +39,8 @@ import JobPostingModal from './modals/JobPostingModal';
 import BookingModal from './modals/BookingModal';
 import PaymentModal from './modals/PaymentModal';
 import ChildModal from './modals/ChildModal';
+import { BookingDetailsModal } from '../../components';
+import { Calendar, Clock, DollarSign, Hourglass, CheckCircle2 } from 'lucide-react-native';
 
 // Constants
 const DEFAULT_FILTERS = {
@@ -49,125 +53,142 @@ const DEFAULT_FILTERS = {
 };
 
 const DEFAULT_CAREGIVER = {
-  _id: '1',
-  userId: '1',
-  name: 'Ana Dela Cruz',
-  avatar: 'https://example.com/avatar.jpg',
-  rating: 4.8,
-  reviews: 124,
-  hourlyRate: 350,
-  rate: '₱350/hr'
+  _id: 'default-caregiver',
+  userId: null,
+  name: 'Caregiver',
+  avatar: null,
+  profileImage: null,
+  rating: 0,
+  reviews: 0,
+  hourlyRate: 0,
+  rate: '₱0/hr',
 };
 
-const ParentDashboard = () => {
+const ParentDashboardInner = () => {
   const navigation = useNavigation();
   const { signOut, user } = useAuth();
   
   // Get privacy-related data
   const { pendingRequests, notifications } = usePrivacy();
   
-  // Dashboard data
   const {
-    activeTab, 
-    setActiveTab: setActiveTabHook,
+    activeTab,
+    setActiveTab,
     profile,
-    jobs, 
-    caregivers, 
-    bookings, 
+    jobs,
+    caregivers,
+    bookings,
     children,
     loading,
-    loadProfile, 
-    fetchJobs, 
-    fetchCaregivers, 
-    fetchBookings, 
-    fetchChildren
+    loadProfile,
+    fetchJobs,
+    fetchCaregivers,
+    fetchBookings,
+    fetchChildren,
   } = useParentDashboard();
-  
-  // Calculate notification counts for each tab
-  const tabNotificationCounts = useMemo(() => {
-    // Count unread messages
-    const unreadMessages = notifications?.filter(n => 
-      n.type === 'message' && !n.read
-    )?.length || 0;
 
-    // Count pending booking requests
-    const pendingBookings = bookings?.filter(b => 
-      b.status === 'pending' || b.status === 'awaiting_payment'
-    )?.length || 0;
-
-    // Count unread job applications
-    const unreadApplications = notifications?.filter(n => 
-      n.type === 'job_application' && !n.read
-    )?.length || 0;
-
-    // Count unread reviews
-    const unreadReviews = notifications?.filter(n => 
-      n.type === 'review' && !n.read
-    )?.length || 0;
-
-    // Count other unread notifications (excluding the ones we've already counted)
-    const otherNotifications = notifications?.filter(n => 
-      !n.read && 
-      !['message', 'job_application', 'review'].includes(n.type)
-    )?.length || 0;
-
-    return {
-      messages: unreadMessages,
-      bookings: pendingBookings,
-      jobs: unreadApplications,
-      reviews: unreadReviews,
-      notifications: otherNotifications
-    };
-  }, [notifications, bookings]);
-
-  const setActiveTab = setActiveTabHook;
-
-  // UI State
   const [refreshing, setRefreshing] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showAllChildren, setShowAllChildren] = useState(false);
 
-  // Modal states
   const [modals, setModals] = useState({
     child: false,
     profile: false,
     jobPosting: false,
     filter: false,
     payment: false,
-    booking: false
+    booking: false,
+    bookingDetails: false,
   });
 
-  // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [filteredCaregivers, setFilteredCaregivers] = useState([]);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [activeFilters, setActiveFilters] = useState(0);
 
-  // Form states
   const [childForm, setChildForm] = useState({
     name: '',
     age: '',
     allergies: '',
     notes: '',
-    editingId: null
+    editingId: null,
   });
 
   const [profileForm, setProfileForm] = useState({
     name: '',
     contact: '',
     location: '',
-    image: ''
+    image: '',
   });
 
-  // Booking state
   const [bookingsFilter, setBookingsFilter] = useState('upcoming');
   const [selectedCaregiver, setSelectedCaregiver] = useState(DEFAULT_CAREGIVER);
+  const [selectedBooking, setSelectedBooking] = useState(null);
   const [paymentData, setPaymentData] = useState({
     bookingId: null,
     base64: '',
     mimeType: 'image/jpeg'
   });
+
+  const bookingFilterStats = useMemo(() => {
+    const initial = {
+      total: 0,
+      upcoming: 0,
+      pending: 0,
+      confirmed: 0,
+      completed: 0,
+      past: 0
+    };
+
+    if (!Array.isArray(bookings) || bookings.length === 0) {
+      return initial;
+    }
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    return bookings.reduce((acc, booking) => {
+      acc.total += 1;
+
+      const bookingDate = parseDate(booking?.date);
+      if (bookingDate) {
+        bookingDate.setHours(0, 0, 0, 0);
+        if (bookingDate >= now) {
+          acc.upcoming += 1;
+        } else {
+          acc.past += 1;
+        }
+      }
+
+      switch (booking?.status) {
+        case BOOKING_STATUSES.PENDING:
+          acc.pending += 1;
+          break;
+        case BOOKING_STATUSES.CONFIRMED:
+        case BOOKING_STATUSES.IN_PROGRESS:
+          acc.confirmed += 1;
+          break;
+        case BOOKING_STATUSES.COMPLETED:
+        case BOOKING_STATUSES.PAID:
+          acc.completed += 1;
+          break;
+        default:
+          break;
+      }
+
+      return acc;
+    }, { ...initial });
+  }, [bookings]);
+
+  const bookingFilterOptions = useMemo(() => ([
+    { key: 'all', label: 'All', count: bookingFilterStats.total, icon: Calendar },
+    { key: 'upcoming', label: 'Upcoming', count: bookingFilterStats.upcoming, icon: Clock },
+    { key: 'pending', label: 'Pending', count: bookingFilterStats.pending, icon: Hourglass },
+    { key: 'confirmed', label: 'Active', count: bookingFilterStats.confirmed, icon: CheckCircle2 },
+    { key: 'completed', label: 'Done', count: bookingFilterStats.completed, icon: DollarSign },
+    { key: 'past', label: 'Past', count: bookingFilterStats.past, icon: Calendar }
+  ]), [bookingFilterStats]);
 
   // Update profile form when profile data changes
   useEffect(() => {
@@ -192,6 +213,11 @@ const ParentDashboard = () => {
 
   // Modal handlers
   const toggleModal = useCallback((modalName, isOpen = null) => {
+    if (typeof modalName === 'object' && modalName !== null) {
+      setModals(prev => ({ ...prev, ...modalName }));
+      return;
+    }
+
     setModals(prev => ({
       ...prev,
       [modalName]: isOpen !== null ? isOpen : !prev[modalName]
@@ -535,6 +561,20 @@ const ParentDashboard = () => {
     }
   }, [fetchBookings]);
 
+  const handleBookingStatusChange = useCallback(async (bookingId, status, feedback = null) => {
+    if (!bookingId || !status) return;
+
+    try {
+      setRefreshing(true);
+      await bookingsAPI.updateStatus(bookingId, status, feedback);
+    } catch (error) {
+      console.warn('Failed to update booking status:', error?.message || error);
+    } finally {
+      await fetchBookings();
+      setRefreshing(false);
+    }
+  }, [fetchBookings]);
+
   const openPaymentModal = useCallback((bookingId, paymentType = 'deposit') => {
     setPaymentData({
       bookingId,
@@ -756,22 +796,22 @@ const ParentDashboard = () => {
             onMessageCaregiver={handleMessageCaregiver}
             onViewReviews={handleViewReviews}
             navigation={navigation}
-            loading={loading}
           />
         );
       case 'search':
         return (
           <SearchTab
-            caregivers={filteredCaregivers}
+            caregivers={caregivers}
+            filteredCaregivers={filteredCaregivers}
             onViewCaregiver={handleViewCaregiver}
             onMessageCaregiver={handleMessageCaregiver}
             onViewReviews={handleViewReviews}
             onBookCaregiver={handleBookCaregiver}
             searchQuery={searchQuery}
             onSearch={handleSearch}
-            onFilterPress={() => toggleModal('filter', true)}
+            onOpenFilter={() => toggleModal('filter', true)}
             activeFilters={activeFilters}
-            loading={loading || searchLoading}
+            loading={searchLoading}
           />
         );
       case 'bookings':
@@ -784,13 +824,15 @@ const ParentDashboard = () => {
             onRefresh={onRefresh}
             onCancelBooking={handleCancelBooking}
             onUploadPayment={openPaymentModal}
-            onViewBookingDetails={(bookingId) => navigation.navigate('BookingDetails', { bookingId })}
+            onViewBookingDetails={(booking) => {
+              setSelectedBooking(booking);
+              toggleModal('bookingDetails', true);
+            }}
             onWriteReview={(bookingId, caregiverId) => navigation.navigate('Review', { bookingId, caregiverId })}
             onCreateBooking={() => {
               setSelectedCaregiver(createCaregiverObject());
               toggleModal('booking', true);
             }}
-            onMessageCaregiver={handleMessageCaregiver}
             navigation={navigation}
             loading={loading}
           />
@@ -814,7 +856,6 @@ const ParentDashboard = () => {
             onDeleteJob={handleDeleteJob}
             onCompleteJob={handleCompleteJob}
             onJobPosted={handleJobPosted}
-            loading={loading}
           />
         );
       case 'job-management':
@@ -827,7 +868,6 @@ const ParentDashboard = () => {
             onEditJob={handleEditJob}
             onDeleteJob={handleDeleteJob}
             onCompleteJob={handleCompleteJob}
-            loading={loading}
           />
         );
       default:
@@ -836,97 +876,162 @@ const ParentDashboard = () => {
   };
 
   return (
-    <PrivacyProvider>
-      <ProfileDataProvider>
-        <View style={styles.container}>
-          <Header
-            navigation={navigation}
-            onProfilePress={() => toggleModal('profile', true)}
-            onSignOut={signOut}
-            greetingName={greetingName}
-            onProfileEdit={() => toggleModal('profile', true)}
-            profileName={profileForm.name}
-            profileImage={profileForm.image}
-          />
-          
-          <NavigationTabs
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            onProfilePress={() => toggleModal('profile', true)}
-            navigation={navigation}
-            tabNotificationCounts={tabNotificationCounts}
-          />
-          
-          {renderActiveTab()}
-          
-          {/* Modals */}
-          <ChildModal
-            visible={modals.child}
-            onClose={() => toggleModal('child', false)}
-            childName={childForm.name}
-            setChildName={(name) => setChildForm(prev => ({ ...prev, name }))}
-            childAge={childForm.age}
-            setChildAge={(age) => setChildForm(prev => ({ ...prev, age }))}
-            childAllergies={childForm.allergies}
-            setChildAllergies={(allergies) => setChildForm(prev => ({ ...prev, allergies }))}
-            childNotes={childForm.notes}
-            setChildNotes={(notes) => setChildForm(prev => ({ ...prev, notes }))}
-            onSave={handleAddOrSaveChild}
-            editing={!!childForm.editingId}
-          />
+    <View style={styles.container}>
+      <Header
+        navigation={navigation}
+        onProfilePress={() => toggleModal('profile', true)}
+        onSignOut={signOut}
+        greetingName={greetingName}
+        onProfileEdit={() => toggleModal('profile', true)}
+        profileName={profileForm.name}
+        profileImage={profileForm.image}
+      />
 
-          <ProfileModal
-            visible={modals.profile}
-            onClose={() => toggleModal('profile', false)}
-            profileName={profileForm.name}
-            setProfileName={(name) => setProfileForm(prev => ({ ...prev, name }))}
-            profileContact={profileForm.contact}
-            setProfileContact={(contact) => setProfileForm(prev => ({ ...prev, contact }))}
-            profileLocation={profileForm.location}
-            setProfileLocation={(location) => setProfileForm(prev => ({ ...prev, location }))}
-            profileImage={profileForm.image}
-            setProfileImage={(image) => setProfileForm(prev => ({ ...prev, image }))}
-            handleSaveProfile={handleSaveProfile}
-          />
+      <NavigationTabs
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onProfilePress={() => toggleModal('profile', true)}
+        navigation={navigation}
+      />
 
-          <FilterModal
-            visible={modals.filter}
-            onClose={() => toggleModal('filter', false)}
-            filters={filters}
-            onApplyFilters={handleApplyFilters}
-          />
+      {/* {activeTab === 'bookings' && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.bookingsFilterWrapper}
+          contentContainerStyle={styles.bookingsFilterTabs}
+        >
+          {bookingFilterOptions.map((option) => {
+            const isActive = bookingsFilter === option.key;
+            const IconComponent = option.icon;
 
-          <JobPostingModal
-            visible={modals.jobPosting}
-            onClose={() => toggleModal('jobPosting', false)}
-            onJobPosted={handleJobPosted}
-          />
+            return (
+              <TouchableOpacity
+                key={option.key}
+                style={[styles.filterTab, isActive && styles.activeFilterTab]}
+                onPress={() => setBookingsFilter(option.key)}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.filterTabIconWrap, isActive && styles.activeFilterTabIconWrap]}>
+                  <IconComponent
+                    size={18}
+                    color={isActive ? colors.primary : colors.textTertiary}
+                  />
+                </View>
+                <Text style={[styles.filterTabText, isActive && styles.activeFilterTabText]}>
+                  {option.label}
+                </Text>
+                <Text style={[styles.filterTabCount, isActive && styles.activeFilterTabCount]}>
+                  {option.count}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )} */}
 
-          <PaymentModal
-            visible={modals.payment}
-            onClose={() => toggleModal('payment', false)}
-            bookingId={paymentData.bookingId}
-            amount={bookings.find(b => b._id === paymentData.bookingId)?.totalCost}
-            caregiverName={bookings.find(b => b._id === paymentData.bookingId)?.caregiver?.name}
-            bookingDate={bookings.find(b => b._id === paymentData.bookingId)?.date}
-            paymentType={bookings.find(b => b._id === paymentData.bookingId)?.status === 'completed' ? 'final_payment' : 'deposit'}
-            onPaymentSuccess={() => {
-              toggleModal('payment', false);
-              fetchBookings();
-            }}
-          />
+      {renderActiveTab()}
+      
+      {/* Modals */}
+      <ChildModal
+        visible={modals.child}
+        onClose={() => toggleModal('child', false)}
+        childName={childForm.name}
+        setChildName={(name) => setChildForm(prev => ({ ...prev, name }))}
+        childAge={childForm.age}
+        setChildAge={(age) => setChildForm(prev => ({ ...prev, age }))}
+        childAllergies={childForm.allergies}
+        setChildAllergies={(allergies) => setChildForm(prev => ({ ...prev, allergies }))}
+        childNotes={childForm.notes}
+        setChildNotes={(notes) => setChildForm(prev => ({ ...prev, notes }))}
+        onSave={handleAddOrSaveChild}
+        editing={!!childForm.editingId}
+      />
 
-          <BookingModal
-            visible={modals.booking}
-            onClose={() => toggleModal('booking', false)}
-            caregiver={selectedCaregiver}
-            childrenList={children}
-            onConfirm={handleBookingConfirm}
-          />
-        </View>
-      </ProfileDataProvider>
-    </PrivacyProvider>
+      <ProfileModal
+        visible={modals.profile}
+        onClose={() => toggleModal('profile', false)}
+        profileName={profileForm.name}
+        setProfileName={(name) => setProfileForm(prev => ({ ...prev, name }))}
+        profileContact={profileForm.contact}
+        setProfileContact={(contact) => setProfileForm(prev => ({ ...prev, contact }))}
+        profileLocation={profileForm.location}
+        setProfileLocation={(location) => setProfileForm(prev => ({ ...prev, location }))}
+        profileImage={profileForm.image}
+        setProfileImage={(image) => setProfileForm(prev => ({ ...prev, image }))}
+        handleSaveProfile={handleSaveProfile}
+      />
+
+      <FilterModal
+        visible={modals.filter}
+        onClose={() => toggleModal('filter', false)}
+        filters={filters}
+        onApplyFilters={handleApplyFilters}
+      />
+
+      <JobPostingModal
+        visible={modals.jobPosting}
+        onClose={() => toggleModal('jobPosting', false)}
+        onJobPosted={handleJobPosted}
+      />
+
+      <PaymentModal
+        visible={modals.payment}
+        onClose={() => toggleModal('payment', false)}
+        bookingId={paymentData.bookingId}
+        amount={bookings.find(b => b._id === paymentData.bookingId)?.totalCost}
+        caregiverName={bookings.find(b => b._id === paymentData.bookingId)?.caregiver?.name}
+        bookingDate={bookings.find(b => b._id === paymentData.bookingId)?.date}
+        paymentType={bookings.find(b => b._id === paymentData.bookingId)?.status === 'completed' ? 'final_payment' : 'deposit'}
+        onPaymentSuccess={() => {
+          toggleModal('payment', false);
+          fetchBookings();
+        }}
+      />
+
+      <BookingModal
+        visible={modals.booking}
+        onClose={() => toggleModal('booking', false)}
+        caregiver={selectedCaregiver}
+        childrenList={children}
+        onConfirm={handleBookingConfirm}
+      />
+
+      {modals.bookingDetails && (
+        <BookingDetailsModal
+          visible={modals.bookingDetails}
+          booking={selectedBooking}
+          onClose={() => toggleModal('bookingDetails', false)}
+          onMessage={() => {
+            if (!selectedBooking) return;
+            const caregiver = selectedBooking.caregiver || selectedBooking.caregiverId;
+            if (caregiver) {
+              handleMessageCaregiver(caregiver);
+            }
+          }}
+          onGetDirections={() => {}}
+          onCompleteBooking={() => {
+            if (!selectedBooking?._id) return;
+            toggleModal('bookingDetails', false);
+            handleBookingStatusChange(selectedBooking._id, 'completed');
+          }}
+          onCancelBooking={() => {
+            if (!selectedBooking?._id) return;
+            toggleModal('bookingDetails', false);
+            handleCancelBooking(selectedBooking._id);
+          }}
+        />
+      )}
+    </View>
   );
 };
+
+const ParentDashboard = () => (
+  <PrivacyProvider>
+    <ProfileDataProvider>
+      <ParentDashboardInner />
+    </ProfileDataProvider>
+  </PrivacyProvider>
+);
 
 export default ParentDashboard;

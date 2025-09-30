@@ -22,11 +22,6 @@ export { default as InformationRequestModal } from './features/privacy/Informati
 export { default as PrivacyNotificationModal } from './features/privacy/PrivacyNotificationModal';
 export { default as PrivacySettingsModal } from './features/privacy/PrivacySettingsModal';
 
-// Feature Components - Messaging
-export { default as ChatInterface } from './features/messaging/ChatInterface';
-export { default as SimpleChat } from './features/messaging/SimpleChat';
-export { default as MessagesTab } from './features/messaging/MessagesTab';
-
 // Feature Components - Profile
 export { default as ReviewList } from './features/profile/ReviewList';
 export { default as ProfileSettings } from './features/profile/ProfileSettings';

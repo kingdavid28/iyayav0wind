@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from "expo-linear-gradient"
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View, FlatList } from "react-native"
 import { Button, Card, Chip, Searchbar } from "react-native-paper"
 import { useNavigation } from '@react-navigation/native'
 import Toast from "../components/ui/feedback/Toast"
 import { bookingsAPI, applicationsAPI, caregiversAPI, authAPI, getCurrentSocketURL, firebaseMessagingService } from "../services"
+import ratingService from '../services/ratingService';
 import { useAuth } from "../contexts/AuthContext"
 import { useMessaging } from '../contexts/MessagingContext';
 import { usePrivacy } from '../components/features/privacy/PrivacyManager';
@@ -312,11 +313,98 @@ function CaregiverDashboard({ route }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState(null);
   const [chatActive, setChatActive] = useState(false);
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
   const showToast = (message, type = 'success') => setToast({ visible: true, message, type })
   const [refreshing, setRefreshing] = useState(false)
+
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const parseCaregiverReviewPayload = useCallback((payload) => {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    const collections = [
+      payload?.data,
+      payload?.ratings,
+      payload?.items,
+      payload?.results,
+      payload?.docs,
+    ];
+
+    for (const collection of collections) {
+      if (Array.isArray(collection)) {
+        return collection;
+      }
+    }
+
+    return [];
+  }, []);
+
+  const normalizeCaregiverReviewItems = useCallback((items) => (
+    items.map((item, index) => ({
+      id: item._id || item.id || item.reviewId || index,
+      rating: item.rating ?? item.score ?? item.stars ?? item.value ?? 0,
+      reviewerName:
+        item.reviewerName ||
+        item.parentName ||
+        item.authorName ||
+        item.reviewer ||
+        item.from ||
+        item.rater?.name ||
+        item.rater?.fullName ||
+        'Parent',
+      reviewerId: item.reviewerId || item.parentId || item.rater?._id || item.rater?.id || undefined,
+      comment: item.review || item.comment || item.notes || item.feedback || '',
+      timestamp: item.createdAt || item.timestamp || item.date || item.updatedAt || item.reviewedAt || new Date().toISOString(),
+      bookingId: item.bookingId || item.booking?._id || item.booking?.id || undefined,
+      raw: __DEV__ ? item : undefined,
+    }))
+  ), []);
+
+  const fetchCaregiverReviews = useCallback(async () => {
+    if (!user?.id) {
+      if (!isMountedRef.current) return;
+      setReviews([]);
+      setReviewsError(null);
+      setReviewsLoading(false);
+      return;
+    }
+
+    if (isMountedRef.current) {
+      setReviewsLoading(true);
+      setReviewsError(null);
+    }
+
+    try {
+      const response = await ratingService.getCaregiverRatings(user.id, 1, 20);
+      const payload = response?.data ?? response;
+      const items = parseCaregiverReviewPayload(payload);
+
+      if (!isMountedRef.current) return;
+      setReviews(normalizeCaregiverReviewItems(items));
+    } catch (error) {
+      console.warn('⚠️ Failed to load caregiver reviews:', error?.message || error);
+      if (!isMountedRef.current) return;
+      setReviewsError(error?.message || 'Unable to load reviews');
+      setReviews([]);
+    } finally {
+      if (isMountedRef.current) {
+        setReviewsLoading(false);
+      }
+    }
+  }, [normalizeCaregiverReviewItems, parseCaregiverReviewPayload, user?.id]);
   
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -348,7 +436,7 @@ function CaregiverDashboard({ route }) {
       setParents([]);
       return;
     }
-  
+
     setParents(
       conversations.map((conv) => ({
         id: conv.parentId || conv.id,
@@ -358,19 +446,18 @@ function CaregiverDashboard({ route }) {
       }))
     );
   }, [conversations]);
- 
- 
-  // Fetch messages for selected parent
+
+
   useEffect(() => {
     if (!selectedParent || !user?.id) return;
-  
+
     const [id1, id2] = [user.id, selectedParent.id].sort();
     const conversationId = `${id1}_${id2}`;
-  
+
     setActiveConversationId(conversationId);
     subscribeToMessages(conversationId, user.id, selectedParent.id);
     markMessagesAsRead(user.id, selectedParent.id, conversationId).catch(console.error);
-  
+
     return () => {
       setActiveConversationId(null);
       subscribeToMessages(null);
@@ -387,44 +474,9 @@ function CaregiverDashboard({ route }) {
   }, [contextMessages]);
 
 
-  // Fetch reviews with runtime Firebase check
   useEffect(() => {
-    if (!user?.id) return;
-
-    // Check if Firebase is available
-    const checkFirebaseAvailability = () => {
-      try {
-        const { database: db, ref, onValue, query, orderByChild } = require('../config/firebase');
-        return !!(db && onValue && ref && query && orderByChild);
-      } catch (error) {
-        console.warn('Firebase not available:', error);
-        return false;
-      }
-    };
-
-    if (!checkFirebaseAvailability()) {
-      console.warn('⚠️ Firebase not available, skipping reviews fetch');
-      return;
-    }
-
-    const { database: db, ref, onValue, query, orderByChild } = require('../config/firebase');
-
-    const reviewsRef = ref(db, `reviews/${user.id}`);
-    const reviewsQuery = query(reviewsRef, orderByChild('timestamp'));
-
-    const unsubscribe = onValue(reviewsQuery, (snapshot) => {
-      const reviewsData = [];
-      snapshot.forEach((childSnapshot) => {
-        reviewsData.push({
-          id: childSnapshot.key,
-          ...childSnapshot.val()
-        });
-      });
-      setReviews(reviewsData.reverse());
-    });
-
-    return () => unsubscribe();
-  }, [user?.id]);
+    fetchCaregiverReviews();
+  }, [fetchCaregiverReviews]);
   
   const { pendingRequests, notifications } = usePrivacy();
   const [showNotifications, setShowNotifications] = useState(false);

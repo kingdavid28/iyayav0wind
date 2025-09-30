@@ -113,6 +113,28 @@ class SocketService {
     return;
   }
 
+  notifyNewJob(jobData) {
+    if (!this.io) {
+      console.warn('⚠️ notifyNewJob called without active socket server');
+      return;
+    }
+
+    try {
+      console.log('📣 Broadcasting new job to caregivers:', {
+        jobId: jobData?.jobId,
+        title: jobData?.title,
+        location: jobData?.location,
+      });
+
+      this.io.emit('job:new', {
+        ...jobData,
+        notifiedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('❌ Failed to broadcast new job notification:', error);
+    }
+  }
+
   // Emit message deleted event
   emitMessageDeleted(conversationId, messageId) {
     if (!this.io) return;

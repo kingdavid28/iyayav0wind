@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, RefreshControl, TouchableOpacity, Alert, Linking, ActivityIndicator, ScrollView } from 'react-native';
 import { Calendar, Clock, DollarSign, Filter, Plus } from 'lucide-react-native';
 import { styles, colors } from '../../styles/ParentDashboard.styles';
 import BookingItem from './BookingItem';
@@ -8,10 +8,10 @@ import { formatAddress } from '../../../utils/addressUtils';
 import { BOOKING_STATUSES } from '../../../constants/bookingStatuses';
 
 const BookingsTab = ({
-  bookings,
-  bookingsFilter,
+  bookings = [],
+  bookingsFilter = 'all',
   setBookingsFilter,
-  refreshing,
+  refreshing = false,
   onRefresh,
   onCancelBooking,
   onUploadPayment,
@@ -20,44 +20,54 @@ const BookingsTab = ({
   onCreateBooking,
   onMessageCaregiver,
   navigation,
-  loading
+  loading = false
 }) => {
   const filteredBookings = useMemo(() => {
-    if (!bookings || !Array.isArray(bookings)) return [];
+    if (!Array.isArray(bookings)) return [];
     
     const now = new Date();
     now.setHours(0, 0, 0, 0); // Start of today
     
     switch (bookingsFilter) {
       case 'upcoming':
-        return bookings.filter((b) => {
-          if (!b.date) return false;
-          const bookingDate = new Date(b.date);
-          bookingDate.setHours(0, 0, 0, 0);
-          return bookingDate >= now;
+        return bookings.filter((booking) => {
+          if (!booking?.date) return false;
+          try {
+            const bookingDate = new Date(booking.date);
+            bookingDate.setHours(0, 0, 0, 0);
+            return bookingDate >= now;
+          } catch (error) {
+            console.error('Error parsing booking date:', error);
+            return false;
+          }
         });
         
       case 'past':
-        return bookings.filter((b) => {
-          if (!b.date) return false;
-          const bookingDate = new Date(b.date);
-          bookingDate.setHours(0, 0, 0, 0);
-          return bookingDate < now;
+        return bookings.filter((booking) => {
+          if (!booking?.date) return false;
+          try {
+            const bookingDate = new Date(booking.date);
+            bookingDate.setHours(0, 0, 0, 0);
+            return bookingDate < now;
+          } catch (error) {
+            console.error('Error parsing booking date:', error);
+            return false;
+          }
         });
         
       case 'pending':
-        return bookings.filter(b => b.status === BOOKING_STATUSES.PENDING);
+        return bookings.filter(booking => booking?.status === BOOKING_STATUSES.PENDING);
         
       case 'confirmed':
-        return bookings.filter(b => 
-          b.status === BOOKING_STATUSES.CONFIRMED || 
-          b.status === BOOKING_STATUSES.IN_PROGRESS
+        return bookings.filter(booking => 
+          booking?.status === BOOKING_STATUSES.CONFIRMED || 
+          booking?.status === BOOKING_STATUSES.IN_PROGRESS
         );
         
       case 'completed':
-        return bookings.filter(b => 
-          b.status === BOOKING_STATUSES.COMPLETED || 
-          b.status === BOOKING_STATUSES.PAID
+        return bookings.filter(booking => 
+          booking?.status === BOOKING_STATUSES.COMPLETED || 
+          booking?.status === BOOKING_STATUSES.PAID
         );
         
       default:
@@ -67,17 +77,20 @@ const BookingsTab = ({
   
   // Calculate booking statistics
   const bookingStats = useMemo(() => {
-    if (!bookings || !Array.isArray(bookings)) {
+    if (!Array.isArray(bookings)) {
       return { total: 0, pending: 0, confirmed: 0, completed: 0, totalSpent: 0 };
     }
     
     return bookings.reduce((stats, booking) => {
+      if (!booking) return stats;
+      
       stats.total += 1;
       
       // Only count money as "spent" if booking is paid or completed with payment
+      const cost = booking.totalCost || booking.amount || 0;
       if (booking.status === BOOKING_STATUSES.PAID || 
           (booking.status === BOOKING_STATUSES.COMPLETED && booking.paymentProof)) {
-        stats.totalSpent += (booking.totalCost || booking.amount || 0);
+        stats.totalSpent += cost;
       }
       
       switch (booking.status) {
@@ -110,6 +123,11 @@ const BookingsTab = ({
       const caregiverId = caregiver._id || caregiver.id;
       const caregiverName = caregiver.name || caregiver.firstName || 'Caregiver';
       
+      if (!caregiverId) {
+        Alert.alert('Error', 'Caregiver ID not found');
+        return;
+      }
+      
       console.log('🔍 BookingsTab - Extracted caregiver info:', { caregiverId, caregiverName });
       
       if (onMessageCaregiver) {
@@ -133,16 +151,21 @@ const BookingsTab = ({
 
   const handleCallCaregiver = async (caregiver) => {
     try {
-      if (!caregiver || !caregiver.phone) {
+      if (!caregiver?.phone) {
         Alert.alert('No Phone Number', 'Caregiver phone number is not available');
         return;
       }
       
       const phoneNumber = caregiver.phone.replace(/[^0-9+]/g, '');
       
+      if (!phoneNumber) {
+        Alert.alert('Error', 'Invalid phone number format');
+        return;
+      }
+      
       Alert.alert(
         'Call Caregiver',
-        `Call ${caregiver.name || 'caregiver'} at ${caregiver.phone}?`,
+        `Call ${caregiver.name || caregiver.firstName || 'caregiver'} at ${caregiver.phone}?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -157,6 +180,15 @@ const BookingsTab = ({
       console.error('Error calling caregiver:', error);
       Alert.alert('Error', 'Failed to make call. Please try again.');
     }
+  };
+
+  // Simple handler functions that don't rely on event objects
+  const handleFilterPress = (filterKey) => {
+    setBookingsFilter?.(filterKey);
+  };
+
+  const handleCreateBooking = () => {
+    onCreateBooking?.();
   };
 
   const renderStatsHeader = () => (
@@ -187,14 +219,19 @@ const BookingsTab = ({
   const renderFilterTabs = () => {
     const filterOptions = [
       { key: 'all', label: 'All', count: bookingStats.total },
-      { key: 'upcoming', label: 'Upcoming', count: null },
+      { key: 'upcoming', label: 'Upcoming', count: filteredBookings.length },
       { key: 'pending', label: 'Pending', count: bookingStats.pending },
       { key: 'confirmed', label: 'Active', count: bookingStats.confirmed },
       { key: 'completed', label: 'Done', count: bookingStats.completed }
     ];
 
     return (
-      <View style={styles.bookingsFilterTabs}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.bookingsFilterWrapper}
+        contentContainerStyle={styles.bookingsFilterTabs}
+      >
         {filterOptions.map((option) => {
           const isActive = bookingsFilter === option.key;
           return (
@@ -204,7 +241,7 @@ const BookingsTab = ({
                 styles.filterTab,
                 isActive && styles.activeFilterTab
               ]}
-              onPress={() => setBookingsFilter(option.key)}
+              onPress={() => handleFilterPress(option.key)}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel={`Filter by ${option.label} bookings`}
@@ -225,7 +262,7 @@ const BookingsTab = ({
             </TouchableOpacity>
           );
         })}
-      </View>
+      </ScrollView>
     );
   };
 
@@ -247,20 +284,34 @@ const BookingsTab = ({
       }
     };
 
+    const getEmptyDescription = () => {
+      switch (bookingsFilter) {
+        case 'all':
+          return 'Start by booking a caregiver for your children';
+        case 'upcoming':
+          return 'You have no upcoming bookings scheduled';
+        case 'pending':
+          return 'You have no pending booking requests';
+        case 'confirmed':
+          return 'You have no active bookings at the moment';
+        case 'completed':
+          return 'You have no completed bookings yet';
+        default:
+          return 'Check other tabs or create a new booking';
+      }
+    };
+
     return (
       <View style={styles.emptySection}>
         <Calendar size={48} color={colors.textSecondary} style={styles.emptyIcon} />
         <Text style={styles.emptySectionTitle}>{getEmptyMessage()}</Text>
         <Text style={styles.emptySectionText}>
-          {bookingsFilter === 'all' 
-            ? 'Start by booking a caregiver for your children'
-            : 'Check other tabs or create a new booking'
-          }
+          {getEmptyDescription()}
         </Text>
         {onCreateBooking && (
           <TouchableOpacity
             style={styles.emptyActionButton}
-            onPress={onCreateBooking}
+            onPress={handleCreateBooking}
           >
             <Plus size={20} color="#FFFFFF" />
             <Text style={styles.emptyActionButtonText}>Book a Caregiver</Text>
@@ -279,20 +330,19 @@ const BookingsTab = ({
     );
   }
 
+  const getCaregiverFromBooking = (booking) => {
+    return booking?.caregiverId || 
+           booking?.caregiver || 
+           booking?.caregiverProfile || 
+           booking?.assignedCaregiver || 
+           {};
+  };
+
   return (
     <View style={[styles.bookingsContent, { flex: 1 }]}>
       <View style={styles.bookingsHeader}>
         <View style={styles.bookingsHeaderTop}>
           <Text style={styles.bookingsTitle}>My Bookings</Text>
-          {onCreateBooking && (
-            <TouchableOpacity
-              style={styles.createBookingButton}
-              onPress={onCreateBooking}
-            >
-              <Plus size={20} color="#FFFFFF" />
-              <Text style={styles.createBookingButtonText}>Book</Text>
-            </TouchableOpacity>
-          )}
         </View>
         
         {bookingStats.total > 0 && renderStatsHeader()}
@@ -302,11 +352,11 @@ const BookingsTab = ({
       <FlatList
         style={{ flex: 1 }}
         data={filteredBookings}
-        keyExtractor={(item, index) => item._id || item.id || `booking-${index}`}
+        keyExtractor={(item, index) => item?._id || item?.id || `booking-${index}`}
         renderItem={({ item }) => (
           <BookingItem
             booking={item}
-            user={item?.caregiverId || item?.caregiver || item?.caregiverProfile || item?.assignedCaregiver}
+            user={getCaregiverFromBooking(item)}
             onCancelBooking={onCancelBooking}
             onUploadPayment={onUploadPayment}
             onViewBookingDetails={onViewBookingDetails}

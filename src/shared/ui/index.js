@@ -4,12 +4,13 @@ export { default as StatusBadge } from './StatusBadge';
 export { default as ModalWrapper } from './ModalWrapper';
 export { default as Card } from './Card';
 export { default as Button } from './Button';
+export { default as SectionTitle } from './SectionTitle';
+export { default as SimpleBookingModal } from './SimpleBookingModal';
+
 export { default as ErrorBoundary } from './feedback/ErrorBoundary';
 export { LoadingSpinner } from './feedback/LoadingSpinner';
 export { QuickStat, QuickAction } from './QuickComponents';
 export { default as NotificationBadge } from './NotificationBadge';
-
-// Form Components
 
 export { default as FormTextArea } from './forms/FormTextArea';
 

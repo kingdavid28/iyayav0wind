@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiService } from '../services';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,10 +32,11 @@ export const useCaregiverDashboard = () => {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const loadingRef = useRef(false);
+  const isCaregiver = useMemo(() => String(user?.role || '').toLowerCase() === 'caregiver', [user?.role]);
 
   // Load profile data with caching
   const loadProfile = useCallback(async () => {
-    if (!user?.id || loadingRef.current) return;
+    if (!user?.id || loadingRef.current || !isCaregiver) return;
 
     try {
       loadingRef.current = true;
@@ -70,7 +71,15 @@ export const useCaregiverDashboard = () => {
           name: caregiverProfile.name || user?.name || prev.name,
           email: caregiverProfile.email || user?.email || prev.email,
           phone: caregiverProfile.phone || user?.phone || prev.phone,
-          location: caregiverProfile.location || (caregiverProfile.address ? `${caregiverProfile.address.city || ''}${caregiverProfile.address.city && caregiverProfile.address.province ? ', ' : ''}${caregiverProfile.address.province || ''}` : user?.location || prev.location),
+          location:
+            caregiverProfile.location ||
+            (caregiverProfile.address
+              ? `${caregiverProfile.address.city || ''}${
+                  caregiverProfile.address.city && caregiverProfile.address.province
+                    ? ', '
+                    : ''
+                }${caregiverProfile.address.province || ''}`
+              : user?.location || prev.location),
           address: caregiverProfile.address || prev.address,
           profileImage: caregiverProfile.profileImage || user?.profileImage || prev.profileImage,
           hourlyRate: caregiverProfile.hourlyRate || caregiverProfile.rate || prev.hourlyRate,
@@ -92,16 +101,31 @@ export const useCaregiverDashboard = () => {
     } finally {
       loadingRef.current = false;
     }
-  }, [user?.id]);
+  }, [user?.id, isCaregiver]);
 
   // Fetch jobs
   const fetchJobs = useCallback(async () => {
-    if (!user?.id || user?.role !== 'caregiver') return;
+    if (!user?.id || !isCaregiver) {
+      setJobs([]);
+      setJobsLoading(false);
+      return;
+    }
 
     setJobsLoading(true);
     try {
       const res = await apiService.jobs.getAvailable();
       const jobsList = res?.data?.jobs || res?.jobs || [];
+
+      console.log('🧾 Jobs API response:', {
+        total: Array.isArray(jobsList) ? jobsList.length : 0,
+        sample: jobsList.slice(0, 2).map(job => ({
+          id: job?._id || job?.id,
+          title: job?.title,
+          rate: job?.hourlyRate || job?.rate,
+          location: job?.location,
+        })),
+        rawKeys: res ? Object.keys(res) : null,
+      });
 
       const transformedJobs = jobsList.map(job => ({
         id: job._id || job.id,
@@ -119,6 +143,7 @@ export const useCaregiverDashboard = () => {
         description: job.description || ''
       }));
 
+      console.log('🧮 Transformed jobs count:', transformedJobs.length);
       setJobs(transformedJobs);
     } catch (error) {
       console.error('Error fetching jobs:', {
@@ -130,16 +155,18 @@ export const useCaregiverDashboard = () => {
         stack: error?.stack
       });
       setJobs([]);
-      // Re-throw to let error handler process it
       throw error;
     } finally {
       setJobsLoading(false);
     }
-  }, [user?.id, user?.role]);
+  }, [user?.id, isCaregiver]);
 
   // Fetch applications
   const fetchApplications = useCallback(async () => {
-    if (!user?.id || user?.role !== 'caregiver') return;
+    if (!user?.id || !isCaregiver) {
+      setApplications([]);
+      return;
+    }
 
     try {
       console.log('📋 Fetching applications for caregiver:', user?.id);
@@ -176,25 +203,26 @@ export const useCaregiverDashboard = () => {
         stack: error?.stack
       });
       setApplications([]);
-      // Re-throw to let error handler process it
       throw error;
     }
-  }, [user?.id, user?.role]);
+  }, [user?.id, isCaregiver]);
 
   // Fetch bookings
   const fetchBookings = useCallback(async () => {
     console.log('📅 fetchBookings called with user:', { id: user?.id, role: user?.role });
-    if (!user?.id || user?.role !== 'caregiver') {
+    if (!user?.id || !isCaregiver) {
       console.log('🚫 Skipping bookings - not caregiver');
+      setBookings([]);
       return;
     }
 
     try {
       console.log('📅 Fetching bookings for caregiver:', user?.id);
       const res = await apiService.bookings.getMy();
-      console.log('📅 Bookings API response:', res);
-
-      const list = Array.isArray(res?.bookings) ? res.bookings : [];
+      const list =
+        res?.data?.bookings ||
+        res?.bookings ||
+        [];
       console.log('📅 Bookings count:', list.length);
 
       if (list.length === 0) {
@@ -220,11 +248,11 @@ export const useCaregiverDashboard = () => {
       console.error('❌ Error fetching bookings:', error);
       setBookings([]);
     }
-  }, [user?.id, user?.role]);
+  }, [user?.id, isCaregiver]);
 
   // Load data only once on mount
   useEffect(() => {
-    if (!dataLoaded && user?.id) {
+    if (!dataLoaded && user?.id && isCaregiver) {
       Promise.all([
         loadProfile(),
         fetchJobs(),
@@ -232,20 +260,24 @@ export const useCaregiverDashboard = () => {
         fetchBookings()
       ]).finally(() => setDataLoaded(true));
     }
-  }, [user?.id, dataLoaded]);
+  }, [user?.id, dataLoaded, isCaregiver, loadProfile, fetchJobs, fetchApplications, fetchBookings]);
 
   // Refresh data when tabs become active
   useEffect(() => {
-    if (activeTab === 'jobs' && user?.id) {
+    if (!user?.id || !isCaregiver) {
+      return;
+    }
+
+    if (activeTab === 'jobs') {
       fetchJobs();
     }
-    if (activeTab === 'bookings' && user?.id) {
+    if (activeTab === 'bookings') {
       fetchBookings();
     }
-    if (activeTab === 'applications' && user?.id) {
+    if (activeTab === 'applications') {
       fetchApplications();
     }
-  }, [activeTab, fetchJobs, fetchBookings, fetchApplications, user?.id]);
+  }, [activeTab, fetchJobs, fetchBookings, fetchApplications, user?.id, isCaregiver]);
 
   return {
     activeTab,
