@@ -39,11 +39,25 @@ const CaregiverCard = ({ caregiver = {}, onPress, onMessagePress, onViewReviews,
 
 
   // Safe defaults
-  const name = caregiver?.name || "Caregiver";
+  const name =
+    caregiver?.displayName ||
+    caregiver?.name ||
+    [caregiver?.firstName, caregiver?.lastName].filter(Boolean).join(" ") ||
+    caregiver?.user?.displayName ||
+    [caregiver?.user?.firstName, caregiver?.user?.lastName].filter(Boolean).join(" ") ||
+    caregiver?.user?.name ||
+    "Caregiver";
+
   const avatarRaw =
     caregiver?.avatar ||
     caregiver?.profileImage ||
     caregiver?.user?.profileImage ||
+    caregiver?.photoURL ||
+    caregiver?.photoUrl ||
+    caregiver?.image ||
+    caregiver?.user?.photoURL ||
+    caregiver?.user?.photoUrl ||
+    caregiver?.user?.avatar ||
     "";
   const rating = typeof caregiver?.rating === "number" ? caregiver.rating : 0;
   const reviewCount =

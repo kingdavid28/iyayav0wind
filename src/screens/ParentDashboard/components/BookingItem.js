@@ -1,16 +1,16 @@
 // src/components/bookings/BookingItem.js
-import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, formatDistanceToNow } from 'date-fns';
-import { parseDate, buildSchedule, to12h } from '../../../utils/dateUtils';
-import { getProfileImageUrl } from '../../../utils/imageUtils';
+import React, { useMemo } from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { buildSchedule, parseDate, to12h } from '../../../utils/dateUtils';
+import { getPlaceholderImage, getProfileImageUrl } from '../../../utils/imageUtils';
 
 const DEFAULT_CURRENCY = '₱';
 
@@ -29,249 +29,318 @@ const BookingItem = ({
   onCallCaregiver,
   showActions = true
 }) => {
+  const caregiver = useMemo(() => {
+    if (user && typeof user === 'object') return user;
+    if (booking?.caregiver && typeof booking.caregiver === 'object') return booking.caregiver;
+    if (booking?.caregiverProfile && typeof booking.caregiverProfile === 'object') return booking.caregiverProfile;
+    if (booking?.assignedCaregiver && typeof booking.assignedCaregiver === 'object') return booking.assignedCaregiver;
+    return null;
+  }, [user, booking]);
+
+  const bookingId =
+    booking?.bookingCode ||
+    booking?.reference ||
+    booking?.bookingId ||
+    booking?._id ||
+    booking?.id ||
+    'N/A';
+
+  const bookingStatus = (booking?.status || 'pending').toLowerCase();
+
+  const costAmount =
+    [
+      booking?.totalCost,
+      booking?.amount,
+      booking?.pricing?.total,
+      booking?.rate,
+      booking?.price
+    ].find((value) => typeof value === 'number') || 0;
+
+  const paymentStatusRaw = (booking?.paymentStatus || booking?.payment_state || booking?.paymentStatusLabel || '').toLowerCase();
+  const hasPaymentProof = Boolean(
+    booking?.paymentProof ||
+    booking?.paymentProofUrl ||
+    booking?.payment?.proof ||
+    booking?.receiptUrl
+  );
+  const paymentStatus = paymentStatusRaw || (hasPaymentProof ? 'paid' : 'pending');
+
+  const locationText =
+    booking?.location ||
+    booking?.address ||
+    booking?.venue ||
+    booking?.meetingPoint ||
+    booking?.serviceLocation ||
+    null;
+
+  const childrenCount = Array.isArray(booking?.children)
+    ? booking.children.length
+    : Number(booking?.childrenCount || booking?.childCount || booking?.children || booking?.numberOfChildren || 0);
+
+  const notesText =
+    booking?.notes ||
+    booking?.instructions ||
+    booking?.additionalNotes ||
+    booking?.specialInstructions ||
+    null;
+
+  const caregiverRole =
+    caregiver?.role ||
+    caregiver?.primaryRole ||
+    booking?.caregiverRole ||
+    booking?.serviceType ||
+    'Caregiver';
+
+  const caregiverDisplayName =
+    caregiver?.displayName ||
+    caregiver?.name ||
+    [caregiver?.firstName, caregiver?.lastName].filter(Boolean).join(' ') ||
+    booking?.caregiverName ||
+    booking?.caregiverFullName ||
+    'Caregiver';
+
+  const rating =
+    typeof caregiver?.rating === 'number'
+      ? caregiver.rating
+      : typeof caregiver?.averageRating === 'number'
+        ? caregiver.averageRating
+        : booking?.caregiverRating || booking?.rating || null;
+
+  const reviewsCount =
+    caregiver?.reviewsCount ||
+    caregiver?.reviewCount ||
+    caregiver?.ratingsCount ||
+    booking?.caregiverReviewsCount ||
+    booking?.reviewsCount ||
+    null;
+
+  const statusConfig = useMemo(() => {
+    const configs = {
+      pending: { color: '#F59E0B', text: 'Pending Approval' },
+      pending_confirmation: { color: '#F59E0B', text: 'Awaiting Confirmation' },
+      confirmed: { color: '#10B981', text: 'Confirmed' },
+      in_progress: { color: '#3B82F6', text: 'In Progress' },
+      completed: { color: '#6366F1', text: 'Completed' },
+      paid: { color: '#14B8A6', text: 'Paid' },
+      cancelled: { color: '#EF4444', text: 'Cancelled' },
+      declined: { color: '#6B7280', text: 'Declined' },
+    };
+    return configs[bookingStatus] || configs.pending;
+  }, [bookingStatus]);
+
+  const paymentStatusConfig = useMemo(() => {
+    const configs = {
+      paid: { color: '#10B981', text: 'Payment Received' },
+      pending: { color: '#F59E0B', text: 'Awaiting Payment' },
+      awaiting_proof: { color: '#F59E0B', text: 'Awaiting Proof' },
+      failed: { color: '#EF4444', text: 'Payment Failed' },
+      refunded: { color: '#6B7280', text: 'Refunded' },
+    };
+    return configs[paymentStatus] || configs.pending;
+  }, [paymentStatus]);
+
+  const { color: statusColor, text: statusText } = statusConfig;
+  const { color: paymentStatusColor, text: paymentStatusText } = paymentStatusConfig;
+
+  // Schedule information
+  const scheduleInfo = useMemo(() => {
+    const dateString =
+      booking?.date ||
+      booking?.scheduledDate ||
+      booking?.startDate ||
+      booking?.dateTime;
+
+    const rawStart =
+      booking?.scheduledStart ||
+      booking?.startTime ||
+      booking?.start_time ||
+      (typeof booking?.time === 'string' ? booking.time.split(' - ')[0] : undefined);
+
+    const rawEnd =
+      booking?.scheduledEnd ||
+      booking?.endTime ||
+      booking?.end_time ||
+      (typeof booking?.time === 'string' ? booking.time.split(' - ')[1] : undefined);
+
+    const friendlySchedule = buildSchedule(dateString, to12h(rawStart), to12h(rawEnd));
+    const parsedStartDate = parseDate(dateString);
+    const relativeTime = parsedStartDate
+      ? formatDistanceToNow(parsedStartDate, { addSuffix: true })
+      : '';
+
+    return {
+      friendlySchedule,
+      relativeTime,
+    };
+  }, [
+    booking?.date,
+    booking?.scheduledDate,
+    booking?.startDate,
+    booking?.dateTime,
+    booking?.scheduledStart,
+    booking?.startTime,
+    booking?.start_time,
+    booking?.scheduledEnd,
+    booking?.endTime,
+    booking?.end_time,
+    booking?.time,
+  ]);
+
   const formatDate = (dateString) => {
+    const parsedDate = parseDate(dateString);
+    if (!parsedDate) return 'N/A';
+
     try {
-      if (!dateString) return 'No date';
-      const date = new Date(dateString);
-      return format(date, 'MMM d, yyyy • h:mm a');
+      return format(parsedDate, 'MMM d, yyyy • h:mm a');
     } catch (error) {
-      console.error('Error formatting date:', error);
       return 'Invalid date';
     }
   };
 
-  const caregiverRole = user?.role || booking?.caregiverRole || 'Caregiver';
-  const rating = typeof user?.rating === 'number' ? user.rating : user?.averageRating;
-  const reviewsCount = user?.reviewsCount || user?.reviewCount || user?.ratingsCount;
-  const childrenCount = Array.isArray(booking?.children)
-    ? booking.children.length
-    : Number(booking?.childrenCount || booking?.childCount || booking?.children || 0);
-  const costAmount = [
-    booking?.totalCost,
-    booking?.amount,
-    booking?.pricing?.total,
-    booking?.rate,
-    booking?.price
-  ].find((value) => typeof value === 'number') || 0;
-  const paymentStatus = (booking?.paymentStatus || booking?.payment_state || booking?.paymentStatusLabel || '').toLowerCase();
-  const hasPaymentProof = Boolean(booking?.paymentProof || booking?.paymentProofUrl || booking?.payment?.proof);
-  const bookingId = booking?.bookingCode || booking?.reference || booking?._id || booking?.id || booking?.bookingId || 'N/A';
-  const locationText = booking?.location || booking?.address || booking?.venue || booking?.meetingPoint;
-  const notesText = booking?.notes || booking?.instructions || booking?.additionalNotes;
-
-  const scheduleInfo = useMemo(() => {
-    const dateString = booking?.date || booking?.startDate || booking?.scheduledDate || booking?.dateTime;
-    const rawStart = booking?.startTime || booking?.start_time || booking?.time?.split(' - ')[0] || booking?.scheduledStart;
-    const rawEnd = booking?.endTime || booking?.end_time || booking?.time?.split(' - ')[1] || booking?.scheduledEnd;
-
-    const startTime = to12h(rawStart);
-    const endTime = to12h(rawEnd);
-
-    const friendlySchedule = buildSchedule(dateString, startTime, endTime);
-    const parsedStartDate = parseDate(dateString);
-    const relativeTime = parsedStartDate
-      ? formatDistanceToNow(parsedStartDate, { addSuffix: true })
-      : null;
-
-    return {
-      friendlySchedule,
-      relativeTime
-    };
-  }, [
-    booking?.date,
-    booking?.dateTime,
-    booking?.startDate,
-    booking?.startTime,
-    booking?.start_time,
-    booking?.time,
-    booking?.endTime,
-    booking?.end_time,
-    booking?.scheduledDate,
-    booking?.scheduledStart,
-    booking?.scheduledEnd
-  ]);
-
-  const getSafeImageUrl = () => {
-    try {
-      const imageUrl = getProfileImageUrl(user);
-      if (imageUrl) {
-        return { uri: imageUrl };
-      }
-    } catch (error) {
-      // Fall through to default
+  // Safe image source
+  const getSafeImageSource = () => {
+    const profileImageUrl = getProfileImageUrl(caregiver);
+    if (typeof profileImageUrl === 'string' && profileImageUrl.trim()) {
+      return { uri: profileImageUrl.trim() };
     }
-    
-    // Return a simple placeholder without base64 encoding
-    return require('../../../../assets/logo.png'); // Add this asset or use a different approach
-  };
 
-  const getPaymentStatusColor = (status) => {
-    switch (status) {
-      case 'paid':
-        return '#0EA5E9';
-      case 'pending':
-      case 'awaiting proof':
-        return '#F59E0B';
-      default:
-        return '#1F2937';
+    const fallbackImage = [
+      caregiver?.profileImage,
+      caregiver?.user?.profileImage,
+      caregiver?.avatar,
+      caregiver?.photoURL,
+      caregiver?.photoUrl,
+      caregiver?.image,
+      booking?.caregiverProfileImage,
+      booking?.caregiverImage,
+      booking?.caregiverAvatar,
+      booking?.caregiverPhoto,
+    ].find((value) => typeof value === 'string' && value.trim());
+
+    if (fallbackImage) {
+      return { uri: fallbackImage.trim() };
     }
+
+    const placeholder = getPlaceholderImage();
+    return placeholder?.uri ? { uri: placeholder.uri } : require('../../../../assets/logo.png');
   };
 
-  const renderStatusBadge = () => {
-    if (!booking?.status) return null;
-
-    const normalizedStatus = booking.status.toLowerCase();
-    const statusConfig = {
-      pending: { label: 'Pending Approval', color: '#F59E0B' },
-      pending_confirmation: { label: 'Awaiting Confirmation', color: '#F59E0B' },
-      confirmed: { label: 'Confirmed', color: '#10B981' },
-      in_progress: { label: 'In Progress', color: '#3B82F6' },
-      completed: { label: 'Completed', color: '#6366F1' },
-      paid: { label: 'Paid', color: '#14B8A6' },
-      cancelled: { label: 'Cancelled', color: '#EF4444' },
-      declined: { label: 'Declined', color: '#6B7280' }
-    };
-
-    const { label, color } = statusConfig[normalizedStatus] || { label: booking.status, color: '#6B7280' };
-
-    return (
-      <View style={[styles.statusBadge, { backgroundColor: color }]}>
-        <Text style={styles.statusText}>{label}</Text>
-      </View>
-    );
+  // Event handlers
+  const handleMessage = () => {
+    onMessageCaregiver?.(caregiver || booking);
   };
 
-  // Safe event handlers that don't use event objects
-  const handleAccept = React.useCallback(() => {
-    console.log('Accept booking pressed');
-    onAccept?.();
-  }, [onAccept]);
+  const handleCall = () => {
+    onCallCaregiver?.(caregiver || booking);
+  };
 
-  const handleDecline = React.useCallback(() => {
-    console.log('Decline booking pressed');
-    onDecline?.();
-  }, [onDecline]);
+  const handleUploadPayment = () => {
+    onUploadPayment?.(booking);
+  };
 
-  const handleComplete = React.useCallback(() => {
-    console.log('Complete booking pressed');
-    onComplete?.();
-  }, [onComplete]);
-
-  const handleCancel = React.useCallback(() => {
-    console.log('Cancel booking pressed');
-    onCancelBooking?.();
-  }, [onCancelBooking]);
-
-  const handleUploadPayment = React.useCallback(() => {
-    console.log('Upload payment pressed');
-    onUploadPayment?.();
-  }, [onUploadPayment]);
-
-  const handleViewDetails = React.useCallback(() => {
-    console.log('View details pressed', booking?._id);
+  const handleViewDetails = () => {
     onViewBookingDetails?.(booking);
-  }, [booking, onViewBookingDetails]);
-
-  const handleWriteReview = React.useCallback(() => {
-    console.log('Write review pressed');
-    onWriteReview?.();
-  }, [onWriteReview]);
-
-  const handleMessage = React.useCallback(() => {
-    console.log('Message caregiver pressed');
-    onMessageCaregiver?.(user);
-  }, [onMessageCaregiver, user]);
-
-  const handleCall = React.useCallback(() => {
-    console.log('Call caregiver pressed');
-    onCallCaregiver?.(user);
-  }, [onCallCaregiver, user]);
-
-  const handlePress = React.useCallback(() => {
-    console.log('Booking item pressed', booking?._id);
-    if (onPress) {
-      onPress(booking);
-    }
-    if (onViewBookingDetails) {
-      onViewBookingDetails(booking);
-    }
-  }, [booking, onPress, onViewBookingDetails]);
-
-  const renderActionButtons = () => {
-    if (!showActions || !booking?.status) return null;
-
-    const normalizedStatus = booking.status.toLowerCase();
-
-    switch (normalizedStatus) {
-      case 'pending':
-      case 'pending_confirmation':
-        return (
-          <View style={styles.actionButtons}>
-            {onDecline && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.declineButton]}
-                onPress={handleDecline}
-                accessibilityLabel="Decline booking request"
-              >
-                <Ionicons name="close" size={20} color="white" />
-              </TouchableOpacity>
-            )}
-            {onAccept && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={handleAccept}
-                accessibilityLabel="Accept booking request"
-              >
-                <Ionicons name="checkmark" size={20} color="white" />
-              </TouchableOpacity>
-            )}
-          </View>
-        );
-      case 'confirmed':
-      case 'in_progress':
-        return (
-          <View style={styles.actionButtons}>
-            {onUploadPayment && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.paymentButton]}
-                onPress={handleUploadPayment}
-                accessibilityLabel="Upload payment receipt"
-              >
-                <Ionicons name="document-text-outline" size={18} color="white" />
-              </TouchableOpacity>
-            )}
-            {onCancelBooking && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.declineButton]}
-                onPress={handleCancel}
-                accessibilityLabel="Cancel booking"
-              >
-                <Ionicons name="trash-outline" size={18} color="white" />
-              </TouchableOpacity>
-            )}
-          </View>
-        );
-      case 'completed':
-        return (
-          <View style={styles.actionButtons}>
-            {onWriteReview && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.reviewButton]}
-                onPress={handleWriteReview}
-                accessibilityLabel="Write a review"
-              >
-                <Ionicons name="star-outline" size={18} color="white" />
-              </TouchableOpacity>
-            )}
-          </View>
-        );
-      default:
-        return null;
-    }
   };
 
+  const handleCardPress = () => {
+    onPress?.(booking);
+    onViewBookingDetails?.(booking);
+  };
+
+  const handleAccept = () => {
+    onAccept?.(booking);
+  };
+
+  const handleDecline = () => {
+    onDecline?.(booking);
+  };
+
+  const handleComplete = () => {
+    onComplete?.(booking);
+  };
+
+  const handleCancel = () => {
+    onCancelBooking?.(booking);
+  };
+
+  const handlePayNow = () => {
+    onUploadPayment?.(booking);
+  };
+
+  const handleAddReview = () => {
+    onWriteReview?.(booking);
+  };
+
+  // Render action buttons based on status
+  const renderActionButtons = () => {
+    if (!showActions || !bookingStatus) return null;
+
+    if (bookingStatus === 'pending' || bookingStatus === 'pending_confirmation') {
+      return (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.acceptButton]}
+            onPress={handleAccept}
+            accessibilityLabel="Accept booking"
+          >
+            <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.declineButton]}
+            onPress={handleDecline}
+            accessibilityLabel="Decline booking"
+          >
+            <Ionicons name="close" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (bookingStatus === 'confirmed' && paymentStatus === 'pending' && (onUploadPayment || onCancelBooking)) {
+      return (
+        <View style={styles.actionButtons}>
+          {onUploadPayment && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.paymentButton]}
+              onPress={handlePayNow}
+              accessibilityLabel="Upload payment receipt"
+            >
+              <Ionicons name="card-outline" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          {onCancelBooking && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.declineButton]}
+              onPress={handleCancel}
+              accessibilityLabel="Cancel booking"
+            >
+              <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    }
+
+    if (bookingStatus === 'completed' && !booking?.hasReview) {
+      return (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.reviewButton]}
+            onPress={handleAddReview}
+            accessibilityLabel="Add review"
+          >
+            <Ionicons name="star-outline" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  // Render complete button for in-progress bookings
   const renderCompleteButton = () => {
-    if ((booking?.status === 'confirmed' || booking?.status === 'in_progress') && onComplete) {
+    if (bookingStatus === 'in_progress') {
       return (
         <TouchableOpacity
           style={styles.completeButton}
@@ -285,37 +354,31 @@ const BookingItem = ({
     return null;
   };
 
-  const paymentStatusText = hasPaymentProof
-    ? 'Payment submitted'
-    : paymentStatus
-      ? paymentStatus.replace(/_/g, ' ')
-      : 'Awaiting proof';
-
-  const paymentStatusColor = getPaymentStatusColor(paymentStatus || (hasPaymentProof ? 'paid' : 'pending'));
+  const imageSource = getSafeImageSource();
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={handlePress}
-      activeOpacity={0.85}
-    >
+    <TouchableOpacity style={styles.container} onPress={handleCardPress} activeOpacity={0.85}>
       <View style={styles.headerSection}>
         <View style={styles.profileRow}>
           <View style={styles.imageSection}>
             <Image
-              source={getSafeImageUrl()}
+              source={imageSource}
               style={styles.profileImage}
-              onError={() => console.log('Image failed to load')}
+              accessibilityLabel="Caregiver profile image"
             />
-            {renderStatusBadge()}
+            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+              <Text style={styles.statusText}>{statusText}</Text>
+            </View>
           </View>
+
           <View style={styles.profileDetails}>
             <View style={styles.nameRow}>
               <Text style={styles.name} numberOfLines={1}>
-                {user?.displayName || user?.name || 'Unknown Caregiver'}
+                {caregiverDisplayName || 'Unknown Caregiver'}
               </Text>
-              <Text style={styles.roleBadge}>{caregiverRole}</Text>
+              <Text style={styles.roleBadge}>{caregiverRole || 'Unknown Role'}</Text>
             </View>
+
             {(rating || reviewsCount) && (
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={14} color="#FBBF24" />
@@ -329,6 +392,7 @@ const BookingItem = ({
                 )}
               </View>
             )}
+
             <View style={styles.contactRow}>
               {onMessageCaregiver && (
                 <TouchableOpacity
@@ -350,6 +414,7 @@ const BookingItem = ({
               )}
             </View>
           </View>
+
           {renderActionButtons()}
         </View>
       </View>
@@ -367,9 +432,9 @@ const BookingItem = ({
             <Text style={styles.infoValue} numberOfLines={1}>
               {scheduleInfo.friendlySchedule || formatDate(booking?.date || booking?.dateTime || booking?.startDate) || 'Schedule pending'}
             </Text>
-            {scheduleInfo.relativeTime && (
+            {scheduleInfo.relativeTime ? (
               <Text style={styles.infoMeta}>{scheduleInfo.relativeTime}</Text>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -471,6 +536,7 @@ const BookingItem = ({
 
 const styles = StyleSheet.create({
   container: {
+    height: 'auto',
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     marginVertical: 10,
@@ -488,6 +554,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     paddingBottom: 16,
+    paddingTop: 16,
     marginBottom: 16,
   },
   profileRow: {
@@ -496,6 +563,9 @@ const styles = StyleSheet.create({
   },
   imageSection: {
     position: 'relative',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 30,
     marginRight: 10,
   },
   profileImage: {
@@ -507,7 +577,7 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   statusBadge: {
-    position: 'relative',
+    position: 'absolute',
     top: -4,
     right: -4,
     paddingHorizontal: 8,
@@ -642,10 +712,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     gap: 8,
     marginLeft: 12,
+    marginTop: 15,
   },
   actionButton: {
     width: 40,
