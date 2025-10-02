@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,12 @@ import {
   StyleSheet,
   RefreshControl,
   Image,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import messagingService from '../../../services/firebaseMessagingService';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useMessaging } from '../../../contexts/MessagingContext';
+import DashboardDataState from '../../common/DashboardDataState';
 
-// Base MessagesTab component with common functionality
 const BaseMessagesTab = ({
   navigation,
   refreshing,
@@ -26,191 +25,236 @@ const BaseMessagesTab = ({
   maxAvatarSize = 40,
   customStyles = {},
 }) => {
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const {
+    conversations,
+    conversationsStatus,
+    conversationsLoading,
+    conversationsError,
+    subscribeToConversations,
+    clearConversationsError,
+  } = useMessaging();
 
-  // Set current user in messaging service
-  useEffect(() => {
-    if (user?.uid) {
-      messagingService.setCurrentUser(user.uid);
-    }
-  }, [user]);
-
-  const loadConversations = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await messagingService.getConversations();
-      setConversations(data);
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const userId = user?.id || user?.uid;
 
   useEffect(() => {
-    loadConversations();
+    if (!userId) {
+      return undefined;
+    }
 
-    // Set up real-time listener
-    const unsubscribe = messagingService.subscribeToConversations((updatedConversations) => {
-      setConversations(updatedConversations);
-    });
-
+    subscribeToConversations(userId, userRole);
     return () => {
-      if (unsubscribe) unsubscribe();
+      subscribeToConversations(null);
     };
-  }, [loadConversations]);
+  }, [subscribeToConversations, userId, userRole]);
 
-  const handleRefresh = useCallback(async () => {
-    await loadConversations();
-    if (onRefresh) onRefresh();
-  }, [loadConversations, onRefresh]);
+  const handleRefresh = useCallback(() => {
+    if (onRefresh) {
+      onRefresh();
+    }
+    if (userId) {
+      subscribeToConversations(userId, userRole);
+    }
+  }, [onRefresh, subscribeToConversations, userId, userRole]);
 
-  const formatTime = (timestamp) => {
+  const handleRetry = useCallback(() => {
+    clearConversationsError();
+    handleRefresh();
+  }, [clearConversationsError, handleRefresh]);
+
+  const formatTime = useCallback((timestamp) => {
+    if (!timestamp) {
+      return '';
+    }
+
     const now = new Date();
     const messageTime = new Date(timestamp);
     const diff = now - messageTime;
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
+    if (Number.isNaN(diff) || diff < 0) {
+      return '';
+    }
+
     if (days > 0) {
       return `${days}d ago`;
-    } else if (hours > 0) {
+    }
+
+    if (hours > 0) {
       return `${hours}h ago`;
-    } else {
-      return 'Just now';
     }
-  };
 
-  // Role-specific conversation opening logic
-  const openConversation = (conversation) => {
-    if (userRole === 'parent') {
+    return 'Just now';
+  }, []);
+
+  const openConversation = useCallback(
+    (conversation) => {
+      if (!conversation) {
+        return;
+      }
+
       navigation.navigate('ChatScreen', {
         conversationId: conversation.id,
         recipientId: conversation.participantId,
         recipientName: conversation.participantName,
         recipientAvatar: conversation.participantAvatar,
-        userRole: 'parent'
+        userRole,
       });
-    } else if (userRole === 'caregiver') {
-      navigation.navigate('ChatScreen', {
-        conversationId: conversation.id,
-        recipientId: conversation.participantId,
-        recipientName: conversation.participantName,
-        recipientAvatar: conversation.participantAvatar,
-        userRole: 'caregiver'
-      });
-    }
-  };
-
-  // Role-specific avatar rendering
-  const renderAvatar = (item) => {
-    if (item.participantAvatar) {
-      return (
-        <Image
-          source={{ uri: item.participantAvatar }}
-          style={[styles.avatarImage, { width: maxAvatarSize, height: maxAvatarSize }]}
-        />
-      );
-    }
-
-    // Role-specific default avatars
-    if (userRole === 'parent') {
-      return <Ionicons name="person-circle" size={maxAvatarSize} color="#DB2777" />;
-    } else if (userRole === 'caregiver') {
-      return <Ionicons name="person-circle" size={maxAvatarSize} color="#3B82F6" />;
-    }
-
-    return <Ionicons name="person-circle" size={maxAvatarSize} color="#6B7280" />;
-  };
-
-  // Role-specific conversation rendering
-  const renderConversation = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.conversationItem, customStyles.conversationItem]}
-      onPress={() => openConversation(item)}
-    >
-      <View style={[styles.avatar, customStyles.avatar]}>
-        {renderAvatar(item)}
-      </View>
-
-      <View style={[styles.conversationContent, customStyles.conversationContent]}>
-        <View style={[styles.conversationHeader, customStyles.conversationHeader]}>
-          <Text style={[styles.recipientName, customStyles.recipientName]}>
-            {item.participantName}
-          </Text>
-          <Text style={[styles.timestamp, customStyles.timestamp]}>
-            {formatTime(item.lastMessageTime)}
-          </Text>
-        </View>
-
-        <View style={[styles.messageRow, customStyles.messageRow]}>
-          <Text style={[styles.lastMessage, customStyles.lastMessage]} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
-          {showUnreadBadge && item.unreadCount > 0 && (
-            <View style={[styles.unreadBadge, customStyles.unreadBadge]}>
-              <Text style={[styles.unreadCount, customStyles.unreadCount]}>
-                {item.unreadCount}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
+    },
+    [navigation, userRole]
   );
 
-  // Role-specific empty state
-  const renderEmptyState = () => (
-    <View style={[styles.emptyContainer, customStyles.emptyContainer]}>
-      <Ionicons name={emptyStateIcon} size={64} color="#9CA3AF" />
-      <Text style={[styles.emptyTitle, customStyles.emptyTitle]}>
-        {emptyStateTitle}
-      </Text>
-      <Text style={[styles.emptySubtitle, customStyles.emptySubtitle]}>
-        {emptyStateSubtitle}
-      </Text>
-    </View>
+  const renderAvatar = useCallback(
+    (item) => {
+      if (item?.participantAvatar) {
+        return (
+          <Image
+            source={{ uri: item.participantAvatar }}
+            style={[styles.avatarImage, { width: maxAvatarSize, height: maxAvatarSize }]}
+          />
+        );
+      }
+
+      if (userRole === 'parent') {
+        return <Ionicons name="person-circle" size={maxAvatarSize} color="#DB2777" />;
+      }
+
+      if (userRole === 'caregiver') {
+        return <Ionicons name="person-circle" size={maxAvatarSize} color="#3B82F6" />;
+      }
+
+      return <Ionicons name="person-circle" size={maxAvatarSize} color="#6B7280" />;
+    },
+    [maxAvatarSize, userRole]
   );
+
+  const renderConversation = useCallback(
+    ({ item }) => (
+      <TouchableOpacity
+        style={[styles.conversationItem, customStyles.conversationItem]}
+        onPress={() => openConversation(item)}
+      >
+        <View style={[styles.avatar, customStyles.avatar]}>{renderAvatar(item)}</View>
+
+        <View style={[styles.conversationContent, customStyles.conversationContent]}>
+          <View style={[styles.conversationHeader, customStyles.conversationHeader]}>
+            <Text style={[styles.recipientName, customStyles.recipientName]}>
+              {item.participantName}
+            </Text>
+            <Text style={[styles.timestamp, customStyles.timestamp]}>
+              {formatTime(item.lastMessageTime)}
+            </Text>
+          </View>
+
+          <View style={[styles.messageRow, customStyles.messageRow]}>
+            <Text style={[styles.lastMessage, customStyles.lastMessage]} numberOfLines={1}>
+              {item.lastMessage}
+            </Text>
+            {showUnreadBadge && item.unreadCount > 0 ? (
+              <View style={[styles.unreadBadge, customStyles.unreadBadge]}>
+                <Text style={[styles.unreadCount, customStyles.unreadCount]}>
+                  {item.unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </TouchableOpacity>
+    ),
+    [customStyles, formatTime, openConversation, renderAvatar, showUnreadBadge]
+  );
+
+  const conversationData = useMemo(() => conversations || [], [conversations]);
+
+  const derivedStatus = useMemo(() => {
+    if (!userId) {
+      return 'idle';
+    }
+
+    if (conversationsStatus === 'maintenance') {
+      return 'maintenance';
+    }
+
+    if (conversationsStatus === 'error' && conversationData.length === 0) {
+      return 'error';
+    }
+
+    if (conversationsStatus === 'ready' && conversationData.length === 0) {
+      return 'empty';
+    }
+
+    return conversationsStatus;
+  }, [userId, conversationsStatus, conversationData.length]);
+
+  const errorMessage = useMemo(() => {
+    if (!conversationsError) {
+      return null;
+    }
+
+    return typeof conversationsError === 'string'
+      ? conversationsError
+      : conversationsError.message || 'Unable to load conversations right now.';
+  }, [conversationsError]);
+
+  const shouldShowRetry = derivedStatus === 'error' || derivedStatus === 'maintenance';
 
   return (
     <View style={[styles.container, customStyles.container]}>
-      <FlatList
-        data={conversations}
-        renderItem={renderConversation}
-        keyExtractor={(item) => item.id}
-        refreshing={refreshing || loading}
-        onRefresh={handleRefresh}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={[
-          conversations.length === 0 ? styles.emptyList : undefined,
-          customStyles.listContent
-        ]}
-      />
+      <DashboardDataState
+        status={derivedStatus}
+        loadingText="Loading conversations…"
+        emptyTitle={emptyStateTitle}
+        emptySubtitle={emptyStateSubtitle}
+        errorSubtitle={errorMessage || 'Unable to load conversations right now.'}
+        maintenanceSubtitle="Messaging is temporarily unavailable."
+        onRetry={shouldShowRetry ? handleRetry : undefined}
+        retryLabel="Retry"
+        iconOverrides={{ empty: emptyStateIcon }}
+        contentStyle={conversationData.length === 0 ? styles.emptyList : undefined}
+        testID={`messages-tab-state-${userRole}`}
+      >
+        <FlatList
+          data={conversationData}
+          renderItem={renderConversation}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing || conversationsLoading}
+              onRefresh={handleRefresh}
+              colors={['#2563EB']}
+              tintColor="#2563EB"
+            />
+          }
+          contentContainerStyle={[
+            conversationData.length === 0 ? styles.emptyList : undefined,
+            customStyles.listContent,
+          ]}
+          showsVerticalScrollIndicator={false}
+        />
+      </DashboardDataState>
     </View>
   );
 };
 
-// Parent-specific MessagesTab component
 export const ParentMessagesTab = ({ navigation, refreshing, onRefresh }) => {
   const parentCustomStyles = {
     container: {
-      backgroundColor: '#FEF7F0', // Warm background for parents
+      backgroundColor: '#FEF7F0',
     },
     conversationItem: {
       backgroundColor: '#FFFFFF',
       borderLeftWidth: 4,
-      borderLeftColor: '#DB2777', // Pink accent for parents
+      borderLeftColor: '#DB2777',
     },
     recipientName: {
-      color: '#7C2D12', // Darker text for better readability
+      color: '#7C2D12',
     },
     avatar: {
-      backgroundColor: '#FCE7F3', // Light pink background
+      backgroundColor: '#FCE7F3',
     },
     unreadBadge: {
-      backgroundColor: '#DB2777', // Pink for unread badges
+      backgroundColor: '#DB2777',
     },
   };
 
@@ -223,32 +267,31 @@ export const ParentMessagesTab = ({ navigation, refreshing, onRefresh }) => {
       emptyStateIcon="people-outline"
       emptyStateTitle="No conversations yet"
       emptyStateSubtitle="Reach out to caregivers to start conversations"
-      showUnreadBadge={true}
+      showUnreadBadge
       maxAvatarSize={40}
       customStyles={parentCustomStyles}
     />
   );
 };
 
-// Caregiver-specific MessagesTab component
 export const CaregiverMessagesTab = ({ navigation, refreshing, onRefresh }) => {
   const caregiverCustomStyles = {
     container: {
-      backgroundColor: '#EFF6FF', // Light blue background for caregivers
+      backgroundColor: '#EFF6FF',
     },
     conversationItem: {
       backgroundColor: '#FFFFFF',
       borderLeftWidth: 4,
-      borderLeftColor: '#3B82F6', // Blue accent for caregivers
+      borderLeftColor: '#3B82F6',
     },
     recipientName: {
-      color: '#1E3A8A', // Darker blue text
+      color: '#1E3A8A',
     },
     avatar: {
-      backgroundColor: '#DBEAFE', // Light blue background
+      backgroundColor: '#DBEAFE',
     },
     unreadBadge: {
-      backgroundColor: '#3B82F6', // Blue for unread badges
+      backgroundColor: '#3B82F6',
     },
   };
 
@@ -261,7 +304,7 @@ export const CaregiverMessagesTab = ({ navigation, refreshing, onRefresh }) => {
       emptyStateIcon="chatbubble-ellipses-outline"
       emptyStateTitle="No conversations yet"
       emptyStateSubtitle="Parents will reach out to you here"
-      showUnreadBadge={true}
+      showUnreadBadge
       maxAvatarSize={40}
       customStyles={caregiverCustomStyles}
     />
@@ -271,25 +314,6 @@ export const CaregiverMessagesTab = ({ navigation, refreshing, onRefresh }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 24,
   },
   emptyList: {
     flex: 1,

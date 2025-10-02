@@ -25,8 +25,7 @@ const BookingItem = ({
   onUploadPayment,
   onViewBookingDetails,
   onWriteReview,
-  onMessageCaregiver,
-  onCallCaregiver,
+  onViewCaregiverProfile,
   showActions = true
 }) => {
   const caregiver = useMemo(() => {
@@ -226,12 +225,8 @@ const BookingItem = ({
   };
 
   // Event handlers
-  const handleMessage = () => {
-    onMessageCaregiver?.(caregiver || booking);
-  };
-
-  const handleCall = () => {
-    onCallCaregiver?.(caregiver || booking);
+  const handleViewCaregiver = () => {
+    onViewCaregiverProfile?.(caregiver || booking);
   };
 
   const handleUploadPayment = () => {
@@ -321,13 +316,18 @@ const BookingItem = ({
       );
     }
 
-    if (bookingStatus === 'completed' && !booking?.hasReview) {
+    if (bookingStatus === 'completed') {
+      const alreadyReviewed = Boolean(booking?.hasReview || booking?.reviewSubmitted || booking?.rating);
+      if (alreadyReviewed) {
+        return null;
+      }
       return (
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.reviewButton]}
             onPress={handleAddReview}
             accessibilityLabel="Add review"
+            disabled={alreadyReviewed}
           >
             <Ionicons name="star-outline" size={18} color="#FFFFFF" />
           </TouchableOpacity>
@@ -394,22 +394,14 @@ const BookingItem = ({
             )}
 
             <View style={styles.contactRow}>
-              {onMessageCaregiver && (
+              {onViewCaregiverProfile && (
                 <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={handleMessage}
-                  accessibilityLabel="Message caregiver"
+                  style={styles.viewProfileButton}
+                  onPress={handleViewCaregiver}
+                  accessibilityLabel="View caregiver profile"
                 >
-                  <Ionicons name="chatbubble-ellipses-outline" size={18} color="#1F2937" />
-                </TouchableOpacity>
-              )}
-              {onCallCaregiver && (
-                <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={handleCall}
-                  accessibilityLabel="Call caregiver"
-                >
-                  <Ionicons name="call-outline" size={18} color="#1F2937" />
+                  <Ionicons name="person-circle-outline" size={20} color="#4338CA" />
+                  <Text style={styles.viewProfileButtonText}>View Profile</Text>
                 </TouchableOpacity>
               )}
             </View>

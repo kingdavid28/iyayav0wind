@@ -76,7 +76,6 @@ class SocketService {
   onUserStoppedTyping(handler) {
     this.messageHandlers.set('user_stopped_typing', handler);
   }
-
   // Job and application event handlers
   onNewJob(handler) {
     this.messageHandlers.set('new_job', handler);
@@ -88,11 +87,6 @@ class SocketService {
 
   onNewBooking(handler) {
     this.messageHandlers.set('new_booking', handler);
-  }
-
-  // Remove listener method
-  removeListener(eventType) {
-    this.messageHandlers.delete(eventType);
   }
 
   // Utility methods

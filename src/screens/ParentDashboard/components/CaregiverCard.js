@@ -8,15 +8,13 @@ import {
   User,
 } from "lucide-react-native";
 import PropTypes from "prop-types";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Card } from '../../../shared/ui';
 
 import { formatAddress } from "../../../utils/addressUtils";
 import { getImageSource } from "../../../utils/imageUtils";
-import { userService } from "../../../services/userService";
 
-import { bookingService } from "../../../services/bookingService";
 import {
   colors,
   spacing,

@@ -13,6 +13,8 @@ import CaregiverProfileComplete from "../../screens/CaregiverProfileComplete";
 import VerificationSuccessScreen from "../../screens/VerificationSuccessScreen";
 import ParentDashboard from "../../screens/ParentDashboard/ParentDashboard";
 import CaregiverDashboard from "../../screens/CaregiverDashboard";
+import CaregiverProfileScreen from "../../screens/CaregiverProfileScreen";
+import OnboardingScreen from "../../screens/OnboardingScreen";
 
 // Auth screen imports
 import ParentAuth from "../../screens/ParentAuth";
@@ -22,9 +24,9 @@ import EmailVerificationScreen from "../../screens/EmailVerificationScreen";
 // Profile screen imports
 import ParentProfile from "../../screens/ParentProfile";
 
-// Chat screen imports
-import ChatScreen from "../../screens/ChatScreen";
+// Chat/reviews imports
 import CaregiverReviewsScreen from "../../screens/CaregiverReviewsScreen";
+import CaregiverChat from "../../screens/CaregiverChat";
 
 // Legacy screen imports (to be migrated)
 import AvailabilityManagementScreen from "../../screens/AvailabilityManagementScreen";
@@ -33,13 +35,10 @@ import ChildrenManagementScreen from "../../screens/ChildrenManagementScreen";
 import EnhancedCaregiverProfileWizard from "../../screens/EnhancedCaregiverProfileWizard";
 import JobPostingScreen from "../../screens/JobPostingScreen";
 import JobSearchScreen from "../../screens/JobSearchScreen";
-import OnboardingScreen from "../../screens/OnboardingScreen";
 import PaymentConfirmationScreen from "../../screens/PaymentConfirmationScreen";
 import ProfileScreen from "../../screens/profile/ProfileScreen";
 import EmailVerificationPendingScreen from "../../screens/EmailVerificationPendingScreen";
 import DemoScreen from "../../screens/DemoScreen";
-
-import CaregiverChat from "../../screens/CaregiverChat";
 
 // Utils
 import { hasSeenOnboarding } from "../../utils/onboarding";
@@ -80,7 +79,7 @@ const AppNavigatorWithAuth = () => {
   }
 
   return (
-    <NavigationContainer 
+    <NavigationContainer
       theme={theme}
       ref={setNavigationRef}
     >
@@ -129,8 +128,8 @@ const AppNavigatorWithAuth = () => {
         <Stack.Screen name="Demo" component={DemoScreen} options={{ title: "Component Demo", headerBackTitle: "Back" }} />
 
         <Stack.Screen name="CaregiverProfileComplete" component={CaregiverProfileComplete} options={{ headerShown: false }} />
+        <Stack.Screen name="CaregiverProfile" component={CaregiverProfileScreen} options={{ title: "Caregiver Profile" }} />
         <Stack.Screen name="ParentProfile" component={ParentProfile} options={{ title: "My Profile", headerBackTitle: "Back" }} />
-        <Stack.Screen name="Chat" component={ChatScreen} options={{ title: "Chat" }} />
         <Stack.Screen name="CaregiverChat" component={CaregiverChat} options={{ title: "Chat with Caregiver" }} />
         <Stack.Screen name="CaregiverReviews" component={CaregiverReviewsScreen} options={{ title: "Caregiver Reviews" }} />
       </Stack.Navigator>

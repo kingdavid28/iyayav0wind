@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { ThemeProvider, useThemeContext } from '../contexts/ThemeContext';
 import { PaperProvider } from 'react-native-paper';
 import { AppProvider as CoreAppProvider } from '../../contexts/AppContext';
+import { ReviewProvider } from '../../contexts/ReviewContext';
 
 // Wrapper component to access theme context
 const ThemeWrapper = ({ children }) => {
@@ -29,7 +30,9 @@ export const AppProvider = ({ children }) => {
     <ThemeProvider>
       <ThemeWrapper>
         <CoreAppProvider>
-          {children}
+          <ReviewProvider>
+            {children}
+          </ReviewProvider>
         </CoreAppProvider>
       </ThemeWrapper>
     </ThemeProvider>

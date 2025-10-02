@@ -40,6 +40,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../shared/ui/inputs/TimePicker';
 import { getCurrentAPIURL, getCurrentSocketURL, authAPI, uploadsAPI } from '../services';
+import { useAuth } from '../contexts/AuthContext';
 import { styles } from './styles/EnhancedCaregiverProfileWizard.styles';
 import { getCurrentDeviceLocation, searchLocation, validateLocation, formatLocationForDisplay } from '../utils/locationUtils';
 import { compressImage, uploadWithRetry, handleUploadError } from '../utils/imageUploadUtils';
@@ -284,6 +285,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       case 'experience.description':
         if (!value || value.length < 50) {
           newErrors.experienceDescription = 'Please provide at least 50 characters describing your experience';
+        } else {
           delete newErrors.experienceDescription;
         }
         break;
@@ -491,8 +493,14 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       const result = await searchLocation(locationSearchText);
       setLocationSearchResults([result]); // Convert to array for consistency
     } catch (error) {
-      console.error('Location search failed:', error);
-      Alert.alert('Search Failed', error.message || 'Failed to search location. Please try again.');
+      if (error?.message === 'Location not found') {
+        console.warn('Location search yielded no results:', locationSearchText);
+        setLocationSearchResults([]);
+        showSnackbar('No matching location found. Try a more specific search.');
+      } else {
+        console.error('Location search failed:', error);
+        Alert.alert('Search Failed', error.message || 'Failed to search location. Please try again.');
+      }
     } finally {
       setLocationSearchLoading(false);
     }
@@ -949,7 +957,11 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
             location: 'Please provide at least city and province information'
           }));
         } else {
-          setErrors(prev => ({ ...prev, location: undefined }));
+          setErrors(prev => {
+            const updated = { ...prev };
+            delete updated.location;
+            return updated;
+          });
         }
         break;
       case 'professional':
@@ -965,25 +977,27 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         break;
       default:
         // For other steps, default to valid
-        isValid = true;
-        break;
+        return true;
     }
-    
+
     return isValid;
   };
 
   const nextStep = () => {
-    if (validateCurrentStep()) {
+    const stepHasValidation = ['basic', 'location', 'professional', 'ageCare', 'emergency'].includes(ENHANCED_STEPS[currentStep]?.id);
+    if (!stepHasValidation || validateCurrentStep()) {
       if (currentStep < ENHANCED_STEPS.length - 1) {
-        setCurrentStep(currentStep + 1);
+        setCurrentStep((prev) => prev + 1);
         scrollRef.current?.scrollTo({ y: 0, animated: true });
       }
+    } else if (stepHasValidation) {
+      Alert.alert('Validation Error', 'Please fill in all required fields before proceeding.');
     }
   };
 
   const prevStep = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      setCurrentStep((prev) => prev - 1);
       scrollRef.current?.scrollTo({ y: 0, animated: true });
     }
   };

@@ -137,7 +137,12 @@ const HomeTab = ({
                       <View style={styles.childInfo}>
                         <Text style={styles.childName}>{fullName}</Text>
                         {ageValue != null ? (
-                          <Text style={styles.childDetails}>Age: {ageValue} years</Text>
+                          <>
+                            <Text style={styles.childDetails}>Age: {ageValue} years</Text>
+                            {birthDate ? (
+                              <Text style={styles.childDetails}>Birth date: {birthDate}</Text>
+                            ) : null}
+                          </>
                         ) : birthDate ? (
                           <Text style={styles.childDetails}>Birth date: {birthDate}</Text>
                         ) : (

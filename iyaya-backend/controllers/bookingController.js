@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const User = require('../models/User');
 const Caregiver = require('../models/Caregiver');
+const { createBookingNotification } = require('../services/notificationService');
 
 const normalizeChildField = (value) => {
   if (Array.isArray(value)) {
@@ -37,76 +38,137 @@ const sanitizeChildren = (children) => {
   });
 };
 
+const buildCaregiverProfile = async (caregiverIdValue) => {
+  if (!caregiverIdValue) {
+    return null;
+  }
+
+  const caregiverFromId = await Caregiver.findById(caregiverIdValue)
+    .populate('userId', 'name email profileImage')
+    .lean();
+
+  if (caregiverFromId) {
+    const caregiverUser = caregiverFromId.userId && typeof caregiverFromId.userId === 'object'
+      ? caregiverFromId.userId
+      : null;
+
+    return {
+      _id: caregiverFromId._id,
+      id: caregiverFromId._id,
+      userId: caregiverUser?._id || caregiverFromId.userId || caregiverIdValue,
+      name: caregiverFromId.name || caregiverUser?.name || 'Caregiver',
+      email: caregiverUser?.email || 'no-email@example.com',
+      profileImage: caregiverFromId.profileImage || caregiverUser?.profileImage,
+      avatar: caregiverFromId.profileImage || caregiverUser?.profileImage,
+      hourlyRate: caregiverFromId.hourlyRate,
+      rating: caregiverFromId.rating,
+      reviewCount: Array.isArray(caregiverFromId.reviews) ? caregiverFromId.reviews.length : 0,
+    };
+  }
+
+  const caregiverFromUserId = await Caregiver.findOne({ userId: caregiverIdValue })
+    .populate('userId', 'name email profileImage')
+    .lean();
+
+  if (caregiverFromUserId) {
+    const caregiverUser = caregiverFromUserId.userId && typeof caregiverFromUserId.userId === 'object'
+      ? caregiverFromUserId.userId
+      : null;
+
+    return {
+      _id: caregiverFromUserId._id,
+      id: caregiverFromUserId._id,
+      userId: caregiverUser?._id || caregiverFromUserId.userId || caregiverIdValue,
+      name: caregiverFromUserId.name || caregiverUser?.name || 'Caregiver',
+      email: caregiverUser?.email || 'no-email@example.com',
+      profileImage: caregiverFromUserId.profileImage || caregiverUser?.profileImage,
+      avatar: caregiverFromUserId.profileImage || caregiverUser?.profileImage,
+      hourlyRate: caregiverFromUserId.hourlyRate,
+      rating: caregiverFromUserId.rating,
+      reviewCount: Array.isArray(caregiverFromUserId.reviews) ? caregiverFromUserId.reviews.length : 0,
+    };
+  }
+
+  const userDoc = await User.findById(caregiverIdValue).lean();
+
+  if (userDoc) {
+    return {
+      _id: userDoc._id,
+      id: userDoc._id,
+      userId: userDoc._id,
+      name: userDoc.name || userDoc.displayName || 'Caregiver',
+      email: userDoc.email || 'no-email@example.com',
+      profileImage: userDoc.profileImage,
+      avatar: userDoc.profileImage,
+      hourlyRate: undefined,
+      rating: undefined,
+      reviewCount: 0,
+    };
+  }
+
+  return null;
+};
+
+const hydrateSingleBooking = async (bookingRecord) => {
+  if (!bookingRecord) {
+    return null;
+  }
+
+  const bookingObj = bookingRecord.toObject ? bookingRecord.toObject() : { ...bookingRecord };
+
+  if (bookingObj.clientId) {
+    bookingObj.parentId = bookingObj.clientId._id || bookingObj.clientId;
+  }
+
+  const caregiverRef = bookingObj.caregiverId;
+  const caregiverIdValue =
+    caregiverRef && typeof caregiverRef === 'object'
+      ? caregiverRef._id || caregiverRef.id || caregiverRef.toString?.()
+      : caregiverRef;
+
+  if (caregiverIdValue) {
+    bookingObj.caregiverId = caregiverIdValue;
+
+    const caregiverProfile = await buildCaregiverProfile(caregiverIdValue);
+
+    if (caregiverProfile) {
+      bookingObj.caregiverProfile = caregiverProfile;
+      if (!bookingObj.caregiver || typeof bookingObj.caregiver !== 'object') {
+        bookingObj.caregiver = caregiverProfile;
+      }
+    }
+  }
+
+  const sanitizedChildren = sanitizeChildren(bookingObj.children);
+  if (sanitizedChildren !== undefined) {
+    bookingObj.children = sanitizedChildren;
+  }
+
+  return bookingObj;
+};
+
 // Get user's bookings
 exports.getMyBookings = async (req, res) => {
   try {
     console.log(`getMyBookings called for user: ${req.user.id}, role: ${req.user.role}`);
-    
+
     const searchCriteria = {
       $or: [
         { clientId: req.user.id },
         { caregiverId: req.user.id }
       ]
     };
-    
     const bookings = await Booking.find(searchCriteria)
-      .populate('clientId', 'name email')
-      .sort({ createdAt: -1 });
-    
-    // Add parentId for messaging purposes
-    bookings.forEach(booking => {
-      if (booking.clientId) {
-        booking.parentId = booking.clientId._id || booking.clientId;
-      }
-    });
-    
-    // Enhance bookings with caregiver data
-    for (const booking of bookings) {
-      if (booking.caregiverId) {
-        // Try to find caregiver by profile ID first
-        let caregiver = await Caregiver.findById(booking.caregiverId).populate('userId', 'name email');
-        
-        if (caregiver) {
-          booking.caregiverId = {
-            _id: caregiver._id,
-            name: caregiver.name || caregiver.userId?.name || 'Unknown Caregiver',
-            email: caregiver.userId?.email || 'no-email@example.com',
-            profileImage: caregiver.profileImage,
-            avatar: caregiver.profileImage,
-            hourlyRate: caregiver.hourlyRate
-          };
-        } else {
-          // Try to find by user ID if profile ID lookup failed
-          const user = await User.findById(booking.caregiverId);
-          if (user) {
-            const caregiverProfile = await Caregiver.findOne({ userId: user._id });
-            booking.caregiverId = {
-              _id: user._id,
-              name: caregiverProfile?.name || user.name || 'Unknown Caregiver',
-              email: user.email || 'no-email@example.com',
-              profileImage: caregiverProfile?.profileImage,
-              avatar: caregiverProfile?.profileImage,
-              hourlyRate: caregiverProfile?.hourlyRate
-            };
-          }
-        }
-      }
-    }
-    
-    const bookingsWithSanitizedChildren = bookings.map((bookingDoc) => {
-      const sanitizedChildren = sanitizeChildren(bookingDoc.children);
+      .populate('clientId', 'name email profileImage')
+      .sort({ createdAt: -1 })
+      .lean();
 
-      if (sanitizedChildren !== undefined) {
-        bookingDoc.children = sanitizedChildren;
-      }
-
-      return bookingDoc;
-    });
-
+    const hydratedBookings = await Promise.all(bookings.map(hydrateSingleBooking));
+    
     res.json({
       success: true,
       data: {
-        bookings: bookingsWithSanitizedChildren,
+        bookings: hydratedBookings,
       },
     });
   } catch (error) {
@@ -126,7 +188,7 @@ exports.createBooking = async (req, res) => {
     const bookingPayload = {
       ...req.body,
       clientId: req.user.id,
-      status: 'pending',
+      status: req.body.status || 'pending',
     };
 
     if (sanitizedChildren !== undefined) {
@@ -134,35 +196,15 @@ exports.createBooking = async (req, res) => {
     }
 
     const newBooking = new Booking(bookingPayload);
-    
     await newBooking.save();
-    
-    // Populate caregiver data for response
-    if (newBooking.caregiverId) {
-      const caregiver = await Caregiver.findById(newBooking.caregiverId).populate('userId', 'name email');
-      if (caregiver) {
-        newBooking.caregiverId = {
-          _id: caregiver._id,
-          name: caregiver.name || caregiver.userId?.name || 'Unknown Caregiver',
-          email: caregiver.userId?.email || 'no-email@example.com',
-          profileImage: caregiver.profileImage,
-          avatar: caregiver.profileImage,
-          hourlyRate: caregiver.hourlyRate
-        };
-      }
-    }
-    
-    const result = newBooking.toObject();
-    const resultChildren = sanitizeChildren(result.children);
 
-    if (resultChildren !== undefined) {
-      result.children = resultChildren;
-    }
+    const bookingRecord = newBooking.toObject();
+    const hydratedBooking = await hydrateSingleBooking(bookingRecord);
 
     res.status(201).json({
       success: true,
       data: {
-        booking: result,
+        booking: hydratedBooking,
       },
     });
   } catch (error) {
@@ -174,6 +216,7 @@ exports.createBooking = async (req, res) => {
   }
 };
 
+// Update booking
 exports.updateBooking = async (req, res) => {
   try {
     const sanitizedChildren = sanitizeChildren(req.body.children);
@@ -191,12 +234,12 @@ exports.updateBooking = async (req, res) => {
         _id: req.params.id,
         $or: [
           { clientId: req.user.id },
-          { caregiverId: req.user.id }
-        ]
+          { caregiverId: req.user.id },
+        ],
       },
       updatePayload,
       { new: true, runValidators: true }
-    );
+    ).lean();
 
     if (!booking) {
       return res.status(404).json({
@@ -205,18 +248,13 @@ exports.updateBooking = async (req, res) => {
       });
     }
 
-    const updated = booking.toObject();
-    const updatedChildren = sanitizeChildren(updated.children);
-
-    if (updatedChildren !== undefined) {
-      updated.children = updatedChildren;
-    }
+    const hydratedBooking = await hydrateSingleBooking(booking);
 
     res.json({
       success: true,
       data: {
-        booking: updated,
-      }
+        booking: hydratedBooking,
+      },
     });
   } catch (error) {
     console.error('Error updating booking:', error);
@@ -231,28 +269,26 @@ exports.updateBooking = async (req, res) => {
 exports.uploadPaymentProof = async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
-    
-    // In a real implementation, you'd save the image file
-    // For now, just store the base64 string
+
     const booking = await Booking.findOneAndUpdate(
-      { 
+      {
         _id: req.params.id,
-        clientId: req.user.id
+        clientId: req.user.id,
       },
-      { paymentProof: imageBase64 },
-      { new: true }
+      { paymentProof: imageBase64, paymentProofMimeType: mimeType },
+      { new: true, lean: true }
     );
-    
+
     if (!booking) {
       return res.status(404).json({
         success: false,
         error: 'Booking not found or not authorized'
       });
     }
-    
+
     res.json({
       success: true,
-      url: 'payment-proof-uploaded'
+      message: 'Payment proof uploaded successfully'
     });
   } catch (error) {
     console.error('Error uploading payment proof:', error);
@@ -270,38 +306,26 @@ exports.getBookingById = async (req, res) => {
       _id: req.params.id,
       $or: [
         { clientId: req.user.id },
-        { caregiverId: req.user.id }
-      ]
+        { caregiverId: req.user.id },
+      ],
     })
-    .populate('clientId', 'name email');
-    
+      .populate('clientId', 'name email profileImage')
+      .lean();
+
     if (!booking) {
       return res.status(404).json({
         success: false,
         error: 'Booking not found or not authorized'
       });
     }
-    
-    // Enhance with caregiver data
-    if (booking.caregiverId) {
-      const caregiver = await Caregiver.findById(booking.caregiverId).populate('userId', 'name email');
-      if (caregiver) {
-        booking.caregiverId = {
-          _id: caregiver._id,
-          name: caregiver.name || caregiver.userId?.name || 'Unknown Caregiver',
-          email: caregiver.userId?.email || 'no-email@example.com',
-          profileImage: caregiver.profileImage,
-          avatar: caregiver.profileImage,
-          hourlyRate: caregiver.hourlyRate
-        };
-      }
-    }
-    
+
+    const hydratedBooking = await hydrateSingleBooking(booking);
+
     res.json({
       success: true,
       data: {
-        booking: booking
-      }
+        booking: hydratedBooking,
+      },
     });
   } catch (error) {
     console.error('Error fetching booking:', error);
@@ -315,69 +339,72 @@ exports.getBookingById = async (req, res) => {
 // Update booking status
 exports.updateBookingStatus = async (req, res) => {
   try {
-    console.log(`🔄 updateBookingStatus called for booking: ${req.params.id}, user: ${req.user.id}, role: ${req.user.role}`);
     const { status, feedback } = req.body;
-    
+
     let caregiverProfileId = null;
-    
+
     if (req.user.role === 'caregiver') {
-      const caregiverProfile = await Caregiver.findOne({ userId: req.user.id });
+      const caregiverProfile = await Caregiver.findOne({ userId: req.user.id }).lean();
       caregiverProfileId = caregiverProfile ? caregiverProfile._id : null;
-      console.log(`📋 Caregiver profile ID: ${caregiverProfileId}`);
     }
-    
+
     const searchCriteria = {
       _id: req.params.id,
       $or: [
         { clientId: req.user.id },
-        { caregiverId: req.user.id }
-      ]
+        { caregiverId: req.user.id },
+      ],
     };
-    
+
     if (caregiverProfileId) {
       searchCriteria.$or.push({ caregiverId: caregiverProfileId });
     }
-    
-    console.log(`🔍 Update search criteria:`, JSON.stringify(searchCriteria, null, 2));
-    
+
     const booking = await Booking.findOneAndUpdate(
       searchCriteria,
       { status, feedback },
       { new: true, runValidators: true }
-    );
-    
+    ).lean();
+
     if (!booking) {
-      console.log(`❌ Booking not found with criteria:`, searchCriteria);
       return res.status(404).json({
         success: false,
         error: 'Booking not found or not authorized'
       });
     }
-    
-    console.log(`✅ Booking status updated to ${status} by user: ${req.user.id}`);
-    
-    // Update caregiver's hasCompletedJobs flag when booking is completed
+
     if (status === 'completed' && booking.caregiverId) {
       try {
         await Caregiver.findByIdAndUpdate(
           booking.caregiverId,
-          { hasCompletedJobs: true },
-          { new: true }
+          { hasCompletedJobs: true }
         );
-        console.log(`✅ Updated hasCompletedJobs for caregiver: ${booking.caregiverId}`);
       } catch (error) {
-        console.error('❌ Error updating caregiver hasCompletedJobs:', error);
+        console.error('Error updating caregiver hasCompletedJobs:', error);
       }
     }
-    
+
+    const hydratedBooking = await hydrateSingleBooking(booking);
+
+    // Send notification to the other party involved in the booking
+    try {
+      const recipientId = booking.clientId === req.user.id ? booking.caregiverId : booking.clientId;
+      if (recipientId && recipientId !== req.user.id) {
+        await createBookingNotification(hydratedBooking, status, recipientId, req.user.id);
+      }
+    } catch (notificationError) {
+      console.error('Failed to send booking status notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
+
     res.json({
       success: true,
       data: {
-        booking: booking
-      }
+        booking: hydratedBooking,
+      },
     });
   } catch (error) {
-    console.error('❌ Error updating booking status:', error);
+    console.error('Error updating booking status:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to update booking status'
@@ -402,6 +429,16 @@ exports.cancelBooking = async (req, res) => {
         success: false,
         error: 'Booking not found or not authorized'
       });
+    }
+    
+    // Send notification to caregiver about cancellation
+    try {
+      if (booking.caregiverId && booking.caregiverId !== req.user.id) {
+        await createBookingNotification(booking, 'cancelled', booking.caregiverId, req.user.id);
+      }
+    } catch (notificationError) {
+      console.error('Failed to send booking cancellation notification:', notificationError);
+      // Don't fail the request if notification fails
     }
     
     res.json({

@@ -1,0 +1,77 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId"
+      }
+    },
+
+    "messages": {
+      "$conversationId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["timestamp", "participants"]
+      }
+    },
+
+    "conversations": {
+      "$conversationId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "connections": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "presence": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null"
+      }
+    },
+
+    "bookings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "jobs": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "applications": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "caregivers": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+
+    "children": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "ratings": {
+      ".read": true,
+      ".write": "auth != null"
+    }
+  }
+}

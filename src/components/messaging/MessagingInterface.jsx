@@ -1,27 +1,38 @@
 // MessagingInterface.jsx - React Native Paper messaging interface component
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Text, Surface, ActivityIndicator, Snackbar } from 'react-native-paper';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMessaging } from '../../contexts/MessagingContext';
 import ConversationList from './ConversationList';
 import MessageInput from './MessageInput';
 import MessageList from './MessageList';
-import { messagingService } from '../../../services/firebaseMessagingService';
-import { firebaseRealtimeService } from '../../../services/firebaseRealtimeService';
 
 const MessagingInterface = () => {
-  const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
 
-  const [selectedConversation, setSelectedConversation] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [authError, setAuthError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  const {
+    ensureRealtimeSession,
+    subscribeToConversations,
+    subscribeToMessages,
+    conversations,
+    conversationsLoading,
+    messages,
+    messagesLoading,
+    sendMessage,
+    setTypingStatus,
+    typingUsers,
+    queueStatus,
+  } = useMessaging();
 
   // Get user type from route params or user context
   const userType = route.params?.userType || (user?.role === 'parent' ? 'parent' : 'caregiver');
@@ -31,7 +42,7 @@ const MessagingInterface = () => {
     const initialize = async () => {
       try {
         setAuthError(null);
-        await firebaseRealtimeService.initializeRealtimeAuth();
+        await ensureRealtimeSession();
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -43,47 +54,51 @@ const MessagingInterface = () => {
 
     initialize();
 
-    // Listen for auth state changes
-    const unsubscribe = firebaseRealtimeService.addAuthStateListener((authenticated) => {
-      setIsAuthenticated(authenticated);
-      if (!authenticated) {
-        setAuthError('Authentication lost. Please restart the app.');
-        setSnackbarMessage('Authentication lost. Please restart the app.');
+    if (user?.id) {
+      subscribeToConversations(user.id, userType === 'caregiver' ? 'caregiver' : 'parent');
+    }
+
+    return () => {
+      subscribeToConversations(null);
+    };
+  }, [ensureRealtimeSession, subscribeToConversations, user?.id, userType]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      subscribeToMessages(null);
+      return () => {};
+    }
+
+    const conversation = conversations?.find((conv) => conv?.id === selectedConversationId);
+    const userId = user?.id;
+    const caregiverId = userType === 'caregiver' ? conversation?.parentId : conversation?.caregiverId;
+
+    subscribeToMessages(selectedConversationId, userId, caregiverId);
+    return () => {
+      subscribeToMessages(null);
+    };
+  }, [conversations, subscribeToMessages, selectedConversationId, user?.id, userType]);
+
+  const selectedConversation = useMemo(
+    () => conversations?.find((conversation) => conversation?.id === selectedConversationId) || null,
+    [conversations, selectedConversationId]
+  );
+
+  const handleSendMessage = useCallback(
+    async (messageText) => {
+      if (!selectedConversation || !user?.id) return;
+
+      try {
+        const caregiverId = userType === 'caregiver' ? selectedConversation?.parentId : selectedConversation?.caregiverId;
+        await sendMessage(user.id, caregiverId, messageText);
+      } catch (error) {
+        console.error('Send message error:', error);
+        setSnackbarMessage('Failed to send message. Please try again.');
         setSnackbarVisible(true);
       }
-    });
-
-    return () => {
-      unsubscribe?.();
-      if (selectedConversation) {
-        messagingService.stopListening(selectedConversation.id);
-      }
-    };
-  }, []);
-
-  // Load messages when conversation is selected
-  useEffect(() => {
-    if (!selectedConversation?.id) {
-      return;
-    }
-
-    // MessageList handles its own message loading
-    return () => {
-      // Cleanup handled by MessageList
-    };
-  }, [selectedConversation]);
-
-  const handleSendMessage = async (messageText) => {
-    if (!selectedConversation) return;
-
-    try {
-      await messagingService.sendMessage(selectedConversation.otherUserId, messageText);
-    } catch (error) {
-      console.error('Send message error:', error);
-      setSnackbarMessage('Failed to send message. Please try again.');
-      setSnackbarVisible(true);
-    }
-  };
+    },
+    [sendMessage, selectedConversation, user?.id, userType]
+  );
 
   const handleImagePick = async () => {
     try {
@@ -104,26 +119,18 @@ const MessagingInterface = () => {
     }
   };
 
-  const handleTyping = (text) => {
-    if (selectedConversation?.id) {
-      if (text.trim()) {
-        messagingService.setTypingStatus(selectedConversation.id, true);
-      } else {
-        messagingService.setTypingStatus(selectedConversation.id, false);
-      }
-    }
-  };
+  const handleTyping = useCallback(
+    (text) => {
+      if (!selectedConversation?.id || !user?.id) return;
+      const trimmed = text?.trim();
+      setTypingStatus(selectedConversation.id, user.id, Boolean(trimmed));
+    },
+    [selectedConversation?.id, setTypingStatus, user?.id]
+  );
 
-  const handleSelectConversation = (conversation) => {
-    setSelectedConversation(conversation);
-    // Navigate to ChatScreen with conversation details
-    navigation.navigate('ChatScreen', {
-      conversationId: conversation.id,
-      recipientId: conversation.otherUserId,
-      recipientName: conversation.recipientName,
-      recipientAvatar: conversation.recipientAvatar,
-    });
-  };
+  const handleSelectConversation = useCallback((conversation) => {
+    setSelectedConversationId(conversation?.id || null);
+  }, []);
 
   const showError = (message) => {
     setSnackbarMessage(message);
@@ -142,7 +149,7 @@ const MessagingInterface = () => {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || conversationsLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -167,7 +174,6 @@ const MessagingInterface = () => {
           <ConversationList
             onSelectConversation={handleSelectConversation}
             selectedConversation={selectedConversation}
-            navigation={navigation}
           />
         </View>
 
@@ -184,7 +190,7 @@ const MessagingInterface = () => {
               <View style={styles.inputArea}>
                 <MessageInput
                   conversation={selectedConversation}
-                  disabled={loading}
+                  disabled={messagesLoading}
                   onSendMessage={handleSendMessage}
                   onImagePick={handleImagePick}
                   onTyping={handleTyping}

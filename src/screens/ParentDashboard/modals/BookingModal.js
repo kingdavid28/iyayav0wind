@@ -211,7 +211,7 @@ const BookingModal = ({ caregiver, childrenList = [], onConfirm, onClose, visibl
       case 1:
         return bookingData.date && bookingData.startTime && bookingData.endTime;
       case 2:
-        return bookingData.selectedChildren.length > 0;
+        return childrenList.length === 0 || bookingData.selectedChildren.length > 0;
       case 3:
         return bookingData.address && bookingData.contactPhone;
       case 4:

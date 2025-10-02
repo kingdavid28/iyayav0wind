@@ -1,12 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const deviceTokenController = require('../controllers/deviceTokenController');
 
 // GET /api/users/profile - Get current user profile
 router.get('/profile', userController.getCurrentUserProfile);
 
 // GET /api/users/:id - Get user profile by ID
 router.get('/:id', userController.getUserProfile);
+
+// POST /api/users/device-token - Register or refresh device token
+router.post('/device-token', deviceTokenController.upsertDeviceToken);
+
+// DELETE /api/users/device-token - Remove device token(s)
+router.delete('/device-token', deviceTokenController.removeDeviceToken);
 
 // PUT /api/users/profile - Update current user profile
 router.put('/profile', userController.updateProfile);

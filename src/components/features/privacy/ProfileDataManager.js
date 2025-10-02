@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Alert } from 'react-native';
-import { caregiversAPI, authAPI, privacyAPI } from '../../../services';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AuthContext } from '../../../contexts/AuthContext';
+import { authAPI, caregiversAPI, privacyAPI } from '../../../services';
 import { tokenManager } from '../../../utils/tokenManager';
 
 // Helper function to check authentication
@@ -124,79 +124,183 @@ export const useProfileData = () => {
 };
 
 export const ProfileDataProvider = ({ children }) => {
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  console.log('[ProfileDataProvider] render count:', renderCountRef.current);
+
   const [profileData, setProfileData] = useState({});
   const [loading, setLoading] = useState(false);
+  const lastLoadedKeyRef = useRef(null);
+  const profileDataRef = useRef({});
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user || null;
+
+  const shallowEqual = useCallback((objA, objB) => {
+    if (objA === objB) {
+      return true;
+    }
+
+    if (!objA || !objB) {
+      return false;
+    }
+
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
+
+    if (keysA.length !== keysB.length) {
+      return false;
+    }
+
+    for (let i = 0; i < keysA.length; i += 1) {
+      const key = keysA[i];
+      if (objA[key] !== objB[key]) {
+        return false;
+      }
+    }
+
+    return true;
+  }, []);
 
   // Load profile data using existing API methods
-  const loadProfileData = async (userType = 'caregiver', userId = null) => {
+  const loadProfileData = useCallback(async (userType = 'caregiver', userId = null, options = {}) => {
+    const { force = false } = options;
+    const loadKey = `${userType}:${userId || 'self'}`;
+
+    if (!force && lastLoadedKeyRef.current === loadKey) {
+      console.log('[ProfileDataProvider] loadProfileData skipped - already loaded for key:', loadKey);
+      return profileDataRef.current;
+    }
+
+    console.log('[ProfileDataProvider] loadProfileData start:', { userType, userId, force });
+
     try {
       setLoading(true);
-      let response;
 
       if (userType === 'caregiver') {
-        // Use existing caregiver profile API from EditCaregiverProfile.js
-        response = await caregiversAPI.getMyProfile();
-        const profileData = response?.caregiver || response?.data?.caregiver || response?.provider || response || {};
-        
-        setProfileData({
-          // Basic info (always visible)
-          name: profileData.name || profileData.fullName || '',
-          email: profileData.email || profileData.userId?.email || '',
-          bio: profileData.bio || profileData.about || '',
-          experience: profileData.experience?.years ?? profileData.experience ?? '',
-          hourlyRate: profileData.hourlyRate ?? profileData.rate ?? '',
-          skills: Array.isArray(profileData.skills) ? profileData.skills : [],
-          certifications: Array.isArray(profileData.certifications) ? profileData.certifications : [],
-          
-          // Private info (controlled sharing)
-          phone: profileData.phone || profileData.contactNumber || '',
-          profileImage: profileData.profileImage || profileData.avatar || '',
-          address: profileData.address || {},
-          portfolio: profileData.portfolio || { images: [], videos: [] },
-          availability: profileData.availability || {},
-          languages: profileData.languages || [],
-          
-          // Sensitive info (requires approval)
-          emergencyContacts: profileData.emergencyContacts || [],
-          documents: profileData.documents || [],
-          backgroundCheck: profileData.backgroundCheck || {},
-          ageCareRanges: profileData.ageCareRanges || [],
+        const response = await caregiversAPI.getMyProfile();
+        const apiProfile = response?.caregiver || response?.data?.caregiver || response?.provider || response || {};
+
+        const nextProfileData = {
+          name: apiProfile.name || apiProfile.fullName || '',
+          email: apiProfile.email || apiProfile.userId?.email || '',
+          bio: apiProfile.bio || apiProfile.about || '',
+          experience: apiProfile.experience?.years ?? apiProfile.experience ?? '',
+          hourlyRate: apiProfile.hourlyRate ?? apiProfile.rate ?? '',
+          skills: Array.isArray(apiProfile.skills) ? apiProfile.skills : [],
+          certifications: Array.isArray(apiProfile.certifications) ? apiProfile.certifications : [],
+          phone: apiProfile.phone || apiProfile.contactNumber || '',
+          profileImage: apiProfile.profileImage || apiProfile.avatar || '',
+          address: apiProfile.address || {},
+          portfolio: apiProfile.portfolio || { images: [], videos: [] },
+          availability: apiProfile.availability || {},
+          languages: apiProfile.languages || [],
+          emergencyContacts: apiProfile.emergencyContacts || [],
+          documents: apiProfile.documents || [],
+          backgroundCheck: apiProfile.backgroundCheck || {},
+          ageCareRanges: apiProfile.ageCareRanges || [],
+        };
+
+        setProfileData(prev => {
+          console.log('[ProfileDataProvider] setProfileData invoked (caregiver)', {
+            prev,
+            next: nextProfileData,
+          });
+          if (shallowEqual(prev, nextProfileData)) {
+            console.log('[ProfileDataProvider] caregiver profile unchanged, skipping state update');
+            profileDataRef.current = prev;
+            return prev;
+          }
+          console.log('[ProfileDataProvider] caregiver profile updated');
+          profileDataRef.current = nextProfileData;
+          return nextProfileData;
         });
       } else if (userType === 'parent') {
-        // Use existing parent profile API
-        response = await authAPI.getProfile();
-        const profileData = response?.data || response || {};
-        
-        setProfileData({
-          // Basic info (always visible)
-          name: profileData.name || '',
-          email: profileData.email || '',
-          
-          // Private info (controlled sharing)
-          phone: profileData.phone || profileData.contact || '',
-          profileImage: profileData.profileImage || profileData.avatar || '',
-          location: profileData.location || '',
-          
-          // Sensitive info (requires approval)
-          emergencyContact: profileData.emergencyContact || '',
-          childMedicalInfo: profileData.childMedicalInfo || '',
-          childAllergies: profileData.childAllergies || '',
-          childBehaviorNotes: profileData.childBehaviorNotes || '',
-          financialInfo: profileData.financialInfo || '',
+        const response = await authAPI.getProfile();
+        const apiProfile = response?.data || response || {};
+
+        const nextProfileData = {
+          name: apiProfile.name || '',
+          email: apiProfile.email || '',
+          phone: apiProfile.phone || apiProfile.contact || '',
+          profileImage: apiProfile.profileImage || apiProfile.avatar || '',
+          location: apiProfile.location || '',
+          emergencyContact: apiProfile.emergencyContact || '',
+          childMedicalInfo: apiProfile.childMedicalInfo || '',
+          childAllergies: apiProfile.childAllergies || '',
+          childBehaviorNotes: apiProfile.childBehaviorNotes || '',
+          financialInfo: apiProfile.financialInfo || '',
+        };
+
+        setProfileData(prev => {
+          console.log('[ProfileDataProvider] setProfileData invoked (parent)', {
+            prev,
+            next: nextProfileData,
+          });
+          if (shallowEqual(prev, nextProfileData)) {
+            console.log('[ProfileDataProvider] parent profile unchanged, skipping state update');
+            profileDataRef.current = prev;
+            return prev;
+          }
+          console.log('[ProfileDataProvider] parent profile updated');
+          profileDataRef.current = nextProfileData;
+          return nextProfileData;
         });
       }
-      
-      return profileData;
+
+      lastLoadedKeyRef.current = loadKey;
+      return profileDataRef.current;
     } catch (error) {
       console.error('Error loading profile data:', error);
       throw error;
     } finally {
       setLoading(false);
     }
-  };
+  }, [shallowEqual]);
+
+  const loadProfileDataRef = useRef(loadProfileData);
+  useEffect(() => {
+    loadProfileDataRef.current = loadProfileData;
+  }, [loadProfileData]);
+
+  useEffect(() => {
+    console.log('[ProfileDataProvider] effect run', {
+      user,
+      lastLoadedKey: lastLoadedKeyRef.current,
+      profileDataKeys: Object.keys(profileDataRef.current || {}),
+    });
+
+    if (!user) {
+      const hadCachedData = lastLoadedKeyRef.current !== null || (profileDataRef.current && Object.keys(profileDataRef.current).length > 0);
+      if (hadCachedData) {
+        console.log('[ProfileDataProvider] clearing cached data due to missing user');
+        profileDataRef.current = {};
+        lastLoadedKeyRef.current = null;
+        setProfileData({});
+      }
+      return;
+    }
+
+    const role = user.role === 'caregiver' ? 'caregiver' : 'parent';
+    const resolvedUserId = role === 'caregiver'
+      ? user.mongoId || user._id || user.id || user.userId || null
+      : null;
+    const loadKey = `${role}:${resolvedUserId || 'self'}`;
+
+    if (lastLoadedKeyRef.current === loadKey) {
+      console.log('[ProfileDataProvider] skipping load, same key', loadKey);
+      return;
+    }
+
+    console.log('[ProfileDataProvider] initial load for role:', role, 'userId:', resolvedUserId);
+
+    loadProfileDataRef.current(role, resolvedUserId, { force: false })
+      .catch((error) => {
+        console.warn('[ProfileDataProvider] initial load failed:', error?.message || error);
+      });
+  }, [user?.role, user?.mongoId, user?._id, user?.id, user?.userId]);
 
   // Update profile data using existing update methods
-  const updateProfileData = async (updates, userType = 'caregiver') => {
+  const updateProfileData = useCallback(async (updates, userType = 'caregiver') => {
     try {
       setLoading(true);
       let response;
@@ -222,7 +326,21 @@ export const ProfileDataProvider = ({ children }) => {
       }
 
       // Update local state
-      setProfileData(prev => ({ ...prev, ...updates }));
+      setProfileData(prev => {
+        console.log('[ProfileDataProvider] setProfileData invoked (updateProfileData)', {
+          prev,
+          updates,
+        });
+        const merged = { ...prev, ...updates };
+        if (shallowEqual(prev, merged)) {
+          console.log('[ProfileDataProvider] updateProfileData skipped - no changes');
+          profileDataRef.current = prev;
+          return prev;
+        }
+        console.log('[ProfileDataProvider] updateProfileData applied');
+        profileDataRef.current = merged;
+        return merged;
+      });
       return response;
     } catch (error) {
       console.error('Error updating profile data:', error);
@@ -230,7 +348,7 @@ export const ProfileDataProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [shallowEqual]);
 
   // Get filtered data based on privacy settings and permissions
   const getFilteredProfileDataInternal = async (targetUserId, viewerUserId, viewerType = 'caregiver') => {
@@ -261,7 +379,7 @@ export const ProfileDataProvider = ({ children }) => {
     }
   };
 
-  const value = {
+  const value = useMemo(() => ({
     profileData,
     loading,
     dataClassification,
@@ -270,7 +388,7 @@ export const ProfileDataProvider = ({ children }) => {
     updateProfileData,
     getFilteredProfileData: getFilteredProfileDataInternal,
     uploadProfileImage,
-  };
+  }), [profileData, loading, loadProfileData, updateProfileData]);
 
   return (
     <ProfileDataContext.Provider value={value}>

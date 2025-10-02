@@ -17,6 +17,11 @@ import { formatAddress } from "../utils/addressUtils"
 import { calculateAge } from "../utils/dateUtils"
 import { __DEV__ } from "../config/constants"
 import MessagesTab from './CaregiverDashboard/components/MessagesTab';
+import ReviewsTab from './CaregiverDashboard/components/ReviewsTab';
+import { useReview } from '../contexts/ReviewContext';
+import { useNotifications } from '../contexts/NotificationContext';
+import ReviewForm from '../components/forms/ReviewForm';
+import { notificationEvents } from '../utils/notificationEvents';
 
 import { 
   EmptyState, 
@@ -35,8 +40,7 @@ import { styles } from './styles/CaregiverDashboard.styles';
 import { useCaregiverDashboard } from '../hooks/useCaregiverDashboard';
 import CaregiverProfileSection from './CaregiverDashboard/components/CaregiverProfileSection';
 import { PrivacyNotificationModal } from '../components/ui/modals/PrivacyNotificationModal';
-import MessageItemLocal from '../components/messaging/MessageItemLocal';
-import ReviewItemLocal from '../components/messaging/ReviewItemLocal';
+import MessagingInterface from '../components/messaging/MessagingInterface';
 
 function JobCard({ job, showActions = true, onApply, hasApplied, onLearnMore, jobCardStyle, gridMode = false }) {
   const applied = typeof hasApplied === 'function' ? hasApplied(job.id) : false
@@ -271,6 +275,7 @@ function BookingCard({ booking, onMessage, onViewDetails, onConfirmAttendance })
 function CaregiverDashboard({ route }) {
   const navigation = useNavigation()
   const { user, signOut } = useAuth()
+  const { enqueueToast } = useNotifications();
   const { width } = Dimensions.get("window");
   const isTablet = width >= 768
   const isAndroid = Platform.OS === 'android'
@@ -312,9 +317,7 @@ function CaregiverDashboard({ route }) {
   const [selectedParent, setSelectedParent] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [reviews, setReviews] = useState([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [reviewsError, setReviewsError] = useState(null);
+  const { reviews, status: reviewsStatus, error: reviewsError, fetchReviews } = useReview();
   const [chatActive, setChatActive] = useState(false);
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' })
@@ -373,38 +376,12 @@ function CaregiverDashboard({ route }) {
     }))
   ), []);
 
-  const fetchCaregiverReviews = useCallback(async () => {
+  const fetchCaregiverReviews = useCallback(() => {
     if (!user?.id) {
-      if (!isMountedRef.current) return;
-      setReviews([]);
-      setReviewsError(null);
-      setReviewsLoading(false);
       return;
     }
-
-    if (isMountedRef.current) {
-      setReviewsLoading(true);
-      setReviewsError(null);
-    }
-
-    try {
-      const response = await ratingService.getCaregiverRatings(user.id, 1, 20);
-      const payload = response?.data ?? response;
-      const items = parseCaregiverReviewPayload(payload);
-
-      if (!isMountedRef.current) return;
-      setReviews(normalizeCaregiverReviewItems(items));
-    } catch (error) {
-      console.warn('⚠️ Failed to load caregiver reviews:', error?.message || error);
-      if (!isMountedRef.current) return;
-      setReviewsError(error?.message || 'Unable to load reviews');
-      setReviews([]);
-    } finally {
-      if (isMountedRef.current) {
-        setReviewsLoading(false);
-      }
-    }
-  }, [normalizeCaregiverReviewItems, parseCaregiverReviewPayload, user?.id]);
+    fetchReviews({ userId: user.id, role: 'caregiver' });
+  }, [fetchReviews, user?.id]);
   
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -914,22 +891,9 @@ function CaregiverDashboard({ route }) {
             </View>
           </Card>
 
-          <Card style={styles.messagesCard}>
-            <FlatList
-              data={messages}
-              renderItem={({ item }) => (
-                <MessageItemLocal
-                  message={item}
-                  isCurrentUser={item.senderId === user?.id}
-                />
-              )}
-              keyExtractor={(item) => item.id}
-              style={styles.messagesList}
-              contentContainerStyle={styles.messagesContent}
-              inverted
-              showsVerticalScrollIndicator={false}
-            />
-          </Card>
+          <View style={{ flex: 1 }}>
+            <MessagingInterface />
+          </View>
 
           <Card style={styles.inputCard}>
             <View style={styles.messageInputContainer}>
@@ -960,24 +924,13 @@ function CaregiverDashboard({ route }) {
   );
 
   const renderReviewsTab = () => (
-    <View style={styles.reviewsContainer}>
-      <Text style={styles.sectionTitle}>Your Reviews</Text>
-      {reviews.length > 0 ? (
-        <FlatList
-          data={reviews}
-          renderItem={({ item }) => <ReviewItemLocal review={item} />}
-          keyExtractor={(item) => item.id}
-          style={styles.reviewsList}
-          contentContainerStyle={styles.reviewsContent}
-        />
-      ) : (
-        <EmptyState 
-          icon="star-outline" 
-          title="No reviews yet"
-          subtitle="Reviews from families will appear here"
-        />
-      )}
-    </View>
+    <ReviewsTab
+      role="caregiver"
+      userId={user?.id || user?.uid}
+      onRefresh={fetchCaregiverReviews}
+      status={reviewsStatus}
+      error={reviewsError}
+    />
   );
 
   const renderHeader = () => {
@@ -1058,13 +1011,7 @@ function CaregiverDashboard({ route }) {
                 onPress={async () => {
                   try {
                     console.log('🚪 Caregiver logout initiated...');
-                    if (onLogout) {
-                      console.log('Using onLogout prop');
-                      await onLogout();
-                    } else {
-                      console.log('Using signOut from AuthContext');
-                      await signOut();
-                    }
+                    await signOut();
                     console.log('✅ Logout completed');
                   } catch (error) {
                     console.error('❌ Logout error:', error);
@@ -1078,8 +1025,8 @@ function CaregiverDashboard({ route }) {
           </View>
         </LinearGradient>
       </View>
-    )
-  }
+    );
+  };
 
   return (
       <View style={styles.container}>

@@ -288,7 +288,7 @@ export const createQuery = (targetRef, ...constraints) => {
 
 export const safeSet = async (target, data) => {
   const dbInstance = await getFirebaseDatabase();
-  if (!dbInstance || typeof dbInstance.ref !== 'function') {
+  if (!dbInstance) {
     throw new Error('Database not available for set');
   }
 
@@ -302,7 +302,7 @@ export const safeSet = async (target, data) => {
 
 export const safePush = async (target, data) => {
   const dbInstance = await getFirebaseDatabase();
-  if (!dbInstance || typeof dbInstance.ref !== 'function') {
+  if (!dbInstance) {
     throw new Error('Database not available for push');
   }
 
@@ -318,7 +318,7 @@ export const safePush = async (target, data) => {
 
 export const safeGet = async (target) => {
   const dbInstance = await getFirebaseDatabase();
-  if (!dbInstance || typeof dbInstance.ref !== 'function') {
+  if (!dbInstance) {
     throw new Error('Database not available for get');
   }
 
@@ -332,7 +332,7 @@ export const safeGet = async (target) => {
 
 export const safeUpdate = async (updates) => {
   const dbInstance = await getFirebaseDatabase();
-  if (!dbInstance || typeof dbInstance.ref !== 'function') {
+  if (!dbInstance) {
     throw new Error('Database not available for update');
   }
 

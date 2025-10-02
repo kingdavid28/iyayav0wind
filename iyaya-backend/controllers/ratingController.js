@@ -1,6 +1,7 @@
 const Rating = require('../models/Rating');
 const Booking = require('../models/Booking');
 const { authenticate } = require('../middleware/auth');
+const { createReviewNotification } = require('../services/notificationService');
 
 // Rate a caregiver
 const rateCaregiver = async (req, res) => {
@@ -46,6 +47,14 @@ const rateCaregiver = async (req, res) => {
     });
 
     await newRating.save();
+
+    // Send notification to caregiver
+    try {
+      await createReviewNotification(newRating, caregiverId, userId);
+    } catch (notificationError) {
+      console.error('Failed to send review notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
 
     res.status(201).json({
       success: true,
@@ -105,6 +114,14 @@ const rateParent = async (req, res) => {
 
     await newRating.save();
 
+    // Send notification to parent
+    try {
+      await createReviewNotification(newRating, parentId, userId);
+    } catch (notificationError) {
+      console.error('Failed to send review notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
+
     res.status(201).json({
       success: true,
       data: newRating
@@ -158,6 +175,46 @@ const getCaregiverRatings = async (req, res) => {
   }
 };
 
+// Get ratings for a specific parent
+const getParentRatings = async (req, res) => {
+  try {
+    const { parentId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    const ratings = await Rating.find({
+      ratee: parentId,
+      type: 'parent'
+    })
+    .populate('rater', 'name email')
+    .populate('booking', 'id')
+    .sort({ createdAt: -1 })
+    .limit(limit * 1)
+    .skip((page - 1) * limit);
+
+    const total = await Rating.countDocuments({
+      ratee: parentId,
+      type: 'parent'
+    });
+
+    res.status(200).json({
+      success: true,
+      data: ratings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Get parent ratings error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch parent ratings'
+    });
+  }
+};
+
 // Get rating summary for a user
 const getRatingSummary = async (req, res) => {
   try {
@@ -199,5 +256,6 @@ module.exports = {
   rateCaregiver,
   rateParent,
   getCaregiverRatings,
+  getParentRatings,
   getRatingSummary
 };

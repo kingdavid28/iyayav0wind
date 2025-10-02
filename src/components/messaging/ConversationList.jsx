@@ -1,5 +1,5 @@
 // ConversationList.jsx - React Native Paper conversation list component
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -7,7 +7,6 @@ import {
   StyleSheet,
 } from 'react-native';
 import {
-  Card,
   Text,
   Avatar,
   ActivityIndicator,
@@ -15,56 +14,28 @@ import {
   Surface,
 } from 'react-native-paper';
 import { MessageCircle, Clock } from 'lucide-react-native';
-import { useAuth } from '../../../contexts/AuthContext';
-import { messagingService } from '../../../services/firebaseMessagingService';
-import { authService } from '../../../services/authService';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMessaging } from '../../contexts/MessagingContext';
 
-const ConversationList = ({ onSelectConversation, selectedConversation, navigation }) => {
+const ConversationList = ({ onSelectConversation, selectedConversation }) => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    conversations,
+    conversationsLoading,
+    subscribeToConversations,
+    totalUnreadCount,
+  } = useMessaging();
 
   useEffect(() => {
-    const userId = authService.getCurrentUserId();
-    if (!userId) {
-      setLoading(false);
-      return;
+    if (!user?.id) {
+      return undefined;
     }
 
-    const unsubscribe = messagingService.listenToUserConversations(userId, async (firebaseConversations) => {
-      // Enhance with user profile data from MongoDB
-      const enhancedConversations = await Promise.all(
-        firebaseConversations.map(async (conv) => {
-          try {
-            const userProfile = await messagingService.getConversationMetadata(conv.id);
-            return {
-              ...conv,
-              recipientName: userProfile?.name || 'Unknown User',
-              recipientAvatar: userProfile?.profileImage || null,
-              recipientRole: userProfile?.role || 'user',
-            };
-          } catch (error) {
-            console.warn('Error fetching user profile:', error);
-            return {
-              ...conv,
-              recipientName: 'Unknown User',
-              recipientAvatar: null,
-              recipientRole: 'user',
-            };
-          }
-        })
-      );
-
-      setConversations(enhancedConversations);
-      setLoading(false);
-    });
-
+    subscribeToConversations(user.id, user.role === 'caregiver' ? 'caregiver' : 'parent');
     return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
+      subscribeToConversations(null);
     };
-  }, []);
+  }, [subscribeToConversations, user?.id, user?.role]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return 'Unknown';
@@ -83,19 +54,36 @@ const ConversationList = ({ onSelectConversation, selectedConversation, navigati
     }
   };
 
-  const handleConversationPress = (conversation) => {
-    if (onSelectConversation) {
-      onSelectConversation(conversation);
-    } else if (navigation) {
-      // Navigate to chat screen if no onSelectConversation provided
-      navigation.navigate('ChatScreen', {
-        conversationId: conversation.id,
-        recipientId: conversation.otherUserId,
-        recipientName: conversation.recipientName,
-        recipientAvatar: conversation.recipientAvatar,
-      });
-    }
-  };
+  const normalizedConversations = useMemo(() => {
+    if (!Array.isArray(conversations)) return [];
+
+    return conversations.map((conversation) => {
+      const isParent = user?.role === 'parent';
+      const recipientName = isParent ? conversation?.caregiverName : conversation?.parentName;
+      const recipientAvatar = isParent ? conversation?.caregiverAvatar : conversation?.parentAvatar;
+      const recipientRole = isParent ? 'caregiver' : 'parent';
+      const otherUserId = isParent ? conversation?.caregiverId : conversation?.parentId;
+      const lastActivity = conversation?.lastMessageTime || conversation?.lastActivity;
+
+      return {
+        ...conversation,
+        recipientName: recipientName || 'Unknown User',
+        recipientAvatar: recipientAvatar || null,
+        recipientRole,
+        otherUserId,
+        lastActivity,
+      };
+    });
+  }, [conversations, user?.role]);
+
+  const handleConversationPress = useCallback(
+    (conversation) => {
+      if (typeof onSelectConversation === 'function') {
+        onSelectConversation(conversation);
+      }
+    },
+    [onSelectConversation]
+  );
 
   const renderConversation = ({ item }) => (
     <TouchableOpacity
@@ -164,7 +152,7 @@ const ConversationList = ({ onSelectConversation, selectedConversation, navigati
     </View>
   );
 
-  if (loading) {
+  if (conversationsLoading && normalizedConversations.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -175,6 +163,8 @@ const ConversationList = ({ onSelectConversation, selectedConversation, navigati
     );
   }
 
+  const isEmpty = normalizedConversations.length === 0;
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -182,15 +172,15 @@ const ConversationList = ({ onSelectConversation, selectedConversation, navigati
           Conversations
         </Text>
         <Text variant="bodySmall" style={styles.subtitle}>
-          {conversations.length} {conversations.length === 1 ? 'conversation' : 'conversations'}
+          {normalizedConversations.length} {normalizedConversations.length === 1 ? 'conversation' : 'conversations'} · {totalUnreadCount} unread
         </Text>
       </View>
 
-      {conversations.length === 0 ? (
+      {isEmpty ? (
         renderEmptyState()
       ) : (
         <FlatList
-          data={conversations}
+          data={normalizedConversations}
           keyExtractor={(item) => item.id}
           renderItem={renderConversation}
           showsVerticalScrollIndicator={false}

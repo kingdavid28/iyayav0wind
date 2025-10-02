@@ -4,6 +4,8 @@ import { ActivityIndicator, View } from "react-native";
 import { authAPI } from '../services';
 import { STORAGE_KEYS } from "../config/constants";
 import { firebaseAuthService } from "../services/firebaseAuthService";
+import { firebaseRealtimeService } from "../services/firebaseRealtimeService";
+import usePushNotifications from '../hooks/usePushNotifications';
 
 // Import safety functions for Firebase initialization - FIXED: Only initialize once
 import { getAuthSync, initializeFirebase } from '../config/firebase';
@@ -20,6 +22,11 @@ export const AuthProvider = ({ children }) => {
   const [hasLoggedOut, setHasLoggedOut] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
 
+  const {
+    registerPushTokenForCurrentDevice,
+    removePushTokenForCurrentDevice,
+  } = usePushNotifications();
+
   // Normalize user object to ensure consistent property names
   const normalizeUser = (userData) => {
     if (!userData) return null;
@@ -33,6 +40,71 @@ export const AuthProvider = ({ children }) => {
       _id: undefined,
       uid: undefined,
     };
+  };
+
+  // Fetch user profile from backend and sync with Firebase auth
+  const fetchUserProfile = async (firebaseUid) => {
+    try {
+      console.log('🔍 Fetching user profile for Firebase UID:', firebaseUid);
+
+      // Call the backend firebase-profile endpoint
+      const response = await authAPI.getFirebaseProfile();
+
+      if (response?.success && response.user) {
+        console.log('✅ User profile fetched successfully:', {
+          id: response.user._id || response.user.id,
+          firebaseUid: response.user.firebaseUid,
+          role: response.user.role
+        });
+
+        // Normalize the user data
+        const normalizedUser = normalizeUser(response.user);
+
+        // Validate UID consistency
+        if (firebaseUid && normalizedUser?.id && firebaseUid !== normalizedUser.id) {
+          console.warn('⚠️ Firebase UID mismatch detected during profile fetch', {
+            firebaseUid,
+            apiUserId: normalizedUser.id,
+            userRole: normalizedUser.role
+          });
+        }
+
+        return normalizedUser;
+      } else {
+        console.warn('⚠️ Profile fetch returned no user data:', response);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch user profile:', error.message);
+
+      // If profile fetch fails, try fallback to /profile endpoint
+      try {
+        console.log('🔄 Attempting fallback profile fetch...');
+        const fallbackResponse = await authAPI.getProfile();
+
+        if (fallbackResponse?.success && fallbackResponse.user) {
+          console.log('✅ Fallback profile fetch successful');
+          return normalizeUser(fallbackResponse.user);
+        }
+      } catch (fallbackError) {
+        console.error('❌ Fallback profile fetch also failed:', fallbackError.message);
+      }
+
+      return null;
+    }
+  };
+
+  // Validate UID consistency between Firebase and MongoDB
+  const validateUidConsistency = (firebaseUid, mongoUserId, context = 'unknown') => {
+    if (firebaseUid && mongoUserId && firebaseUid !== mongoUserId) {
+      console.warn(`⚠️ Firebase UID mismatch detected in ${context}`, {
+        firebaseUid,
+        apiUserId: mongoUserId,
+        context
+      });
+      return false;
+    }
+    return true;
   };
 
   useEffect(() => {
@@ -86,28 +158,58 @@ export const AuthProvider = ({ children }) => {
                 firstName: profile.firstName,
                 lastName: profile.lastName,
                 middleInitial: profile.middleInitial,
-                birthDate: profile.birthDate,
                 phone: profile.phone,
                 ...profile
               });
               
               setUser(normalizedUser);
+
+              try {
+                const realtimeUser = await firebaseRealtimeService.initializeRealtimeAuth();
+                const firebaseUid = realtimeUser?.uid || firebaseAuthService.getCurrentUser()?.uid;
+                console.log('🔁 Realtime auth synchronized', {
+                  firebaseUid,
+                  apiUserId: normalizedUser?.id,
+                });
+                if (firebaseUid && normalizedUser?.id && firebaseUid !== normalizedUser.id) {
+                  console.warn('⚠️ Firebase UID mismatch detected for realtime messaging', {
+                    firebaseUid,
+                    apiUserId: normalizedUser.id,
+                  });
+                }
+              } catch (realtimeError) {
+                console.warn('⚠️ Failed to initialize realtime auth session:', realtimeError?.message || realtimeError);
+              }
             } catch (profileError) {
               console.error('❌ Error fetching user profile:', profileError);
               // Fallback to basic user data if profile fetch fails
-              setUser(normalizeUser({
+              const fallbackUser = normalizeUser({
                 id: user.uid,
                 email: user.email,
                 name: user.displayName,
                 emailVerified: user.emailVerified,
                 role: null
-              }));
+              });
+              setUser(fallbackUser);
+
+              try {
+                const realtimeUser = await firebaseRealtimeService.initializeRealtimeAuth();
+                const firebaseUid = realtimeUser?.uid || firebaseAuthService.getCurrentUser()?.uid;
+                console.log('🔁 Realtime auth synchronized (fallback profile)', {
+                  firebaseUid,
+                  apiUserId: fallbackUser?.id,
+                });
+              } catch (realtimeError) {
+                console.warn('⚠️ Failed to initialize realtime auth session after profile fallback:', realtimeError?.message || realtimeError);
+              }
             }
           } else {
+            firebaseRealtimeService.resetAuthSession();
             setUser(null);
             await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
             console.log('🚪 User logged out or email not verified');
           }
+
           
           setIsLoading(false);
         });
@@ -131,6 +233,41 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
+  useEffect(() => {
+    console.log('[AuthContext] push token effect run', {
+      authInitialized,
+      isLoading,
+      hasUser: !!user,
+    });
+    if (!authInitialized || isLoading) {
+      return;
+    }
+    let cancelled = false;
+
+    const syncPushToken = async () => {
+      try {
+        if (user) {
+          console.log('[AuthContext] registering push token for user', {
+            id: user.id,
+            role: user.role,
+          });
+          await registerPushTokenForCurrentDevice();
+        } else if (!cancelled) {
+          console.log('[AuthContext] removing push token (no user)');
+          await removePushTokenForCurrentDevice();
+        }
+      } catch (error) {
+        console.warn('Push token sync failed:', error?.message || error);
+      }
+    };
+
+    syncPushToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authInitialized, isLoading, user, registerPushTokenForCurrentDevice, removePushTokenForCurrentDevice]);
+
   const login = async (email, password) => {
     try {
       setIsLoading(true);
@@ -150,7 +287,42 @@ export const AuthProvider = ({ children }) => {
 
       // Normalize the user object before setting it
       if (res.user) {
-        setUser(normalizeUser(res.user));
+        const normalizedLoginUser = normalizeUser(res.user);
+        setUser(normalizedLoginUser);
+
+        try {
+          const realtimeUser = await firebaseRealtimeService.initializeRealtimeAuth();
+          const firebaseUid = realtimeUser?.uid || firebaseAuthService.getCurrentUser()?.uid;
+          console.log('🔁 Realtime auth initialized after login', {
+            firebaseUid,
+            apiUserId: normalizedLoginUser?.id,
+          });
+          if (firebaseUid && normalizedLoginUser?.id && firebaseUid !== normalizedLoginUser.id) {
+            console.warn('⚠️ Firebase UID mismatch detected immediately after login', {
+              firebaseUid,
+              apiUserId: normalizedLoginUser.id,
+            });
+          }
+        } catch (realtimeError) {
+          console.warn('⚠️ Failed to initialize realtime auth immediately after login:', realtimeError?.message || realtimeError);
+        }
+      } else {
+        // No user data in response, try to fetch from backend
+        console.log('🔍 No user data in login response, fetching profile...');
+        try {
+          const firebaseUser = firebaseAuthService.getCurrentUser();
+          if (firebaseUser?.uid) {
+            const profileUser = await fetchUserProfile(firebaseUser.uid);
+            if (profileUser) {
+              setUser(profileUser);
+              console.log('✅ Profile fetched and user set after login');
+            } else {
+              console.warn('⚠️ Could not fetch user profile after login');
+            }
+          }
+        } catch (profileError) {
+          console.error('❌ Profile fetch failed after login:', profileError.message);
+        }
       }
 
       return { success: true, user: res.user };
@@ -184,6 +356,40 @@ export const AuthProvider = ({ children }) => {
         const normalizedUser = normalizeUser(facebookResult.user);
         setUser(normalizedUser);
         console.log('✅ Facebook user set in context:', normalizedUser);
+
+        try {
+          const realtimeUser = await firebaseRealtimeService.initializeRealtimeAuth();
+          const firebaseUid = realtimeUser?.uid || firebaseAuthService.getCurrentUser()?.uid;
+          console.log('🔁 Realtime auth initialized after Facebook login', {
+            firebaseUid,
+            apiUserId: normalizedUser?.id,
+          });
+          if (firebaseUid && normalizedUser?.id && firebaseUid !== normalizedUser.id) {
+            console.warn('⚠️ Firebase UID mismatch detected after Facebook login', {
+              firebaseUid,
+              apiUserId: normalizedUser.id,
+            });
+          }
+        } catch (realtimeError) {
+          console.warn('⚠️ Failed to initialize realtime auth after Facebook login:', realtimeError?.message || realtimeError);
+        }
+      } else {
+        // No user data in Facebook response, try to fetch from backend
+        console.log('🔍 No user data in Facebook response, fetching profile...');
+        try {
+          const firebaseUser = firebaseAuthService.getCurrentUser();
+          if (firebaseUser?.uid) {
+            const profileUser = await fetchUserProfile(firebaseUser.uid);
+            if (profileUser) {
+              setUser(profileUser);
+              console.log('✅ Profile fetched and user set after Facebook login');
+            } else {
+              console.warn('⚠️ Could not fetch user profile after Facebook login');
+            }
+          }
+        } catch (profileError) {
+          console.error('❌ Profile fetch failed after Facebook login:', profileError.message);
+        }
       }
 
       return { success: true, user: facebookResult.user };
@@ -233,6 +439,8 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setHasLoggedOut(true);
       console.log('✅ Firebase signOut completed');
+      await removePushTokenForCurrentDevice();
+      firebaseRealtimeService.resetAuthSession();
     } catch (err) {
       console.log('❌ Logout error:', err);
       throw err;
@@ -302,6 +510,7 @@ export const AuthProvider = ({ children }) => {
     signOut,
     resetPassword,
     verifyEmailToken,
+    fetchUserProfile, // Expose for other components to use
     // Safe current user getter
     getCurrentUser: () => {
       try {

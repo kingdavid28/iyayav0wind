@@ -1,42 +1,80 @@
 // firebaseRealtimeService.js - Firebase for real-time features only
-import { getFirebaseDatabase, getAuthSync, ref, onValue, off, push, set, query, orderByChild, onAuthStateChanged, signInAnonymously } from '../config/firebase';
+import { getFirebaseDatabase, getAuthSync, ref, onValue, off, push, set, query, orderByChild, onAuthStateChanged } from '../config/firebase';
 
 class FirebaseRealtimeService {
   constructor() {
     this.currentUser = null;
     this.authStateListeners = [];
     this.databaseListeners = new Map();
+    this.initializationPromise = null;
   }
 
-  async initializeRealtimeAuth() {
-    return new Promise((resolve, reject) => {
-      // Get auth synchronously first
-      const auth = getAuthSync();
+  async initializeRealtimeAuth({ requireAuthenticatedUser = true } = {}) {
+    if (this.currentUser) {
+      return this.currentUser;
+    }
 
-      // Set up auth state listener
-      onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          this.currentUser = user;
-          this.notifyAuthStateChange(true);
-          resolve(user);
-        } else {
-          try {
-            // Only sign in anonymously if no user exists
-            const result = await signInAnonymously(auth);
-            this.currentUser = result.user;
-            this.notifyAuthStateChange(true);
-            resolve(result.user);
-          } catch (error) {
-            console.error('Firebase realtime auth error:', error);
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = new Promise((resolve, reject) => {
+      try {
+        const auth = getAuthSync();
+
+        const cleanup = () => {
+          this.initializationPromise = null;
+        };
+
+        const timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error('Realtime auth initialization timed out waiting for Firebase user.'));
+        }, 15000);
+
+        const unsubscribe = onAuthStateChanged(
+          auth,
+          (user) => {
+            if (user) {
+              clearTimeout(timeoutId);
+              unsubscribe();
+              this.currentUser = user;
+              this.notifyAuthStateChange(true);
+              cleanup();
+              resolve(user);
+            } else if (!requireAuthenticatedUser) {
+              clearTimeout(timeoutId);
+              unsubscribe();
+              cleanup();
+              resolve(null);
+            }
+          },
+          (error) => {
+            console.error('Firebase realtime auth state listener error:', error);
+            clearTimeout(timeoutId);
+            unsubscribe();
+            cleanup();
             reject(error);
           }
-        }
-      });
+        );
+      } catch (error) {
+        console.error('Firebase realtime auth sync error:', error);
+        this.initializationPromise = null;
+        reject(error);
+      }
     });
+
+    return this.initializationPromise;
   }
 
   addAuthStateListener(listener) {
+    if (typeof listener !== 'function') {
+      return () => {};
+    }
+
     this.authStateListeners.push(listener);
+    return () => {
+      this.authStateListeners = this.authStateListeners.filter((registered) => registered !== listener);
+    };
   }
 
   notifyAuthStateChange(isAuthenticated) {
@@ -45,6 +83,13 @@ class FirebaseRealtimeService {
 
   getCurrentUserId() {
     return this.currentUser ? this.currentUser.uid : null;
+  }
+
+  resetAuthSession() {
+    this.currentUser = null;
+    this.initializationPromise = null;
+    this.cleanup();
+    this.notifyAuthStateChange(false);
   }
 
   // Real-time database methods for messaging

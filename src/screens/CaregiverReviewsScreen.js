@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  Alert
+  Alert,
+  RefreshControl
 } from 'react-native';
-import { getFirebaseDatabase, ref, onValue, push, set, query, orderByChild } from '../config/firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { ratingsService } from '../services';
 import { StarRatingInput, StarRatingDisplay } from 'react-native-star-rating-widget';
 
 const ReviewItem = ({ review }) => (
@@ -18,53 +20,59 @@ const ReviewItem = ({ review }) => (
       starSize={20}
       color="#FFD700"
     />
-    {review.comment && (
-      <Text style={styles.comment}>{review.comment}</Text>
+    {review.review && (
+      <Text style={styles.comment}>{review.review}</Text>
     )}
     <Text style={styles.timestamp}>
-      {new Date(review.timestamp).toLocaleDateString()}
+      {new Date(review.createdAt).toLocaleDateString()}
     </Text>
   </View>
 );
 
 const CaregiverReviewsScreen = ({ route }) => {
-  const { userId, caregiverId } = route.params;
+  const { caregiverId } = route.params;
+  const { user } = useAuth();
   const [reviews, setReviews] = useState([]);
+  const [ratingSummary, setRatingSummary] = useState(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch reviews
+  // Fetch reviews and summary
+  const fetchReviewsAndSummary = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch rating summary
+      const summaryResponse = await ratingsService.getRatingSummary(caregiverId, 'caregiver');
+      if (summaryResponse?.success) {
+        setRatingSummary(summaryResponse.data);
+      }
+
+      // Fetch recent reviews
+      const reviewsResponse = await ratingsService.getCaregiverRatings(caregiverId, 1, 10);
+      if (reviewsResponse?.success) {
+        setReviews(reviewsResponse.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+      Alert.alert('Error', 'Failed to load reviews');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchReviews = async () => {
-      const database = await getFirebaseDatabase();
-      const reviewsRef = ref(database, `reviews/${caregiverId}`);
-      const reviewsQuery = query(reviewsRef, orderByChild('timestamp'));
-
-      const unsubscribe = onValue(reviewsQuery, (snapshot) => {
-        const reviewsData = [];
-        snapshot.forEach((childSnapshot) => {
-          reviewsData.push({
-            id: childSnapshot.key,
-            parentId: childSnapshot.val().parentId,
-            rating: childSnapshot.val().rating,
-            comment: childSnapshot.val().comment,
-            timestamp: childSnapshot.val().timestamp
-          });
-        });
-        setReviews(reviewsData);
-      });
-
-      return unsubscribe;
-    };
-
-    let unsubscribe;
-    fetchReviews().then((unsub) => {
-      unsubscribe = unsub;
-    });
-
-    return () => unsubscribe && unsubscribe();
+    fetchReviewsAndSummary();
   }, [caregiverId]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchReviewsAndSummary();
+    setRefreshing(false);
+  };
 
   const submitReview = async () => {
     if (rating === 0) {
@@ -72,19 +80,29 @@ const CaregiverReviewsScreen = ({ route }) => {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'You must be logged in to submit a review');
+      return;
+    }
+
     try {
-      const database = await getFirebaseDatabase();
-      const reviewRef = push(ref(database, `reviews/${caregiverId}`));
-      await set(reviewRef, {
-        parentId: userId,
-        rating: rating,
-        comment: comment,
-        timestamp: Date.now()
-      });
-      setRating(0);
-      setComment('');
-      setShowReviewForm(false);
-      Alert.alert('Success', 'Review submitted successfully');
+      // Submit rating via backend API
+      const response = await ratingsService.rateCaregiver(caregiverId, null, rating, comment);
+
+      if (response?.success) {
+        // Refresh reviews and summary after successful submission
+        await fetchReviewsAndSummary();
+
+        setRating(0);
+        setComment('');
+        setShowReviewForm(false);
+        Alert.alert('Success', 'Review submitted successfully');
+
+        // Also refresh dashboard data if needed
+        // This could trigger a global refresh or update parent dashboard
+      } else {
+        Alert.alert('Error', response?.error || 'Failed to submit review');
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to submit review');
       console.error('Error submitting review:', error);
@@ -95,10 +113,38 @@ const CaregiverReviewsScreen = ({ route }) => {
     <ReviewItem review={item} />
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading reviews...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
+      {/* Rating Summary Section */}
+      {ratingSummary && (
+        <View style={styles.summaryContainer}>
+          <Text style={styles.summaryTitle}>Rating Summary</Text>
+          <View style={styles.summaryRow}>
+            <StarRatingDisplay
+              rating={ratingSummary.averageRating || 0}
+              starSize={20}
+              color="#FFD700"
+            />
+            <Text style={styles.averageRating}>
+              {ratingSummary.averageRating?.toFixed(1) || '0.0'}
+            </Text>
+            <Text style={styles.totalRatings}>
+              ({ratingSummary.totalRatings || 0} reviews)
+            </Text>
+          </View>
+        </View>
+      )}
+
       {!showReviewForm ? (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addReviewButton}
           onPress={() => setShowReviewForm(true)}
         >
@@ -120,13 +166,13 @@ const CaregiverReviewsScreen = ({ route }) => {
             numberOfLines={4}
           />
           <View style={styles.reviewButtons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => setShowReviewForm(false)}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.submitButton}
               onPress={submitReview}
             >
@@ -135,11 +181,15 @@ const CaregiverReviewsScreen = ({ route }) => {
           </View>
         </View>
       )}
+
       <FlatList
         data={reviews}
         renderItem={renderReviewItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id || item.id}
         style={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No reviews yet</Text>
@@ -156,8 +206,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     padding: 16,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   list: {
     flex: 1,
+  },
+  summaryContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  averageRating: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+    color: '#333',
+  },
+  totalRatings: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,

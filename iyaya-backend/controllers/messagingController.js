@@ -2,6 +2,7 @@ const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const { authenticate } = require('../middleware/auth');
 const { errorHandler } = require('../utils/errorHandler');
+const { createMessageNotification } = require('../services/notificationService');
 
 // Get all conversations for the current user
 const getConversations = async (req, res) => {
@@ -104,6 +105,14 @@ const sendMessage = async (req, res) => {
 
     await message.save();
 
+    // Send notification to recipient
+    try {
+      await createMessageNotification(message, recipientId, senderId);
+    } catch (notificationError) {
+      console.error('Failed to send message notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
+
     // Update conversation's last message
     conversation.lastMessage = {
       content,
@@ -169,6 +178,14 @@ const startConversation = async (req, res) => {
     });
 
     await message.save();
+
+    // Send notification to recipient for initial message
+    try {
+      await createMessageNotification(message, recipientId, senderId);
+    } catch (notificationError) {
+      console.error('Failed to send initial message notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
 
     res.status(201).json({
       success: true,

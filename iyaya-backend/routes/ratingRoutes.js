@@ -5,7 +5,8 @@ const {
   rateCaregiver,
   rateParent,
   getCaregiverRatings,
-  getRatingSummary
+  getRatingSummary,
+  getParentRatings
 } = require('../controllers/ratingController');
 
 // All rating routes require authentication
@@ -19,6 +20,9 @@ router.post('/parent', rateParent);
 
 // Get ratings for a specific caregiver
 router.get('/caregiver/:caregiverId', getCaregiverRatings);
+
+// Get ratings for a specific parent
+router.get('/parent/:parentId', getParentRatings);
 
 // Get rating summary for a user
 router.get('/summary/:userId', getRatingSummary);

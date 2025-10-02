@@ -451,3 +451,137 @@ src/
 
 # Status
 - Task completed: Provided a detailed incremental implementation plan for notifications, Firebase messaging, and reviews across both dashboards.
+
+Recommended Actions
+Messaging cleanup: Keep only the realtime Firebase implementation. Remove or migrate 
+src/components/MessageItem.js
+ and the *Local.js messaging artifacts so both dashboards rely exclusively on 
+firebaseMessagingService.js
+ plus the 
+MessagingInterface
+ components.
+Phase 1 deliverables:
+Document existing Firebase messaging behavior and gaps.
+Add shared TypeScript-friendly definitions (e.g., ChatConversation, ChatMessage, Notification, Review) under src/shared/types/.
+Draft or confirm Express controllers/routes in the backend for notifications and reviews (e.g., notificationsController.js, reviewsController.js).
+Phase 2 preparations:
+Design MongoDB Notification schema and corresponding REST endpoints.
+Implement src/services/notificationService.js and expand NotificationContext to match the plan before wiring UI badges/lists.
+Identify event hooks (booking updates, review submissions) that should trigger notifications.
+Phase 3+ roadmap:
+Refactor 
+firebaseMessagingService.js
+ to use the safe helpers (
+safeDatabaseOperation
+, 
+createRef
+) consistently and extract channel management into a dedicated service per plan.
+Add centralized MessagingContext or Redux slice for conversation/unread state.
+Schedule UI enhancements (typing indicators, optimistic send) for both dashboards.
+Begin outlining MongoDB review services and UI (Review form modal, caregiver response view) once backend endpoints exist.
+01JEY5AQN7L WIFI PASSWORD
+
+
+
+Step-by-Step Implementation Plan
+Phase 0 · Discovery & Alignment
+[0.1 Inventory Firebase messaging] Catalogue functions exported by src/services/firebaseMessagingService.js, note usage across src/components/messaging/ and dashboard tabs. Document findings in docs/messaging-audit.md.
+[0.2 Review auth & token flow] Confirm push token storage strategy by inspecting src/utils/tokenManager.js and AuthContext to ensure headers are available for new services.
+[0.3 Backend capability check] Verify iyaya-backend/ has JWT-protected endpoints for notifications/reviews. If missing, open tickets for controller/route creation.
+Phase 1 · Shared Foundations
+[1.1 Type definitions] Create src/shared/types/index.ts containing Notification, ChatConversation, ChatMessage, Review, ReviewResponse, and re-export for JS consumers (JSDoc typedefs).
+[1.2 API clients] Add notificationService and reviewService stubs in src/services/ returning mocked data to unblock UI work.
+[1.3 State scaffolding] Decide on Redux slice vs context. If following Redux Toolkit pattern documented in memories, add notificationSlice.ts and reviewSlice.ts under src/store/.
+Phase 2 · Notification System (Parent & Caregiver)
+[2.1 Backend schema] In iyaya-backend/models/Notification.js, define schema with userId, actorId, type, entityRef, payload, readAt, timestamps, and indexes.
+[2.2 REST endpoints] Implement controller (controllers/notificationController.js) and router (routes/notificationRoutes.js) supporting GET /notifications, PATCH /notifications/:id/read, PATCH /notifications/read-all.
+[2.3 Service layer] Flesh out src/services/notificationService.js with fetchNotifications(), markAsRead(), markAllAsRead(), subscribeSocket() (placeholder).
+[2.4 Notification context] Create src/contexts/NotificationContext.js exposing useNotifications() and useNotificationActions(); integrate into 
+App.js
+ provider tree near MessagingProvider.
+[2.5 UI entry points]
+Parent: augment src/screens/ParentDashboard/components/Header.js with bell badge, connect to context.
+Caregiver: update src/screens/CaregiverDashboard/components/DashboardHeader.js similarly.
+Build NotificationList component under src/components/notifications/ consumed by modal in both dashboards.
+[2.6 Trigger integration] Add backend hooks (e.g., inside booking controller, messaging service) to create notifications. Use existing event bus if available; otherwise add service wrappers.
+[2.7 Tests]
+Frontend: Jest tests for notification context reducers/services.
+Backend: Supertest suite verifying auth protection and pagination.
+Phase 3 · Firebase Messaging Enhancements
+[3.1 Service refactor] Update src/services/firebaseMessagingService.js to call safeDatabaseOperation() and createRef() from src/config/firebase.js. Extract channel utilities into src/services/messagingChannelService.js.
+[3.2 Central messaging state] Implement MessagingContext (or Redux slice) to track conversations, unread counts, current thread. Place provider near NotificationProvider.
+[3.3 Parent dashboard messaging] Modify src/screens/ParentDashboard/components/MessagesTab.js (and associated components) to consume messaging state, show conversation previews with last message timestamp.
+[3.4 Caregiver messaging enhancements] Do same for src/screens/CaregiverDashboard/components/MessagesTab.js, adding optimistic sending via local queue (src/components/messaging/OfflineMessageQueue.js).
+[3.5 Presence & typing indicators] Add Firebase refs storing user presence/typing; display in both dashboards.
+[3.6 Push notifications (optional)
+Integrate expo-notifications, create src/hooks/usePushNotifications.js.
+Store device tokens via backend endpoint (POST /users/device-token).
+Fire push notifications on new messages.
+[3.7 QA scenarios] End-to-end test with two simulators ensuring real-time updates, offline queue flush, and no infinite renders.
+Phase 4 · Review Workflow
+[4.1 Backend review model] Introduce Review schema referencing bookingId, authorId, caregiverId, rating, comment, response, status.
+[4.2 Routes & policies] Controller controllers/reviewController.js handling POST /bookings/:id/review, GET /caregivers/:id/reviews, POST /reviews/:id/response. Enforce one review per completed booking.
+[4.3 Frontend services] Implement src/services/reviewService.js hooking into new endpoints; ensure tokenManager used for auth.
+[4.4 Parent UI] Add ReviewFormModal in src/components/reviews/ triggered after booking completes on 
+ParentDashboard
+.
+[4.5 Caregiver UI] Update src/screens/CaregiverDashboard/components/ReviewsTab.js to consume real data, display averages, allow responses.
+[4.6 Profile integration] Surface average ratings in 
+ParentDashboard
+ profile and caregiver profile components.
+[4.7 Notifications] Use notification system to alert caregivers about new reviews and parents about responses.
+Phase 5 · Quality, Documentation, Rollout
+[5.1 Feature flags] Add config keys (e.g., FEATURE_NOTIFICATIONS) in src/config/featureFlags.js and utilize in providers to enable staged rollout.
+[5.2 Documentation updates] Refresh 
+README.md
+, ARCHITECTURE.md, and create NOTIFICATIONS.md detailing setup, schemas, and integration steps.
+[5.3 Automated tests] Expand Jest coverage, add Detox or Cypress flows for parent/caregiver running through notifications, messaging, reviews.
+[5.4 Monitoring & analytics] Instrument analytics events (
+useAnalytics
+) for notification open, message send, review submit. Add backend logging and consider Sentry alerts.
+Phase 6 · Cleanup & Enhancements
+[6.1 Legacy removal] Delete or migrate obsolete messaging components mentioned in README (e.g., src/components/MessageItem.js, legacy Local artifacts).
+[6.2 Performance tuning] Memoize heavy dashboard components, ensure contexts use selectors to avoid re-renders.
+[6.3 Accessibility & UX polish] Add toasts, skeleton loaders, empty states, and confirm both dashboards meet accessibility guidelines.
+Recommended Next Actions
+[Immediate] Complete Phase 0 audits, share findings with stakeholders.
+[Short-term] Implement Phase 1 artifacts (types, services, state scaffolds) to unblock parallel backend work.
+[Clarification] The string “01JEY5AQN7L WIFI PASSWORD” appears unrelated to implementation; confirm if it’s a placeholder or can be ignored.
+Once Phase 1 is underway, we can iterate on Phases 2–4 with backend/frontend teams in parallel, enabling gradual feature rollout across Parent and Caregiver dashboards.
+
+
+
+Implementation Gaps
+Messaging: Need centralized state (Redux slice or enhanced context), service refactor to extract channel helpers, presence/typing indicators, Expo push integration pipeline, and UI polish for both dashboards.
+Notifications: Missing NotificationContext, UI components (bell badge, list modal), frontend tests, and backend trigger wiring for booking/message/review events.
+Reviews: Need backend controller/routes, REST endpoints, and frontend service + workflow (submit modal, caregiver response, analytics).
+Recommended Actions
+Messaging:
+[Refactor service] Extract channel utilities, ensure all Firebase calls use safeDatabaseOperation and createRef.
+[State layer] Build MessagingContext/Redux slice storing conversations and unread counts.
+[UI updates] Enhance parent/caregiver message tabs for previews, optimistic sending, typing indicators, offline queue flush.
+[Push integration] Finish frontend deviceTokenService + usePushNotifications.js, register tokens in AuthContext, trigger backend push on new messages.
+Notifications:
+[Frontend infrastructure] Implement NotificationContext, notificationService, UI badge/list in dashboard headers.
+[Backend triggers] Add create-notification calls in booking/messaging/review controllers.
+[Testing] Jest tests for context reducers; Supertest coverage for notification routes.
+Reviews:
+[Backend API] Create reviewController.js, routes, and service logic enforcing one review per booking.
+[Frontend service] Add reviewService.js with CRUD methods; integrate with ReviewContext.
+[UI workflow] Parent review form modal, caregiver review management, profile summaries; trigger notifications when reviews/ responses posted.
+Push tokens:
+[Frontend implementation] Create src/services/deviceTokenService.js, src/hooks/usePushNotifications.js, update AuthContext to register/deregister tokens, and add logout cleanup.
+Status
+Backend device-token endpoints are in place; all other messaging/notification/review enhancements remain to be implemented following best practices above.
+
+
+Notifications
+[testing] Add unit tests for NotificationContext reducers and integration tests for notification flows.
+[backend coordination] Confirm backend review/booking/message triggers fire notificationEvents payloads expected by front end.
+Reviews
+[backend] Implement REST controller/routes enforcing single-review-per-booking and returning summaries.
+[frontend polish] Wire rating summary refresh + analytics updates (e.g., rating badges, dashboard metrics) after submissions.
+Push tokens
+[auth integration] Hook 
+usePushNotifications()
+ into AuthContext lifecycle so tokens register on login and clear on logout.

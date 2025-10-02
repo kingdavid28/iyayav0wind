@@ -1,10 +1,11 @@
 // MessageInput.jsx - React Native Paper message input component
 import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Keyboard } from 'react-native';
-import { ActivityIndicator } from 'react-native-paper';
+import { ActivityIndicator, Badge } from 'react-native-paper';
 import { Send, Paperclip } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
+import { useMessaging } from '../../contexts/MessagingContext';
 
 const MessageInput = ({
   conversation,
@@ -14,6 +15,16 @@ const MessageInput = ({
   onTyping,
   placeholder = "Type a message..."
 }) => {
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const { queueStatus } = useMessaging();
+
+  const pendingCount = queueStatus?.pendingCount || 0;
+  const failedCount = queueStatus?.failedCount || 0;
+  const isOffline = queueStatus?.isOnline === false;
+  const queueCount = failedCount > 0 ? failedCount : pendingCount;
+  const hasQueueActivity = queueCount > 0;
+
   const handleTextChange = (text) => {
     setMessage(text);
     if (onTyping) {
@@ -39,14 +50,6 @@ const MessageInput = ({
       setSending(false);
     }
   };
-
-  const handleKeyPress = (e) => {
-    if (e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const handleImagePick = async () => {
     if (onImagePick) {
       await onImagePick();
@@ -89,26 +92,38 @@ const MessageInput = ({
           (disabled || sending) && styles.textInputDisabled
         ]}
         multiline
-        maxLength={1000}
         onSubmitEditing={handleSend}
         blurOnSubmit={false}
         disabled={disabled || sending}
       />
 
-      <TouchableOpacity
-        onPress={handleSend}
-        disabled={!message.trim() || disabled || sending}
-        style={[
-          styles.sendButton,
-          (!message.trim() || disabled || sending) && styles.sendButtonDisabled
-        ]}
-      >
-        {sending ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Send size={20} color="#fff" />
+      <View style={styles.sendWrapper}>
+        {hasQueueActivity && (
+          <Badge
+            style={[
+              styles.queueBadge,
+              failedCount > 0 ? styles.queueBadgeError : null,
+            ]}
+          >
+            {queueCount}
+          </Badge>
         )}
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleSend}
+          disabled={!message.trim() || disabled || sending}
+          style={[
+            styles.sendButton,
+            (!message.trim() || disabled || sending) && styles.sendButtonDisabled,
+            isOffline ? styles.sendButtonOffline : null,
+          ]}
+        >
+          {sending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Send size={20} color="#fff" />
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -142,6 +157,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     color: '#999',
   },
+  sendWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   sendButton: {
     backgroundColor: '#007AFF',
     borderRadius: 20,
@@ -154,6 +174,21 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#ccc',
+  },
+  sendButtonOffline: {
+    backgroundColor: '#5C6BC0',
+  },
+  queueBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFA000',
+    color: '#000',
+    zIndex: 2,
+  },
+  queueBadgeError: {
+    backgroundColor: '#D32F2F',
+    color: '#fff',
   },
 });
 

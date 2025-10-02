@@ -1,5 +1,5 @@
 // ChatScreen.jsx - Enhanced chat screen with Firebase messaging
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -23,14 +23,23 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useAuth } from '../../core/contexts/AuthContext';
-import { messagingService } from '../../services/messagingService';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMessaging } from '../../contexts/MessagingContext';
 import MessageInput from './MessageInput';
 
 const ChatScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
+  const {
+    subscribeToMessages,
+    sendMessage,
+    setTypingStatus,
+    messages,
+    messagesLoading,
+    typingUsers,
+    queueStatus,
+  } = useMessaging();
   const flatListRef = useRef(null);
 
   const { conversationId, recipientId, recipientName, recipientAvatar } = route.params || {};
@@ -44,32 +53,17 @@ const ChatScreen = () => {
   } : null;
 
   // State
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingUsers, setTypingUsers] = useState([]);
 
   // Load messages
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !user?.id) return () => {};
 
-    setLoading(true);
-    const unsubscribe = messagingService.listenToMessages(conversationId, (newMessages) => {
-      setMessages(newMessages);
-      setLoading(false);
-    });
-
-    // Listen to typing indicators
-    const typingUnsubscribe = messagingService.listenToTypingStatus(conversationId, (users) => {
-      setTypingUsers(users);
-    });
-
+    subscribeToMessages(conversationId, user.id, recipientId);
     return () => {
-      unsubscribe();
-      typingUnsubscribe();
+      subscribeToMessages(null);
     };
-  }, [conversationId]);
+  }, [conversationId, recipientId, subscribeToMessages, user?.id]);
 
   // Handle sending message
   const handleSendMessage = async (messageText) => {
@@ -77,15 +71,14 @@ const ChatScreen = () => {
 
     setSending(true);
     try {
-      const messageId = await messagingService.sendMessage(recipientId, messageText);
-      setIsTyping(false);
+      await sendMessage(user?.id, recipientId, messageText, 'text', null, conversationId);
+      await setTypingStatus(conversationId, user?.id, false);
 
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
-      Alert.alert('Error', 'Failed to send message. Please try again.');
       console.error('Send message error:', error);
     } finally {
       setSending(false);
@@ -93,40 +86,27 @@ const ChatScreen = () => {
   };
 
   // Handle typing
-  const handleTyping = useCallback((text) => {
-    if (text.trim()) {
-      if (!isTyping) {
-        setIsTyping(true);
-        messagingService.setTypingStatus(conversationId, true);
+  const handleTyping = useCallback(
+    (text) => {
+      if (!conversationId || !user?.id) {
+        return;
       }
-    } else {
-      if (isTyping) {
-        setIsTyping(false);
-        messagingService.setTypingStatus(conversationId, false);
-      }
-    }
-  }, [conversationId, isTyping]);
 
-  // Handle image selection
-  const handleImagePick = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled) {
-        // TODO: Upload image and send as message
-        Alert.alert('Info', 'Image sharing feature coming soon!');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
+      const hasContent = Boolean(text?.trim());
+      setTypingStatus(conversationId, user.id, hasContent);
+    },
+    [conversationId, setTypingStatus, user?.id]
+  );
 
   // Render message
+  const visibleMessages = useMemo(
+    () =>
+      (messages || [])
+        .filter((message) => (message?.conversationId || conversationId) === conversationId)
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)),
+    [conversationId, messages]
+  );
+
   const renderMessage = ({ item }) => (
     <MessageCard
       message={item}
@@ -139,18 +119,39 @@ const ChatScreen = () => {
 
   // Render typing indicator
   const renderTypingIndicator = () => {
-    if (typingUsers.length === 0) return null;
+    const otherTyping = typingUsers?.filter((id) => id !== user?.id) || [];
+    if (otherTyping.length === 0) return null;
 
     return (
       <View style={styles.typingContainer}>
         <Text variant="caption" style={styles.typingText}>
-          {typingUsers.includes(recipientId) ? `${recipientName} is typing...` : 'Someone is typing...'}
+          {otherTyping.includes(recipientId) ? `${recipientName} is typing...` : 'Someone is typing...'}
         </Text>
       </View>
     );
   };
 
+  const renderOfflineBanner = () => {
+    if (!queueStatus?.isOnline) {
+      return (
+        <View style={styles.offlineBanner}>
+          <Text variant="bodySmall" style={styles.offlineText}>
+            Offline mode. {queueStatus?.pendingCount || 0} message(s) pending sync.
+          </Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
   // Render header
+  const otherParticipantId = useMemo(() => {
+    if (!conversationId) return recipientId;
+    const ids = conversationId.split('_');
+    if (!ids || ids.length !== 2) return recipientId;
+    return ids[0] === user?.id ? ids[1] : ids[0];
+  }, [conversationId, recipientId, user?.id]);
+
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity
@@ -170,7 +171,7 @@ const ChatScreen = () => {
             {recipientName}
           </Text>
           <Text variant="caption" style={styles.recipientStatus}>
-            {typingUsers.includes(recipientId) ? 'Typing...' : 'Online'}
+            {typingUsers.includes(otherParticipantId) ? 'Typing...' : 'Online'}
           </Text>
         </View>
       </View>
@@ -189,7 +190,7 @@ const ChatScreen = () => {
     </View>
   );
 
-  if (loading) {
+  if (messagesLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -206,10 +207,11 @@ const ChatScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {renderHeader()}
+      {renderOfflineBanner()}
 
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={visibleMessages}
         keyExtractor={(item) => item.id || item.timestamp.toString()}
         renderItem={renderMessage}
         style={styles.messagesList}
@@ -222,7 +224,7 @@ const ChatScreen = () => {
 
       <MessageInput
         conversation={conversation}
-        disabled={loading || sending}
+        disabled={messagesLoading || sending}
         onSendMessage={handleSendMessage}
         onImagePick={handleImagePick}
         onTyping={handleTyping}

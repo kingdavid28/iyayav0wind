@@ -1,20 +1,61 @@
 const { Types } = require('mongoose');
 const Notification = require('../models/Notification');
-const { authenticate } = require('../middleware/auth');
+
+const MAX_LIMIT = 100;
+const DEFAULT_LIMIT = 20;
+
+const parsePaginationParams = (query) => {
+  const rawPage = Number.parseInt(query.page, 10);
+  const rawLimit = Number.parseInt(query.limit, 10);
+
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, MAX_LIMIT) : DEFAULT_LIMIT;
+
+  return { page, limit };
+};
+
+const mapNotification = (notification) => {
+  if (!notification) {
+    return null;
+  }
+
+  const sender = notification.sender || {};
+  const relatedBooking = notification.relatedBooking || {};
+
+  return {
+    id: notification._id,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    read: notification.read,
+    createdAt: notification.createdAt,
+    readAt: notification.readAt,
+    actor: sender && sender._id
+      ? {
+          id: sender._id,
+          displayName: sender.name || sender.displayName || sender.email || '',
+          avatarUrl: sender.avatar || sender.avatarUrl || sender.profileImage
+        }
+      : undefined,
+    relatedBooking: relatedBooking._id || relatedBooking,
+    data: notification.data || {},
+    metadata: notification.metadata || {}
+  };
+};
 
 // Get all notifications for the current user
 const getNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 20 } = req.query;
+    const { page, limit } = parsePaginationParams(req.query);
 
     if (!Types.ObjectId.isValid(userId)) {
       return res.status(200).json({
         success: true,
         data: [],
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total: 0,
           pages: 0
         }
@@ -22,22 +63,23 @@ const getNotifications = async (req, res) => {
     }
 
     const notifications = await Notification.find({ recipient: userId })
-      .populate('sender', 'name email')
-      .populate('relatedBooking', 'id')
+      .populate('sender', 'name email avatar profileImage')
+      .populate('relatedBooking', '_id bookingCode status')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(limit)
+      .skip((page - 1) * limit)
+      .lean();
 
     const total = await Notification.countDocuments({ recipient: userId });
 
     res.status(200).json({
       success: true,
-      data: notifications,
+      data: notifications.map(mapNotification).filter(Boolean),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit) || 0
       }
     });
   } catch (error) {
@@ -66,7 +108,10 @@ const markAsRead = async (req, res) => {
       { _id: notificationId, recipient: userId },
       { read: true, readAt: new Date() },
       { new: true }
-    );
+    )
+      .populate('sender', 'name email avatar profileImage')
+      .populate('relatedBooking', '_id bookingCode status')
+      .lean();
 
     if (!notification) {
       return res.status(404).json({
@@ -77,7 +122,7 @@ const markAsRead = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: notification
+      data: mapNotification(notification)
     });
   } catch (error) {
     console.error('Mark notification as read error:', error);

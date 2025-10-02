@@ -33,6 +33,7 @@ export default function BookingsTab({
   bookings = [],
   onBookingView,
   onMessageFamily,
+  onRequestReview,
   refreshing = false,
   onRefresh,
   loading = false,
@@ -148,6 +149,7 @@ export default function BookingsTab({
         onClose={handleCloseModal}
         onMessageFamily={onMessageFamily}
         onOpenBooking={onBookingView}
+        onRequestReview={onRequestReview}
       />
     </View>
   );

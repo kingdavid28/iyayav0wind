@@ -7,24 +7,110 @@ import { tokenManager } from '../utils/tokenManager';
 import { firebaseMessagingService } from './firebaseMessagingService';
 import { firebaseAuthService } from './firebaseAuthService';
 import { initializeAuthService } from './authService';
+import { notificationEvents } from '../utils/notificationEvents';
 
-// Dynamic API URL from environment
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
-  ? `${process.env.EXPO_PUBLIC_API_URL}/api`
-  : __DEV__
-  ? 'http://localhost:5000/api' // Replace with your machine's LAN IP + backend port during development
-    : 'http://192.168.1.9:5000/api'; // TODO: set to your production API host
+// Dynamic API URL from environment with automatic IP detection
+const getApiBaseUrl = () => {
+  // First priority: Environment variable
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return `${process.env.EXPO_PUBLIC_API_URL}/api`;
+  }
 
-// Network monitoring (from apiService.js)
-let isConnected = true;
-try {
-  const NetInfo = require('@react-native-netinfo/netinfo').default;
-  NetInfo?.addEventListener((state) => {
-    isConnected = state.isConnected;
-  });
-} catch (error) {
-  // NetInfo not available
+  // Second priority: Auto-detect local IP address (Node.js environment only)
+  if (__DEV__ && typeof require !== 'undefined') {
+    try {
+      // Check if we're in a Node.js environment
+      const os = require('os');
+      if (os && os.networkInterfaces) {
+        const interfaces = os.networkInterfaces();
+        let detectedIP = null;
+
+        // Find the first non-internal IPv4 address
+        Object.keys(interfaces).forEach(name => {
+          interfaces[name].forEach(iface => {
+            if (iface.family === 'IPv4' && !iface.internal && iface.address) {
+              detectedIP = iface.address;
+            }
+          });
+        });
+
+        if (detectedIP) {
+          console.log(`🔗 Auto-detected IP address: ${detectedIP}`);
+          return `http://${detectedIP}:5000/api`;
+        }
+      }
+    } catch (error) {
+      console.warn('IP auto-detection not available in this environment:', error.message);
+    }
+  }
+
+  // Fallback: Use hardcoded IP (can be changed in .env file)
+  return __DEV__
+    ? 'http://192.168.1.70:5000/api' // Fallback IP - update as needed
+    : 'http://192.168.1.9:5000/api'; // Production fallback
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log connection info in development (safe logging)
+if (__DEV__) {
+  try {
+    const connectionInfo = {
+      apiUrl: API_BASE_URL,
+      socketUrl: API_BASE_URL.replace('/api', ''),
+      environment: __DEV__ ? 'development' : 'production',
+      autoDetectedIP: !process.env.EXPO_PUBLIC_API_URL && __DEV__ && typeof require !== 'undefined'
+    };
+    console.log('🔗 API Configuration:', connectionInfo);
+  } catch (error) {
+    console.log('🔗 API Base URL:', API_BASE_URL);
+  }
 }
+
+// Enhanced network monitoring
+let isConnected = true;
+let networkListener = null;
+
+const setupNetworkMonitor = () => {
+  try {
+    const NetInfo = require('@react-native-netinfo/netinfo').default;
+
+    if (typeof NetInfo?.fetch === 'function') {
+      NetInfo.fetch().then(state => {
+        isConnected = state.isConnected;
+      });
+
+      return NetInfo.addEventListener(state => {
+        isConnected = state.isConnected;
+        logger.info(`Network status changed: ${state.isConnected ? 'Online' : 'Offline'}`);
+      });
+    }
+  } catch (error) {
+    logger.warn('NetInfo not available:', error.message);
+  }
+  return () => {};
+};
+
+// TypeScript support (JSDoc for better IDE support)
+/**
+ * @typedef {Object} APIRequestOptions
+ * @property {string} [method] - HTTP method
+ * @property {any} [body] - Request body
+ * @property {Record<string, string>} [headers] - Custom headers
+ * @property {boolean} [useAuth] - Include authentication
+ * @property {number} [retries] - Retry attempts
+ * @property {boolean} [cache] - Enable caching
+ * @property {string} [cacheKey] - Cache key
+ * @property {number} [timeout] - Request timeout in ms
+ * @property {boolean} [validateToken] - Validate token before request
+ */
+
+/**
+ * @typedef {Object} CacheEntry
+ * @property {any} data - Cached data
+ * @property {number} timestamp - Cache timestamp
+ * @property {number} ttl - Time to live in ms
+ */
 
 class EnhancedAPIService {
   constructor() {
@@ -32,6 +118,7 @@ class EnhancedAPIService {
     this.cache = new Map();
     this.requestQueue = [];
     this.isRefreshing = false;
+    this.networkListener = setupNetworkMonitor();
   }
 
   // Enhanced request method with fallback support
@@ -58,10 +145,10 @@ class EnhancedAPIService {
       body,
       headers = {},
       useAuth = true,
-      retries = 2,
+      retries = parseInt(process.env.EXPO_PUBLIC_API_MAX_RETRIES) || 3,
       cache = false,
       cacheKey = null,
-      timeout = 8000,
+      timeout = parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT) || 15000,
       validateToken = true
     } = options;
 
@@ -334,6 +421,23 @@ class EnhancedAPIService {
       timeout: 10000
     }),
 
+    getById: (caregiverId, options = {}) => {
+      if (!caregiverId) {
+        throw new Error('caregiverId is required');
+      }
+
+      const id = caregiverId.toString();
+      const cacheKey = `caregiver:${id}`;
+
+      return this.request(`/caregivers/${id}`, {
+        cache: true,
+        cacheKey,
+        retries: 1,
+        timeout: 10000,
+        ...options,
+      });
+    },
+
     getMyProfile: () => this.request('/caregivers/profile', {
       cache: true,
       cacheKey: 'caregiver-profile',
@@ -573,7 +677,7 @@ class EnhancedAPIService {
   // Enhanced Children operations (from childrenAPI + userService.js)
   children = {
     getMy: () => this.requestWithFallback('/children', []),
-    getMyChildren: () => this.requestWithFallback('/children', []), // Backward compatibility
+    // Removed duplicate: getMyChildren: () => this.requestWithFallback('/children', []), // Backward compatibility
 
     create: (childData) => {
       // Create a deep copy to avoid mutating the original
@@ -851,8 +955,68 @@ class EnhancedAPIService {
     }
   };
 
-  // Notification operations
+  // Notification operations - Enhanced with real-time support
   notifications = {
+    fetchNotifications: async (params = {}) => {
+      try {
+        return await this.request('/notifications', {
+          cache: true,
+          cacheKey: 'notifications',
+          ...params
+        });
+      } catch (error) {
+        handleApiError(error, '/notifications');
+      }
+    },
+
+    fetchFiltered: async (params = {}) => {
+      try {
+        return await this.request('/notifications/filter', {
+          cache: true,
+          cacheKey: 'notifications_filtered',
+          ...params
+        });
+      } catch (error) {
+        handleApiError(error, '/notifications/filter');
+      }
+    },
+
+    markAsRead: async (notificationId) => {
+      try {
+        this.clearCache('notifications');
+        return await this.request(`/notifications/${notificationId}/read`, {
+          method: 'PUT'
+        });
+      } catch (error) {
+        handleApiError(error, `/notifications/${notificationId}/read`);
+      }
+    },
+
+    markAllAsRead: async () => {
+      try {
+        this.clearCache('notifications');
+        return await this.request('/notifications/read-all', {
+          method: 'PUT'
+        });
+      } catch (error) {
+        handleApiError(error, '/notifications/read-all');
+      }
+    },
+
+    subscribe: (callback) => {
+      console.log('Notifications subscription requested (stub)');
+      return () => console.log('Notifications subscription cancelled');
+    },
+
+    initializeRealtime: () => {
+      try {
+        console.log('Real-time notifications initialized (stub)');
+      } catch (error) {
+        console.warn('Failed to initialize real-time notifications:', error.message);
+      }
+    },
+
+    // Legacy methods for backward compatibility
     getNotifications: async () => {
       try {
         return await this.request('/notifications', {
@@ -864,35 +1028,18 @@ class EnhancedAPIService {
         return { data: [] };
       }
     },
-    
-    getAll: () => this.request('/notifications', {
-      cache: true,
-      cacheKey: 'notifications'
-    }),
-    
-    markAsRead: (notificationId) => {
-      this.clearCache('notifications');
-      return this.request(`/notifications/${notificationId}/read`, {
-        method: 'PATCH'
-      });
-    },
-    
-    markAllAsRead: () => {
-      this.clearCache('notifications');
-      return this.request('/notifications/read-all', {
-        method: 'PATCH'
-      });
-    },
-    
+
+    getAll: () => this.notifications.getNotifications(),
+
     requestPermissions: async () => {
       logger.info('Notification permissions granted (stub)');
       return true;
     },
-    
+
     schedule: async (title, body, data = {}) => {
       logger.info('Notification scheduled (stub):', { title, body, data });
     },
-    
+
     init: async () => {
       logger.info('Notifications initialized (stub)');
       return 'expo-go-stub-token';
@@ -901,9 +1048,16 @@ class EnhancedAPIService {
 
   // Enhanced cache management (from apiService.js + integratedService.js)
   clearCache(pattern = null) {
+    if (pattern === 'all') {
+      this.cache.clear();
+      return;
+    }
+
     if (pattern) {
-      for (const key of this.cache.keys()) {
-        if (key.includes(pattern)) {
+      const now = Date.now();
+      for (const [key, entry] of this.cache) {
+        // Clear by pattern or expired entries
+        if (key.includes(pattern) || now - entry.timestamp > entry.ttl) {
           this.cache.delete(key);
         }
       }
@@ -916,7 +1070,7 @@ class EnhancedAPIService {
   getCachedData(key, ttl = 300000) {
     if (this.cache.has(key)) {
       const cached = this.cache.get(key);
-      if (Date.now() - cached.timestamp < ttl) {
+      if (Date.now() - cached.timestamp < (cached.ttl || ttl)) {
         return cached.data;
       }
       this.cache.delete(key);
@@ -938,6 +1092,18 @@ class EnhancedAPIService {
       return { status: 'unhealthy', error: error.message, timestamp: new Date().toISOString() };
     }
   }
+
+  // Cleanup method for proper resource disposal
+  cleanup() {
+    if (this.networkListener) {
+      this.networkListener();
+      this.networkListener = null;
+    }
+    this.cache.clear();
+    this.requestQueue = [];
+    this.isRefreshing = false;
+    logger.info('EnhancedAPIService cleanup completed');
+  }
 }
 
 // Create singleton instance
@@ -945,6 +1111,18 @@ export const apiService = new EnhancedAPIService();
 
 // Initialize dependent services
 initializeAuthService(apiService);
+
+// Initialize real-time notifications with error handling
+try {
+  if (apiService.notifications && typeof apiService.notifications.initializeRealtime === 'function') {
+    apiService.notifications.initializeRealtime();
+    console.log('✅ Real-time notifications initialized');
+  } else {
+    console.warn('⚠️ Notifications service not available for initialization');
+  }
+} catch (error) {
+  console.warn('⚠️ Failed to initialize real-time notifications:', error.message);
+}
 
 // Export individual services for backward compatibility
 export const authAPI = apiService.auth;
@@ -985,6 +1163,14 @@ export const privacyAPI = {
 // Export utilities
 export const getCurrentAPIURL = () => API_BASE_URL;
 export const getCurrentSocketURL = () => API_BASE_URL.replace('/api', '');
+
+// Enhanced debugging utility
+export const getConnectionInfo = () => ({
+  apiUrl: API_BASE_URL,
+  socketUrl: API_BASE_URL.replace('/api', ''),
+  environment: __DEV__ ? 'development' : 'production',
+  autoDetectedIP: !process.env.EXPO_PUBLIC_API_URL && __DEV__
+});
 
 // Legacy compatibility - export API_BASE_URL for direct access
 export { API_BASE_URL };

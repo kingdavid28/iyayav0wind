@@ -1,12 +1,35 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, Linking, Alert, Platform, StyleSheet, Dimensions } from 'react-native';
-import { Calendar, Clock, DollarSign, MapPin, Phone, Mail, MessageCircle, Navigation, Star, Baby, AlertCircle, CheckCircle, X } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Linking,
+  Alert,
+  Platform,
+  StyleSheet,
+  Dimensions,
+} from 'react-native';
+import {
+  Calendar,
+  Clock,
+  DollarSign,
+  MapPin,
+  Phone,
+  Mail,
+  MessageCircle,
+  Navigation,
+  Baby,
+  AlertCircle,
+  CheckCircle,
+  X,
+  User, // new
+} from 'lucide-react-native';
 import PropTypes from 'prop-types';
 import { colors, spacing, typography } from '../../../screens/styles/ParentDashboard.styles';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-// Simple i18n helper - replace with proper i18n library in production
 const t = (key) => {
   const translations = {
     'booking.details': 'Booking Details',
@@ -24,7 +47,7 @@ const t = (key) => {
     'children.preferences': 'Preferences',
     'children.instructions': 'Special Instructions',
     'children.allergies': 'Allergies',
-    'requirements': 'Requirements',
+    requirements: 'Requirements',
     'notes.special': 'Special Notes',
     'emergency.contact': 'Emergency Contact',
     'emergency.name': 'Name',
@@ -37,24 +60,16 @@ const t = (key) => {
     'alerts.completed': 'Booking Completed',
     'alerts.completed.message': 'The booking has been marked as complete',
     'alerts.cancelled': 'Booking Cancelled',
-    'alerts.cancelled.message': 'The booking has been cancelled'
+    'alerts.cancelled.message': 'The booking has been cancelled',
+    'actions.viewProfile': 'View Profile',
+    'booking.info': 'Booking Information',
+    'booking.id': 'Booking ID',
+    'booking.created': 'Created',
+    'booking.updated': 'Updated',
   };
   return translations[key] || key;
 };
 
-/**
- * BookingDetailsModal displays detailed information about a booking, including children, contact, and actions.
- * Accessibility labels and roles are provided for all interactive elements.
- *
- * @param {Object} props
- * @param {boolean} props.visible - Whether the modal is visible
- * @param {Object} props.booking - Booking details object
- * @param {Function} props.onClose - Called when the modal is closed
- * @param {Function} props.onMessage - Called when the message button is pressed
- * @param {Function} props.onGetDirections - Called when the directions button is pressed
- * @param {Function} props.onCompleteBooking - Called to mark booking as complete
- * @param {Function} props.onCancelBooking - Called to cancel booking
- */
 export function BookingDetailsModal({
   visible,
   booking,
@@ -62,25 +77,65 @@ export function BookingDetailsModal({
   onMessage,
   onGetDirections,
   onCompleteBooking,
-  onCancelBooking
+  onCancelBooking,
+  onViewCaregiverProfile,
 }) {
-  if (!visible || !booking) return null;
+  if (!visible || !booking) {
+    return null;
+  }
+  const displayBookingId =
+    booking.bookingCode ||
+    booking.reference ||
+    booking.bookingId ||
+    booking._id ||
+    booking.id ||
+    null;
 
-  const statusStyles = {
-    confirmed: { backgroundColor: '#DCFCE7', borderColor: '#A7F3D0', color: '#166534' },
-    pending: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', color: '#B45309' },
-    pending_confirmation: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A', color: '#B45309' },
-    completed: { backgroundColor: '#DBEAFE', borderColor: '#BFDBFE', color: '#1D4ED8' },
-    cancelled: { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5', color: '#B91C1C' },
-    in_progress: { backgroundColor: '#E0F2FE', borderColor: '#BAE6FD', color: '#0C4A6E' },
-    default: { backgroundColor: '#E5E7EB', borderColor: '#D1D5DB', color: '#374151' }
+  const formatDateTime = (value) => {
+    if (!value) return null;
+    try {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return null;
+      return new Intl.DateTimeFormat('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+      }).format(date);
+    } catch (error) {
+      console.warn('BookingDetailsModal: unable to format date', value, error);
+      return null;
+    }
   };
 
-  const statusKey = (booking.status || '').toLowerCase();
-  const statusColor = statusStyles[statusKey] || statusStyles.default;
+  const createdAt = formatDateTime(booking.createdAt);
+  const updatedAt = formatDateTime(booking.updatedAt);
 
-  // Calculate total amount if not provided
-  const totalAmount = booking.totalAmount || (booking.hourlyRate * (booking.totalHours || 1));
+  const renderStatus = () => {
+    const statusMap = {
+      pending: { label: 'Pending', color: colors.warning },
+      pending_confirmation: { label: 'Awaiting Confirmation', color: colors.warning },
+      confirmed: { label: 'Confirmed', color: colors.success },
+      in_progress: { label: 'In Progress', color: colors.accent },
+      completed: { label: 'Completed', color: colors.success },
+      paid: { label: 'Paid', color: colors.success },
+      cancelled: { label: 'Cancelled', color: colors.error },
+      declined: { label: 'Declined', color: colors.error },
+    };
+
+    const status = statusMap[booking.status] || { label: booking.status, color: colors.text };
+    return (
+      <View style={[styles.statusPill, { borderColor: status.color + '40', backgroundColor: status.color + '15' }]}>
+        <Text style={[styles.statusPillText, { color: status.color }]}>{status.label}</Text>
+      </View>
+    );
+  };
+
+  const displayRate = booking.hourlyRate != null ? `₱${booking.hourlyRate}/hr` : '—';
+  const displayTotal = booking.totalAmount != null ? `₱${booking.totalAmount}` : '—';
+  const displayDate = booking.date || '—';
+  const displayTime = booking.time || booking.timeRange || '—';
 
   return (
     <View style={styles.overlay}>
@@ -88,115 +143,124 @@ export function BookingDetailsModal({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.headerIconWrap}>
-              <Calendar size={24} color={colors.primary || '#3b82f6'} />
+              <Calendar size={20} color={colors.primary} />
             </View>
             <View style={styles.headerTextContainer}>
               <Text style={styles.headerTitle}>{t('booking.details')}</Text>
-              {!!booking.family && (
-                <Text style={styles.headerSubtitle}>{booking.family}</Text>
-              )}
-            </View>
-          </View>
-          <View style={styles.headerRight}>
-            <View
-              style={[styles.statusPill, {
-                backgroundColor: statusColor.backgroundColor,
-                borderColor: statusColor.borderColor
-              }]}
-            >
-              <Text style={[styles.statusPillText, { color: statusColor.color }]}>
-                {statusKey ? statusKey.replace('_', ' ') : 'scheduled'}
+              <Text style={styles.headerSubtitle}>
+                {booking.family || 'Family'} · {displayDate}
               </Text>
             </View>
-            <Pressable onPress={onClose} hitSlop={12} style={styles.closeButton}>
-              <X size={22} color={colors?.textSecondary || '#6B7280'} />
+          </View>
+
+          <View style={styles.headerRight}>
+            {renderStatus()}
+            <Pressable onPress={onClose} style={styles.closeButton} accessibilityLabel="Close booking details">
+              <X size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
         </View>
 
-        <ScrollView 
-          contentContainerStyle={styles.contentContainer}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('booking.overview')}</Text>
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
-                <Calendar size={18} color="#6B7280" />
+                <Clock size={18} color={colors.primary} />
                 <View style={styles.infoTextWrap}>
                   <Text style={styles.infoLabel}>{t('booking.date')}</Text>
-                  <Text style={styles.infoValue}>{booking.date}</Text>
+                  <Text style={styles.infoValue}>{displayDate}</Text>
                 </View>
               </View>
+
               <View style={styles.infoItem}>
-                <Clock size={18} color="#6B7280" />
+                <Clock size={18} color={colors.primary} />
                 <View style={styles.infoTextWrap}>
                   <Text style={styles.infoLabel}>{t('booking.time')}</Text>
-                  <Text style={styles.infoValue}>{booking.time}</Text>
+                  <Text style={styles.infoValue}>{displayTime}</Text>
                 </View>
               </View>
+
               <View style={styles.infoItem}>
-                <DollarSign size={18} color="#6B7280" />
+                <DollarSign size={18} color={colors.primary} />
                 <View style={styles.infoTextWrap}>
                   <Text style={styles.infoLabel}>{t('booking.rate')}</Text>
-                  <Text style={[styles.infoValue, styles.highlightText]}>₱{booking.hourlyRate}/hr</Text>
+                  <Text style={[styles.infoValue, styles.highlightText]}>{displayRate}</Text>
                 </View>
               </View>
+
               <View style={styles.infoItem}>
-                <Star size={18} color="#6B7280" />
+                <DollarSign size={18} color={colors.primary} />
                 <View style={styles.infoTextWrap}>
                   <Text style={styles.infoLabel}>{t('booking.total')}</Text>
-                  <Text style={[styles.infoValue, styles.successText]}>₱{totalAmount}</Text>
+                  <Text style={[styles.infoValue, styles.highlightText]}>{displayTotal}</Text>
                 </View>
               </View>
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('location.contact')}</Text>
-            <View style={styles.locationContainer}>
-              <View style={styles.locationRow}>
-                <MapPin size={18} color="#4B5563" />
-                <View style={styles.locationTextWrap}>
-                  <Text style={styles.locationTitle}>{booking.location}</Text>
-                  <Text style={styles.locationSubtitle}>{booking.address}</Text>
-                </View>
-              </View>
-              <View style={styles.contactRow}>
-                <Phone size={18} color="#4B5563" />
-                <Text style={styles.contactLabel}>Phone</Text>
-                <Text style={styles.contactValue}>
-                  {booking.contactPhone || t('contact.hidden')}
-                </Text>
-              </View>
-              <View style={styles.contactRow}>
-                <Mail size={18} color="#4B5563" />
-                <Text style={styles.contactLabel}>Email</Text>
-                <Text style={styles.contactValue}>
-                  {booking.contactEmail || t('contact.hidden')}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {booking.childrenDetails && booking.childrenDetails.length > 0 && (
+          {booking.location || booking.address || booking.contactPhone || booking.contactEmail ? (
             <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <Baby size={18} color="#4B5563" />
-                <Text style={styles.sectionTitle}>{t('children.details')}</Text>
+              <Text style={styles.sectionTitle}>{t('location.contact')}</Text>
+              <View style={styles.locationContainer}>
+                {(booking.location || booking.address) && (
+                  <View style={styles.locationRow}>
+                    <MapPin size={18} color={colors.primary} />
+                    <View style={styles.locationTextWrap}>
+                      <Text style={styles.locationTitle}>{booking.location || 'Booking Location'}</Text>
+                      <Text style={styles.locationSubtitle}>{booking.address || 'Address will be shared after confirmation.'}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <View style={styles.locationContainer}>
+                  <View style={styles.contactRow}>
+                    <Phone size={16} color={colors.primary} />
+                    <Text style={styles.contactLabel}>{t('contact.phone')}</Text>
+                    <Text style={styles.contactValue}>{booking.contactPhone || t('contact.hidden')}</Text>
+                  </View>
+
+                  <View style={styles.contactRow}>
+                    <Mail size={16} color={colors.primary} />
+                    <Text style={styles.contactLabel}>{t('contact.email')}</Text>
+                    <Text style={styles.contactValue}>{booking.contactEmail || t('contact.hidden')}</Text>
+                  </View>
+                </View>
               </View>
+            </View>
+          ) : null}
+
+          {Array.isArray(booking.childrenDetails) && booking.childrenDetails.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('children.details')}</Text>
               <View style={styles.childrenList}>
                 {booking.childrenDetails.map((child, index) => (
                   <View key={index} style={styles.childCard}>
                     <View style={styles.childHeader}>
-                      <Text style={styles.childName}>{child.name}</Text>
-                      <Text style={styles.childMeta}>{child.age ? `Age ${child.age}` : 'Age n/a'}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                        <Baby size={16} color={colors.primary} />
+                        <Text style={styles.childName}>{child.name || `Child #${index + 1}`}</Text>
+                      </View>
+                      <Text style={styles.childMeta}>
+                        {t('children.age')}: {child.age ?? child.ageMonths ?? '—'}
+                      </Text>
                     </View>
+
                     <View style={styles.childBody}>
-                      <Text style={styles.childLabel}>{t('children.preferences')}</Text>
-                      <Text style={styles.childValue}>{child.preferences || 'No preferences listed'}</Text>
-                      <Text style={styles.childLabel}>{t('children.instructions')}</Text>
-                      <Text style={styles.childValue}>{child.specialInstructions || 'None'}</Text>
+                      {child.preferences ? (
+                        <Text style={styles.childValue}>
+                          <Text style={styles.childLabel}>{t('children.preferences')}: </Text>
+                          {child.preferences}
+                        </Text>
+                      ) : null}
+
+                      {child.specialInstructions ? (
+                        <Text style={styles.childValue}>
+                          <Text style={styles.childLabel}>{t('children.instructions')}: </Text>
+                          {child.specialInstructions}
+                        </Text>
+                      ) : null}
+
                       {child.allergies && child.allergies !== 'None' && (
                         <View style={styles.childAlertRow}>
                           <AlertCircle size={16} color="#DC2626" />
@@ -224,14 +288,14 @@ export function BookingDetailsModal({
             </View>
           )}
 
-          {booking.notes && (
+          {booking.notes ? (
             <View style={[styles.section, styles.notesSection]}>
               <Text style={styles.sectionTitle}>{t('notes.special')}</Text>
               <Text style={styles.notesText}>{booking.notes}</Text>
             </View>
-          )}
+          ) : null}
 
-          {booking.emergencyContact && (
+          {booking.emergencyContact ? (
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <AlertCircle size={18} color="#B91C1C" />
@@ -248,65 +312,118 @@ export function BookingDetailsModal({
                 </View>
                 <View style={styles.emergencyRow}>
                   <Text style={styles.emergencyLabel}>{t('emergency.phone')}</Text>
-                  <Text style={[styles.emergencyValue, styles.emergencyHighlight]}>
-                    {booking.emergencyContact.phone}
-                  </Text>
+                  <Text style={[styles.emergencyValue, styles.emergencyHighlight]}>{booking.emergencyContact.phone}</Text>
                 </View>
               </View>
             </View>
+          ) : null}
+                  {(displayBookingId || createdAt || updatedAt) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{t('booking.info')}</Text>
+              <View style={styles.metadataList}>
+                {displayBookingId && (
+                  <View style={styles.metadataRow}>
+                    <Text style={styles.metadataLabel}>{t('booking.id')}</Text>
+                    <Text style={styles.metadataValue}>{displayBookingId}</Text>
+                  </View>
+                )}
+                {createdAt && (
+                  <View style={styles.metadataRow}>
+                    <Text style={styles.metadataLabel}>{t('booking.created')}</Text>
+                    <Text style={styles.metadataValue}>{createdAt}</Text>
+                  </View>
+                )}
+                {updatedAt && (
+                  <View style={styles.metadataRow}>
+                    <Text style={styles.metadataLabel}>{t('booking.updated')}</Text>
+                    <Text style={styles.metadataValue}>{updatedAt}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           )}
+
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable
-            onPress={onMessage}
-            style={[styles.footerButton, styles.secondaryButton]}
-            accessibilityRole="button"
-          >
-            <MessageCircle size={16} color="#1D4ED8" />
-            <Text style={styles.secondaryButtonText}>{t('actions.message')}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              if (booking.address) {
-                Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(booking.address)}`);
-                onGetDirections?.();
-              }
-            }}
-            style={[styles.footerButton, styles.secondaryButton]}
-            accessibilityRole="button"
-            disabled={!booking.address}
-          >
-            <Navigation size={16} color="#047857" />
-            <Text style={styles.secondaryButtonText}>{t('actions.directions')}</Text>
-          </Pressable>
-
-          {booking.status === 'confirmed' && (
+          <View style={[styles.footerRow, styles.footerRowSecondary]}>
             <Pressable
-              onPress={() => {
-                Alert.alert(t('alerts.completed'), t('alerts.completed.message'));
-                onCompleteBooking?.();
-              }}
-              style={[styles.footerButton, styles.primaryButton]}
+              onPress={onMessage}
+              style={[styles.footerButton, styles.secondaryButton]}
               accessibilityRole="button"
             >
-              <CheckCircle size={16} color="#FFFFFF" />
-              <Text style={styles.primaryButtonText}>{t('actions.complete')}</Text>
+              <MessageCircle size={16} color="#1D4ED8" />
+              <Text style={styles.secondaryButtonText}>{t('actions.message')}</Text>
             </Pressable>
-          )}
+            {onViewCaregiverProfile && (
+              <Pressable
+                onPress={() => onViewCaregiverProfile?.(booking)}
+                style={[styles.footerButton, styles.secondaryButton]}
+                accessibilityRole="button"
+              >
+                <User size={16} color="#6B21A8" />
+                <Text style={styles.secondaryButtonText}>{t('actions.viewProfile')}</Text>
+              </Pressable>
+            )}
 
-          {(booking.status === 'pending_confirmation' || booking.status === 'confirmed') && (
             <Pressable
               onPress={() => {
-                Alert.alert(t('alerts.cancelled'), t('alerts.cancelled.message'));
-                onCancelBooking?.();
+                if (booking.address) {
+                  Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(booking.address)}`);
+                  onGetDirections?.();
+                }
               }}
-              style={[styles.footerButton, styles.destructiveButton]}
+              style={[
+                styles.footerButton,
+                styles.secondaryButton,
+                !booking.address && styles.disabledButton,
+              ]}
               accessibilityRole="button"
+              disabled={!booking.address}
             >
-              <Text style={styles.destructiveButtonText}>{t('actions.cancel')}</Text>
+              <Navigation size={16} color={booking.address ? '#047857' : '#94A3B8'} />
+              <Text
+                style={[
+                  styles.secondaryButtonText,
+                  !booking.address && styles.disabledButtonText,
+                ]}
+              >
+                {t('actions.directions')}
+              </Text>
             </Pressable>
+          </View>
+
+          {(booking.status === 'confirmed' ||
+            booking.status === 'in_progress' ||
+            booking.status === 'pending_confirmation') && (
+            <View style={styles.footerRow}>
+              {(booking.status === 'confirmed' || booking.status === 'in_progress') && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(t('alerts.completed'), t('alerts.completed.message'));
+                    onCompleteBooking?.();
+                  }}
+                  style={[styles.footerButton, styles.primaryButton]}
+                  accessibilityRole="button"
+                >
+                  <CheckCircle size={16} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>{t('actions.complete')}</Text>
+                </Pressable>
+              )}
+
+              {(booking.status === 'pending_confirmation' || booking.status === 'confirmed') && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(t('alerts.cancelled'), t('alerts.cancelled.message'));
+                    onCancelBooking?.();
+                  }}
+                  style={[styles.footerButton, styles.destructiveButton]}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.destructiveButtonText}>{t('actions.cancel')}</Text>
+                </Pressable>
+              )}
+            </View>
           )}
         </View>
       </View>
@@ -331,29 +448,29 @@ BookingDetailsModal.propTypes = {
         age: PropTypes.number,
         specialInstructions: PropTypes.string,
         allergies: PropTypes.string,
-        preferences: PropTypes.string
+        preferences: PropTypes.string,
       })
     ),
     emergencyContact: PropTypes.shape({
       name: PropTypes.string,
       phone: PropTypes.string,
-      relation: PropTypes.string
+      relation: PropTypes.string,
     }),
     status: PropTypes.string,
     family: PropTypes.string,
     date: PropTypes.string,
     time: PropTypes.string,
-    notes: PropTypes.string
+    notes: PropTypes.string,
   }),
   onClose: PropTypes.func.isRequired,
   onMessage: PropTypes.func,
   onGetDirections: PropTypes.func,
   onCompleteBooking: PropTypes.func,
-  onCancelBooking: PropTypes.func
+  onCancelBooking: PropTypes.func,
+  onViewCaregiverProfile: PropTypes.func,
 };
-
 BookingDetailsModal.defaultProps = {
-  booking: {}
+  booking: {},
 };
 
 const styles = StyleSheet.create({
@@ -367,7 +484,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 640,
-    height: Platform.OS === 'web' ? 'auto' : screenHeight * 0.5, // 50% height for mobile
+    height: Platform.OS === 'web' ? 'auto' : screenHeight * 0.5,
     maxHeight: Platform.OS === 'web' ? '80%' : screenHeight * 0.5,
     borderRadius: 24,
     backgroundColor: colors.surface,
@@ -401,7 +518,7 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.md,
     flex: 1,
     marginRight: spacing.md,
@@ -434,7 +551,7 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.sm,
     flexShrink: 0,
   },
@@ -443,7 +560,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     marginTop: 2,
   },
   statusPillText: {
@@ -663,12 +780,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footer: {
-    flexDirection: 'row',
     gap: spacing.xs,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    flexWrap: 'wrap',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  footerRowSecondary: {
+    marginBottom: spacing.xs,
   },
   footerButton: {
     flexDirection: 'row',
@@ -711,6 +833,31 @@ const styles = StyleSheet.create({
     ...typography.button,
     color: colors.error,
     fontSize: 12,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  disabledButtonText: {
+    color: '#94A3B8',
+  },
+  metadataList: {
+    gap: spacing.xs,
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  metadataLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  metadataValue: {
+    ...typography.body1,
+    color: colors.text,
+    fontSize: 13,
     fontWeight: '600',
   },
 });
