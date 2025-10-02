@@ -54,15 +54,11 @@ class FirebaseMessagingService {
   }
 
   async ensureRealtimeSession() {
-    try {
-      const user = await firebaseRealtimeService.initializeRealtimeAuth();
-      if (!user) {
-        throw new Error('Firebase realtime session is unavailable.');
-      }
-      return user;
-    } catch (error) {
-      throw error;
+    const user = await firebaseRealtimeService.initializeRealtimeAuth();
+    if (!user) {
+      throw new Error('Firebase realtime session is unavailable.');
     }
+    return user;
   }
 
   async createConnection(userId, caregiverId) {
