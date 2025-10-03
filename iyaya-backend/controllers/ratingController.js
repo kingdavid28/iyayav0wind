@@ -3,6 +3,31 @@ const Booking = require('../models/Booking');
 const { authenticate } = require('../middleware/auth');
 const { createReviewNotification } = require('../services/notificationService');
 
+const ensureUserCanAccessBooking = (booking, user) => {
+  if (!booking || !user) {
+    return { allowed: false, reason: 'Booking not found' };
+    }
+
+  const userId = user.id?.toString();
+  const role = user.role;
+
+  if (role === 'parent') {
+    if (booking.parent?.toString() === userId) {
+      return { allowed: true, type: 'caregiver', ratee: booking.caregiver };
+    }
+    return { allowed: false, reason: 'You are not the parent for this booking' };
+  }
+
+  if (role === 'caregiver') {
+    if (booking.caregiver?.toString() === userId) {
+      return { allowed: true, type: 'parent', ratee: booking.parent };
+    }
+    return { allowed: false, reason: 'You are not the caregiver for this booking' };
+  }
+
+  return { allowed: false, reason: 'Unsupported user role' };
+};
+
 // Rate a caregiver
 const rateCaregiver = async (req, res) => {
   try {
@@ -252,10 +277,97 @@ const getRatingSummary = async (req, res) => {
   }
 };
 
+// Get an existing rating for a booking made by the current user
+const getBookingRating = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const booking = await Booking.findById(bookingId).select('parent caregiver');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        error: 'Booking not found'
+      });
+    }
+
+    const access = ensureUserCanAccessBooking(booking, req.user);
+    if (!access.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: access.reason
+      });
+    }
+
+    const rating = await Rating.findOne({
+      booking: bookingId,
+      rater: req.user.id,
+      type: access.type
+    }).populate('ratee', 'name email').populate('rater', 'name email');
+
+    return res.status(200).json({
+      success: true,
+      data: rating || null
+    });
+  } catch (error) {
+    console.error('Get booking rating error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch booking rating'
+    });
+  }
+};
+
+// Determine if the current user can still rate a booking
+const canRateBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const booking = await Booking.findById(bookingId).select('parent caregiver status');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        error: 'Booking not found'
+      });
+    }
+
+    const access = ensureUserCanAccessBooking(booking, req.user);
+    if (!access.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: access.reason,
+        canRate: false
+      });
+    }
+
+    const existingRating = await Rating.findOne({
+      booking: bookingId,
+      rater: req.user.id,
+      type: access.type
+    });
+
+    const canRate = !existingRating;
+
+    return res.status(200).json({
+      success: true,
+      canRate,
+      existingRating: existingRating || null
+    });
+  } catch (error) {
+    console.error('Can rate booking error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify rating eligibility',
+      canRate: false
+    });
+  }
+};
+
 module.exports = {
   rateCaregiver,
   rateParent,
   getCaregiverRatings,
   getParentRatings,
-  getRatingSummary
+  getRatingSummary,
+  getBookingRating,
+  canRateBooking
 };

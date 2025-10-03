@@ -6,7 +6,9 @@ const {
   rateParent,
   getCaregiverRatings,
   getRatingSummary,
-  getParentRatings
+  getParentRatings,
+  getBookingRating,
+  canRateBooking
 } = require('../controllers/ratingController');
 
 // All rating routes require authentication
@@ -26,5 +28,11 @@ router.get('/parent/:parentId', getParentRatings);
 
 // Get rating summary for a user
 router.get('/summary/:userId', getRatingSummary);
+
+// Check existing rating for a booking by current user
+router.get('/booking/:bookingId', getBookingRating);
+
+// Determine if the current user can rate a booking
+router.get('/can-rate/:bookingId', canRateBooking);
 
 module.exports = router;

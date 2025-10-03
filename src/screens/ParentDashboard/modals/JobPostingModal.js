@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Modal, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  ScrollView,
   Alert,
   ActivityIndicator,
-  Keyboard
+  Platform,
 } from 'react-native';
 import { 
   X, 
@@ -24,6 +24,13 @@ import {
 } from 'lucide-react-native';
 import jobService from '../../../services/jobService';
 import { useAuth } from '../../../contexts/AuthContext';
+import KeyboardAvoidingWrapper from '../../../shared/ui/layout/KeyboardAvoidingWrapper';
+import { Button } from 'react-native-paper';
+import {
+  getCurrentDeviceLocation,
+  searchLocation,
+  formatLocationForDisplay,
+} from '../../../utils/locationUtils';
 
 import CustomDateTimePicker from '../../../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../../../shared/ui/inputs/TimePicker';
@@ -42,13 +49,11 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-  
   const [jobData, setJobData] = useState({
     title: '',
     description: '',
-    location: '',
+    location: null,
+    locationText: '',
     rate: '',
     startDate: '',
     endDate: '',
@@ -61,8 +66,11 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
     updatedAt: null,
     applicants: [],
   });
-
-  // Set parent ID when component mounts
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationSearchVisible, setLocationSearchVisible] = useState(false);
+  const [locationSearchText, setLocationSearchText] = useState('');
+  const [locationSearchResults, setLocationSearchResults] = useState([]);
+  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
   useEffect(() => {
     const userId = user?.uid || user?.id;
     if (userId) {
@@ -74,6 +82,17 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!visible) {
+      setStep(1);
+      setErrors({});
+      setLocationLoading(false);
+      setLocationSearchVisible(false);
+      setLocationSearchText('');
+      setLocationSearchResults([]);
+    }
+  }, [visible]);
 
   const formatDate = (date) => {
     if (!date) return '';
@@ -96,7 +115,7 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
     if (step === 1) {
       if (!jobData.title.trim()) newErrors.title = 'Job title is required';
       if (!jobData.description.trim()) newErrors.description = 'Description is required';
-      if (!jobData.location.trim()) newErrors.location = 'Location is required';
+      if (!jobData.locationText.trim()) newErrors.location = 'Location is required';
       if (!jobData.rate) newErrors.rate = 'Hourly rate is required';
       if (isNaN(jobData.rate)) newErrors.rate = 'Rate must be a number';
     } 
@@ -143,6 +162,27 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
     }));
   };
 
+  const handleLocationSearch = async () => {
+    if (!locationSearchText.trim()) {
+      return;
+    }
+
+    try {
+      setLocationSearchLoading(true);
+      const result = await searchLocation(locationSearchText.trim());
+      const resultsArray = Array.isArray(result) ? result : [result].filter(Boolean);
+      if (resultsArray.length === 0) {
+        Alert.alert('Search Failed', 'No results found for that query.');
+      }
+      setLocationSearchResults(resultsArray);
+    } catch (error) {
+      console.error('Location search error:', error);
+      Alert.alert('Search Failed', error?.message || 'Failed to search location.');
+    } finally {
+      setLocationSearchLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     try {
       setLoading(true);
@@ -151,7 +191,8 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
       const payload = {
         title: jobData.title.trim(),
         description: jobData.description.trim(),
-        location: jobData.location.trim(),
+        location: jobData.locationText.trim(),
+        locationDetails: jobData.location,
         salary: Number(jobData.rate), // Backend expects 'salary' not 'rate'
         rate: Number(jobData.rate), // Keep both for compatibility
         startDate: jobData.startDate,
@@ -184,7 +225,8 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
       setJobData({
         title: '',
         description: '',
-        location: '',
+        location: null,
+        locationText: '',
         rate: '',
         startDate: '',
         endDate: '',
@@ -235,13 +277,52 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
             
             <View>
               <Text style={styles.label}>Location *</Text>
-              <View style={[styles.inputGroup, errors.location && styles.inputError]}> 
+              <View style={styles.locationActions}>
+                <Button
+                  mode="outlined"
+                  onPress={async () => {
+                    try {
+                      setLocationLoading(true);
+                      const deviceLocation = await getCurrentDeviceLocation();
+                      const formatted = deviceLocation?.address?.formatted || formatLocationForDisplay(deviceLocation?.address);
+                      setJobData(prev => ({
+                        ...prev,
+                        location: deviceLocation,
+                        locationText: formatted?.trim() || prev.locationText,
+                      }));
+                    } catch (error) {
+                      Alert.alert('Location Error', error?.message || 'Failed to get current location.');
+                    } finally {
+                      setLocationLoading(false);
+                    }
+                  }}
+                  style={styles.gpsButton}
+                  loading={locationLoading}
+                  disabled={locationLoading}
+                  icon="map-marker-outline"
+                >
+                  {locationLoading ? 'Locating…' : 'Use Current Location'}
+                </Button>
+                <Button
+                  mode="outlined"
+                  onPress={() => {
+                    setLocationSearchVisible(true);
+                    setLocationSearchText('');
+                    setLocationSearchResults([]);
+                  }}
+                  style={styles.searchButton}
+                  icon="magnify"
+                >
+                  Search Location
+                </Button>
+              </View>
+              <View style={[styles.inputGroup, errors.location && styles.inputError]}>
                 <MapPin size={20} color="#6B7280" style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.inputWithIcon]}
                   placeholder="e.g., 123 Main St, City"
-                  value={jobData.location}
-                  onChangeText={(text) => setJobData({ ...jobData, location: text })}
+                  value={jobData.locationText}
+                  onChangeText={(text) => setJobData({ ...jobData, locationText: text, location: null })}
                 />
               </View>
               {errors.location && <Text style={styles.errorText}>{errors.location}</Text>}
@@ -397,87 +478,166 @@ const JobPostingModal = ({ visible, onClose, onJobPosted }) => {
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {step === 1 ? 'Job Details' : step === 2 ? 'Schedule' : 'Review & Post'}
-            </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.stepIndicatorContainer}>
-              {[1, 2, 3].map((stepNum) => (
-                <React.Fragment key={stepNum}>
-                  <View 
-                    style={[
-                      styles.stepIndicator, 
-                      step === stepNum && styles.stepIndicatorActive,
-                      step > stepNum && styles.stepIndicatorCompleted
-                    ]}
+    <>
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <KeyboardAvoidingWrapper
+          scrollEnabled={false}
+          keyboardVerticalOffset={Platform.select({ ios: 100, android: 0 })}
+          style={styles.keyboardAvoiding}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {step === 1 ? 'Job Details' : step === 2 ? 'Schedule' : 'Review & Post'}
+                </Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                  <X size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalContent}>
+                <View style={styles.stepIndicatorContainer}>
+                  {[1, 2, 3].map((stepNum) => (
+                    <React.Fragment key={stepNum}>
+                      <View
+                        style={[
+                          styles.stepIndicator,
+                          step === stepNum && styles.stepIndicatorActive,
+                          step > stepNum && styles.stepIndicatorCompleted,
+                        ]}
+                      >
+                        {step > stepNum ? (
+                          <Check size={16} color="#fff" />
+                        ) : (
+                          <Text
+                            style={[
+                              styles.stepText,
+                              (step === stepNum || step < stepNum) && styles.stepTextActive,
+                            ]}
+                          >
+                            {stepNum}
+                          </Text>
+                        )}
+                      </View>
+                      {stepNum < 3 && <View style={styles.stepLine} />}
+                    </React.Fragment>
+                  ))}
+                </View>
+
+                {renderStep()}
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <View style={styles.footerContent}>
+                  {step > 1 && (
+                    <TouchableOpacity
+                      style={[styles.button, styles.secondaryButton]}
+                      onPress={handleBack}
+                      disabled={loading}
+                    >
+                      <Text style={styles.secondaryButtonText}>Back</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.button, styles.primaryButton, loading && styles.buttonDisabled]}
+                    onPress={handleNext}
+                    disabled={loading}
                   >
-                    {step > stepNum ? (
-                      <Check size={16} color="#fff" />
+                    {loading ? (
+                      <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text style={[
-                        styles.stepText,
-                        (step === stepNum || step < stepNum) && styles.stepTextActive
-                      ]}>
-                        {stepNum}
+                      <Text style={styles.primaryButtonText}>
+                        {step === 3 ? 'Post Job' : 'Continue'}
                       </Text>
                     )}
-                  </View>
-                  {stepNum < 3 && <View style={styles.stepLine} />}
-                </React.Fragment>
-              ))}
-            </View>
-            
-            {renderStep()}
-          </ScrollView>
-          
-          <View style={styles.modalFooter}>
-            <View style={styles.footerContent}>
-              {step > 1 && (
-                <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
-                  onPress={handleBack}
-                  disabled={loading}
-                >
-                  <Text style={styles.secondaryButtonText}>Back</Text>
-                </TouchableOpacity>
-              )}
-              
-              <TouchableOpacity
-                style={[styles.button, styles.primaryButton, loading && styles.buttonDisabled]}
-                onPress={handleNext}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>
-                    {step === 3 ? 'Post Job' : 'Continue'}
-                  </Text>
-                )}
-              </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           </View>
+        </KeyboardAvoidingWrapper>
+      </Modal>
+
+      <Modal
+        visible={locationSearchVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLocationSearchVisible(false)}
+      >
+        <View style={styles.searchOverlay}>
+          <View style={styles.searchContainer}>
+            <View style={styles.searchHeader}>
+              <Text style={styles.searchTitle}>Search Location</Text>
+              <TouchableOpacity onPress={() => setLocationSearchVisible(false)} style={styles.closeButton}>
+                <X size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.input, styles.searchInput]}
+              placeholder="Enter address or place"
+              value={locationSearchText}
+              onChangeText={(text) => setLocationSearchText(text)}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                if (!locationSearchText.trim()) return;
+                handleLocationSearch();
+              }}
+            />
+            <Button
+              mode="contained"
+              onPress={handleLocationSearch}
+              style={styles.searchActionButton}
+              loading={locationSearchLoading}
+              disabled={locationSearchLoading || !locationSearchText.trim()}
+            >
+              Search
+            </Button>
+            <ScrollView style={styles.searchResults}>
+              {locationSearchResults.length === 0 && !locationSearchLoading ? (
+                <Text style={styles.searchPlaceholder}>No results yet. Try searching for a city, street, or landmark.</Text>
+              ) : (
+                locationSearchResults.map((result, index) => {
+                  const formatted = result?.address?.formatted || formatLocationForDisplay(result?.address);
+                  return (
+                    <TouchableOpacity
+                      key={`${formatted}-${index}`}
+                      style={styles.searchResultItem}
+                      onPress={() => {
+                        setJobData(prev => ({
+                          ...prev,
+                          location: result,
+                          locationText: formatted || prev.locationText,
+                        }));
+                        setLocationSearchVisible(false);
+                        setLocationSearchText('');
+                        setLocationSearchResults([]);
+                      }}
+                    >
+                      <MapPin size={18} color="#4F46E5" style={styles.searchResultIcon} />
+                      <Text style={styles.searchResultText}>{formatted}</Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardAvoiding: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -487,7 +647,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '90%',
+    maxHeight: '85%',
+    marginHorizontal: 12,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -507,6 +668,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: 16,
+    paddingBottom: 32,
   },
   modalFooter: {
     padding: 16,
@@ -623,6 +785,18 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     marginBottom: 16,
   },
+  locationActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+    gap: 8,
+  },
+  gpsButton: {
+    flexGrow: 1,
+  },
+  searchButton: {
+    flexGrow: 1,
+  },
   inputIcon: {
     marginLeft: 12,
   },
@@ -720,6 +894,59 @@ const styles = StyleSheet.create({
   },
   skillChipTextSelected: {
     color: '#fff',
+  },
+  searchOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  searchContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  searchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  searchTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  searchInput: {
+    marginBottom: 12,
+  },
+  searchActionButton: {
+    marginBottom: 16,
+  },
+  searchResults: {
+    maxHeight: 280,
+  },
+  searchPlaceholder: {
+    color: '#6B7280',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
+  searchResultIcon: {
+    marginRight: 12,
+  },
+  searchResultText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#111827',
   },
 });
 

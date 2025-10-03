@@ -144,7 +144,6 @@ const hydrateSingleBooking = async (bookingRecord) => {
     bookingObj.children = sanitizedChildren;
   }
 
-  return bookingObj;
 };
 
 // Get user's bookings
@@ -152,12 +151,15 @@ exports.getMyBookings = async (req, res) => {
   try {
     console.log(`getMyBookings called for user: ${req.user.id}, role: ${req.user.role}`);
 
-    const searchCriteria = {
-      $or: [
-        { clientId: req.user.id },
-        { caregiverId: req.user.id }
-      ]
-    };
+    const { role, id: userId } = req.user;
+
+    let searchCriteria = {};
+    if (role === 'caregiver') {
+      searchCriteria = { caregiverId: userId };
+    } else {
+      searchCriteria = { clientId: userId };
+    }
+
     const bookings = await Booking.find(searchCriteria)
       .populate('clientId', 'name email profileImage')
       .sort({ createdAt: -1 })

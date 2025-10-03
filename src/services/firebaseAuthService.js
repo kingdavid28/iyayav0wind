@@ -8,11 +8,27 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 
+
 // Import safety functions for Firebase initialization - FIXED: Only initialize once
 import { getAuthSync, getFirebaseAuth, initializeFirebase } from '../config/firebase';
+import { API_CONFIG } from '../config/constants';
+
+
 
 // Global flag to prevent multiple initializations
 let isInitialized = false;
+
+const API_BASE_URL = (() => {
+  const baseUrl = API_CONFIG?.BASE_URL || '';
+  if (baseUrl) {
+    return baseUrl.replace(/\/$/, '');
+  }
+
+  const envBase = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+  return `${envBase.replace(/\/$/, '')}/api`;
+})();
+
+const buildUrl = (path) => `${API_BASE_URL}${path}`;
 
 export const refreshToken = async () => {
   try {
@@ -21,7 +37,6 @@ export const refreshToken = async () => {
       await initializeFirebase();
       isInitialized = true;
     }
-
     const auth = getAuthSync();
     const user = auth.currentUser;
 
@@ -40,6 +55,7 @@ export const refreshToken = async () => {
   }
 };
 
+
 export const getCurrentUser = () => {
   try {
     const auth = getAuthSync();
@@ -49,6 +65,7 @@ export const getCurrentUser = () => {
     return null;
   }
 };
+
 
 export const onAuthStateChangedSafe = (callback) => {
   try {
@@ -61,11 +78,13 @@ export const onAuthStateChangedSafe = (callback) => {
   }
 };
 
+
 export const firebaseAuthService = {
   async signup(userData) {
     let user;
     try {
       const { email, password, name, role } = userData;
+
 
       // Only initialize once
       if (!isInitialized) {
@@ -74,10 +93,13 @@ export const firebaseAuthService = {
       }
       const auth = getAuthSync();
 
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       user = userCredential.user;
 
+
       await updateProfile(user, { displayName: name });
+
 
       // Send Firebase verification email
       await sendEmailVerification(user);
@@ -85,6 +107,7 @@ export const firebaseAuthService = {
       console.error('Firebase signup error:', error);
       throw error;
     }
+
 
     // Sync complete profile with MongoDB
     try {
@@ -102,17 +125,24 @@ export const firebaseAuthService = {
         emailVerified: user.emailVerified
       };
 
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/firebase-sync`, {
+
+      const response = await fetch(buildUrl('/auth/firebase-sync'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify(profileData)
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Firebase sync failed: ${response.status} ${errorText || ''}`.trim());
+      }
     } catch (error) {
       console.warn('Failed to sync with MongoDB:', error.message);
     }
+
 
     return {
       success: true,
@@ -120,6 +150,7 @@ export const firebaseAuthService = {
       message: 'Account created successfully. Please check your email to verify your account.'
     };
   },
+
 
   async login(email, password) {
     try {
@@ -130,29 +161,37 @@ export const firebaseAuthService = {
       }
       const auth = getAuthSync();
 
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+
 
       if (!user.emailVerified) {
         throw new Error('Please verify your email before logging in.');
       }
 
+
       const token = await user.getIdToken();
+
 
       // Get complete user profile from MongoDB
       let profile = { role: 'parent' };
       try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/firebase-profile`, {
+        const response = await fetch(buildUrl('/auth/firebase-profile'), {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}` 
           }
         });
         if (response.ok) {
           profile = await response.json();
+        } else {
+          const errorText = await response.text();
+          throw new Error(`Firebase profile fetch failed: ${response.status} ${errorText || ''}`.trim());
         }
       } catch (error) {
         console.warn('Failed to get MongoDB profile:', error.message);
       }
+
 
       return {
         success: true,
@@ -165,6 +204,8 @@ export const firebaseAuthService = {
           role: profile.role || 'parent',
           firstName: profile.firstName,
           lastName: profile.lastName,
+          middleInitial: profile.middleInitial,
+          birthDate: profile.birthDate,
           phone: profile.phone,
           profileImage: profile.profileImage,
           caregiverProfile: profile.caregiverProfile
@@ -176,6 +217,7 @@ export const firebaseAuthService = {
     }
   },
 
+
   async signOut() {
     try {
       // Only initialize once
@@ -185,12 +227,14 @@ export const firebaseAuthService = {
       }
       const auth = getAuthSync();
 
+
       await signOut(auth);
     } catch (error) {
       console.error('Firebase signOut error:', error);
       throw error;
     }
   },
+
 
   async resetPassword(email) {
     try {
@@ -200,6 +244,7 @@ export const firebaseAuthService = {
         isInitialized = true;
       }
       const auth = getAuthSync();
+
 
       await sendPasswordResetEmail(auth, email);
       return {
@@ -212,6 +257,7 @@ export const firebaseAuthService = {
     }
   },
 
+
   // Safe current user getter
   getCurrentUser() {
     try {
@@ -222,6 +268,7 @@ export const firebaseAuthService = {
       return null;
     }
   },
+
 
   // Safe auth state listener
   onAuthStateChanged(callback) {

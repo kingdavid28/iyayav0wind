@@ -28,16 +28,23 @@ export const AuthProvider = ({ children }) => {
   } = usePushNotifications();
 
   // Normalize user object to ensure consistent property names
-  const normalizeUser = (userData) => {
+  const normalizeUser = (userData, firebaseUid = null) => {
     if (!userData) return null;
 
+    // Extract MongoDB ID and Firebase UID
+    const mongoUserId = userData._id || userData.id;
+    const userFirebaseUid = userData.firebaseUid || firebaseUid || userData.uid;
+
     return {
-      // Use id consistently (prefer _id from MongoDB if available)
-      id: userData._id || userData.id || userData.uid,
+      // MongoDB user ID for API calls
+      id: mongoUserId,
+      // Firebase UID for Firebase operations
+      firebaseUid: userFirebaseUid,
+      // Original MongoDB _id for compatibility
+      _id: mongoUserId,
       // Preserve all other properties
       ...userData,
-      // Ensure we don't have duplicate properties
-      _id: undefined,
+      // Ensure we don't have duplicate/conflicting properties
       uid: undefined,
     };
   };
@@ -58,7 +65,7 @@ export const AuthProvider = ({ children }) => {
         });
 
         // Normalize the user data
-        const normalizedUser = normalizeUser(response.user);
+        const normalizedUser = normalizeUser(response.user, firebaseUid);
 
         // Validate UID consistency
         if (firebaseUid && normalizedUser?.id && firebaseUid !== normalizedUser.id) {
@@ -160,7 +167,7 @@ export const AuthProvider = ({ children }) => {
                 middleInitial: profile.middleInitial,
                 phone: profile.phone,
                 ...profile
-              });
+              }, user.uid);
               
               setUser(normalizedUser);
 
@@ -189,7 +196,7 @@ export const AuthProvider = ({ children }) => {
                 name: user.displayName,
                 emailVerified: user.emailVerified,
                 role: null
-              });
+              }, user.uid);
               setUser(fallbackUser);
 
               try {
@@ -287,7 +294,8 @@ export const AuthProvider = ({ children }) => {
 
       // Normalize the user object before setting it
       if (res.user) {
-        const normalizedLoginUser = normalizeUser(res.user);
+        const firebaseUser = firebaseAuthService.getCurrentUser();
+        const normalizedLoginUser = normalizeUser(res.user, firebaseUser?.uid);
         setUser(normalizedLoginUser);
 
         try {
@@ -353,7 +361,8 @@ export const AuthProvider = ({ children }) => {
 
       // Normalize and set the user
       if (facebookResult.user) {
-        const normalizedUser = normalizeUser(facebookResult.user);
+        const firebaseUser = firebaseAuthService.getCurrentUser();
+        const normalizedUser = normalizeUser(facebookResult.user, firebaseUser?.uid);
         setUser(normalizedUser);
         console.log('✅ Facebook user set in context:', normalizedUser);
 

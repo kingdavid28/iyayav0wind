@@ -1,6 +1,8 @@
 const Application = require('../models/Application');
 const Job = require('../models/Job');
 const User = require('../models/User');
+const Caregiver = require('../models/Caregiver');
+const mongoose = require('mongoose');
 const { validationResult } = require('express-validator');
 const { process: processError } = require('../utils/errorHandler');
 const logger = require('../utils/logger');
@@ -26,8 +28,126 @@ const getUserId = (user) => {
   return user?.id || user?.uid || user?.mongoId || 'demo-caregiver-id';
 };
 
+const normalizeObjectId = (value) => {
+  if (!value) return null;
+  if (value instanceof mongoose.Types.ObjectId) {
+    return value;
+  }
+  if (typeof value === 'string' && mongoose.Types.ObjectId.isValid(value)) {
+    return new mongoose.Types.ObjectId(value);
+  }
+  return null;
+};
+
+const resolveUserMongoId = async (user) => {
+  let candidate = normalizeObjectId(user?.mongoId || user?._id || user?.id);
+
+  if (!candidate && user?.id && typeof user.id === 'string') {
+    const userDoc = await User.findOne({ firebaseUid: user.id }).select('_id');
+    if (userDoc) {
+      candidate = userDoc._id;
+    }
+  }
+
+  if (!candidate && user?.uid && typeof user.uid === 'string') {
+    const userDoc = await User.findOne({ firebaseUid: user.uid }).select('_id');
+    if (userDoc) {
+      candidate = userDoc._id;
+    }
+  }
+
+  return candidate;
+};
+
+const buildCaregiverDisplayData = async (caregiverIdValue, caregiverUserIdValue) => {
+  const normalizedProfileId = normalizeObjectId(
+    caregiverIdValue && caregiverIdValue._id ? caregiverIdValue._id : caregiverIdValue
+  );
+  const normalizedUserId = normalizeObjectId(
+    caregiverUserIdValue && caregiverUserIdValue._id ? caregiverUserIdValue._id : caregiverUserIdValue
+  );
+
+  let caregiverProfile = null;
+  let caregiverUser = null;
+
+  if (normalizedProfileId) {
+    caregiverProfile = await Caregiver.findById(normalizedProfileId)
+      .populate('userId', 'name email profileImage avatar displayName')
+      .lean();
+  }
+
+  if (!caregiverProfile && normalizedUserId) {
+    caregiverProfile = await Caregiver.findOne({ userId: normalizedUserId })
+      .populate('userId', 'name email profileImage avatar displayName')
+      .lean();
+  }
+
+  const resolvedProfileId = caregiverProfile?._id || normalizedProfileId || null;
+  const resolvedUserId = caregiverProfile?.userId?._id || normalizedUserId || null;
+
+  if (caregiverProfile?.userId && caregiverProfile.userId._id) {
+    caregiverUser = caregiverProfile.userId;
+  }
+
+  if (!caregiverUser && resolvedUserId) {
+    caregiverUser = await User.findById(resolvedUserId)
+      .select('name email profileImage avatar displayName')
+      .lean();
+  }
+
+  const name = caregiverProfile?.name
+    || caregiverProfile?.userId?.name
+    || caregiverUser?.name
+    || caregiverUser?.displayName
+    || (caregiverUser?.email ? caregiverUser.email.split('@')[0] : null);
+
+  const email = caregiverProfile?.email
+    || caregiverProfile?.userId?.email
+    || caregiverUser?.email
+    || null;
+
+  const profileImage = caregiverProfile?.profileImage
+    || caregiverProfile?.avatar
+    || caregiverProfile?.userId?.profileImage
+    || caregiverUser?.profileImage
+    || caregiverUser?.avatar
+    || null;
+
+  return {
+    profileId: resolvedProfileId,
+    userId: resolvedUserId,
+    name: name || 'Caregiver',
+    email,
+    profileImage,
+    rating: caregiverProfile?.rating ?? null,
+    hourlyRate: caregiverProfile?.hourlyRate ?? null,
+    location: caregiverProfile?.location ?? null,
+    caregiverProfile,
+    caregiverUser
+  };
+};
+
 // Ensure we always use a valid Mongo ObjectId for DB operations
-const mongoose = require('mongoose');
+const resolveCaregiverIds = async (user) => {
+  const userMongoId = await resolveUserMongoId(user);
+
+  if (!userMongoId) {
+    return {
+      profileId: null,
+      userId: null
+    };
+  }
+
+  const caregiverProfile = await Caregiver.findOne({ userId: userMongoId })
+    .select('_id userId')
+    .lean();
+
+  return {
+    profileId: caregiverProfile?._id || null,
+    userId: userMongoId
+  };
+};
+
 const resolveMongoId = async (user) => {
   console.log('🔍 resolveMongoId called with user:', {
     id: user?.id,
@@ -35,60 +155,17 @@ const resolveMongoId = async (user) => {
     mongoId: user?.mongoId,
     _id: user?._id
   });
-  
-  // First try direct MongoDB IDs, but prioritize caregiver profile lookup
-  const directId = user?.mongoId || user?._id;
-  if (directId && mongoose.isValidObjectId(directId)) {
-    console.log('✅ Found direct MongoDB ID:', directId);
-    
-    // Check if this is a User ID and find corresponding Caregiver profile
-    try {
-      const caregiver = await require('../models/Caregiver').findOne({ 
-        userId: directId 
-      });
-      
-      if (caregiver) {
-        console.log('✅ Found caregiver profile for user ID:', caregiver._id);
-        return caregiver._id;
-      }
-    } catch (error) {
-      console.error('❌ Error finding caregiver by user ID:', error);
-    }
-    
-    return directId;
-  }
-  
-  // If user has Firebase UID, find corresponding user in User collection
-  if (user?.id || user?.uid) {
-    try {
-      const userId = user.id || user.uid;
-      console.log('🔍 Looking for user with firebaseUid:', userId);
-      
-      // First find the user by Firebase UID
-      const userDoc = await require('../models/User').findOne({ 
-        firebaseUid: userId 
-      });
-      
-      if (userDoc) {
-        // Then find caregiver profile using the user's MongoDB ID
-        const caregiver = await require('../models/Caregiver').findOne({ 
-          userId: userDoc._id 
-        });
-        
-        if (caregiver) {
-          console.log('✅ Found caregiver profile ID:', caregiver._id);
-          return caregiver._id;
-        }
-        
-        console.log('✅ Found user MongoDB ID:', userDoc._id);
-        return userDoc._id;
-      }
+  const { profileId, userId } = await resolveCaregiverIds(user);
 
-    } catch (error) {
-      console.error('❌ Error finding user:', error);
-    }
+  if (profileId) {
+    console.log('✅ Found caregiver profile ID:', profileId);
+    return profileId;
   }
-  
+
+  if (userId) {
+    return userId;
+  }
+
   console.log('❌ No MongoDB ID found for user');
   return null;
 };
@@ -97,39 +174,45 @@ const resolveMongoId = async (user) => {
 exports.applyToJob = async (req, res) => {
   try {
     const { jobId, coverLetter, proposedRate, message } = req.body;
-    const caregiverMongoId = await resolveMongoId(req.user);
-    
+    const { profileId: caregiverProfileId, userId: caregiverUserId } = await resolveCaregiverIds(req.user);
+
     if (!jobId) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Job ID is required' 
-      });
-    }
-    
-    if (!caregiverMongoId) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'User not properly authenticated' 
+        error: 'Job ID is required'
       });
     }
 
-    // Check for duplicate application
+    if (!caregiverProfileId && !caregiverUserId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Caregiver profile not found. Please complete your caregiver registration.'
+      });
+    }
+
+      const primaryCaregiverId = caregiverProfileId || caregiverUserId;
+
+    // Check for duplicate application using caregiver identifiers
     const existingApp = await Application.findOne({
       jobId,
-      caregiverId: caregiverMongoId
+      $or: [
+        { caregiverId: primaryCaregiverId },
+        { caregiverUserId: caregiverUserId || caregiverProfileId }
+      ]
     });
-    
+
     if (existingApp) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'You have already applied to this job' 
+        error: 'You have already applied to this job'
       });
     }
 
     // Create application in database
     const application = new Application({
       jobId,
-      caregiverId: caregiverMongoId,
+      caregiverId: caregiverProfileId,
+      caregiverUserId: caregiverUserId || caregiverProfileId,
       coverLetter: coverLetter || '',
       proposedRate: proposedRate ? Number(proposedRate) : undefined,
       message: message || '',
@@ -137,36 +220,38 @@ exports.applyToJob = async (req, res) => {
     });
 
     await application.save();
-    
+
     // Get job and parent info for notification
     const job = await Job.findById(jobId).populate('clientId', 'name');
-    const caregiver = await require('../models/Caregiver').findById(caregiverMongoId).select('name');
-    
-    if (job && caregiver) {
+    const caregiverInfo = await buildCaregiverDisplayData(caregiverProfileId, caregiverUserId);
+
+    if (job && caregiverInfo?.name) {
       // Send real-time notification to parent
       socketService.notifyNewApplication(job.clientId._id, {
         applicationId: application._id,
         jobTitle: job.title,
-        caregiverName: caregiver.name,
+        caregiverName: caregiverInfo.name,
         jobId: job._id
       });
     }
 
-    res.status(201).json({ 
-      success: true, 
+    res.status(201).json({
+      success: true,
       message: 'Application submitted successfully',
-      data: application 
+      data: {
+        application,
+        caregiver: caregiverInfo
+      }
     });
   } catch (error) {
     console.error('Application submission error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to submit application' 
+      error: 'Failed to submit application'
     });
   }
 };
 
-// Parent updates application status (accept/reject/shortlist)
 exports.updateApplicationStatus = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -220,32 +305,35 @@ exports.updateApplicationStatus = async (req, res) => {
     application.status = status;
     application.reviewedAt = new Date();
     application.reviewedBy = parentId;
-    
+
     if (feedback) {
       application.feedback = feedback;
     }
 
     await application.save();
-    
+
+    const caregiverObjectId = application.caregiverId?._id
+      || application.caregiverId
+      || application.caregiverUserId;
+
     // Update caregiver's hasCompletedJobs flag when application is completed
-    if (status === 'completed' && previousStatus !== 'completed' && application.caregiverId) {
+    if (status === 'completed' && previousStatus !== 'completed' && caregiverObjectId) {
       try {
-        const Caregiver = require('../models/Caregiver');
         await Caregiver.findByIdAndUpdate(
-          application.caregiverId._id,
+          caregiverObjectId,
           { hasCompletedJobs: true },
           { new: true }
         );
-        console.log(`✅ Updated hasCompletedJobs for caregiver: ${application.caregiverId._id}`);
+        console.log(`✅ Updated hasCompletedJobs for caregiver: ${caregiverObjectId}`);
       } catch (error) {
         console.error('❌ Error updating caregiver hasCompletedJobs:', error);
       }
     }
     
     // Send booking confirmation notification to parent if accepted
-    if (status === 'accepted' && previousStatus !== 'accepted') {
-      const caregiver = await require('../models/Caregiver').findById(application.caregiverId._id).select('name');
-      if (caregiver) {
+    if (status === 'accepted' && previousStatus !== 'accepted' && caregiverObjectId) {
+      const caregiver = await Caregiver.findById(caregiverObjectId).select('name');
+      if (caregiver && socketService?.notifyBookingConfirmed) {
         socketService.notifyBookingConfirmed(parentId, {
           applicationId: application._id,
           caregiverName: caregiver.name,
@@ -275,16 +363,16 @@ exports.updateApplicationStatus = async (req, res) => {
     // Update job status if application is accepted
     if (status === 'accepted' && previousStatus !== 'accepted' && application.jobId && application.jobId._id) {
       const job = await Job.findById(application.jobId._id);
-      if (job && application.caregiverId && application.caregiverId._id) {
+      if (job && caregiverObjectId) {
         job.status = 'filled';
-        job.assignedCaregiver = application.caregiverId._id;
+        job.assignedCaregiver = caregiverObjectId;
         await job.save();
 
         // Create booking from accepted application
         const Booking = require('../models/Booking');
         const booking = new Booking({
           clientId: parentId,
-          caregiverId: application.caregiverId._id,
+          caregiverId: caregiverObjectId,
           date: job.date,
           startTime: job.startTime,
           endTime: job.endTime,

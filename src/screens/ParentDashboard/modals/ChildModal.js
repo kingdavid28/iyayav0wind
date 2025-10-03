@@ -41,81 +41,93 @@ const ChildModal = ({
       animationType="slide"
       style={styles.modalContent}
     >
-          <Text style={styles.modalTitle}>
-            {editing ? "Edit Child" : "Add Child"}
-          </Text>
+      <KeyboardAvoidingWrapper
+        style={styles.keyboardWrapper}
+        scrollEnabled={false}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.contentContainer}>
+            <Text style={styles.modalTitle}>
+              {editing ? "Edit Child" : "Add Child"}
+            </Text>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              style={styles.input}
-              value={childName}
-              onChangeText={setChildName}
-              placeholder="Enter child's name"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Name</Text>
+              <TextInput
+                style={styles.input}
+                value={childName}
+                onChangeText={setChildName}
+                placeholder="Enter child's name"
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Age</Text>
-            <TextInput
-              style={styles.input}
-              value={String(childAge)}
-              onChangeText={(value) => {
-                // Only allow numbers
-                const numValue = value.replace(/[^0-9]/g, "");
-                setChildAge(numValue);
-              }}
-              placeholder="Enter child's age"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="numeric"
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Age</Text>
+              <TextInput
+                style={styles.input}
+                value={String(childAge)}
+                onChangeText={(value) => {
+                  const numValue = value.replace(/[^0-9]/g, "");
+                  setChildAge(numValue);
+                }}
+                placeholder="Enter child's age"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+              />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Allergies (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={childAllergies}
-              onChangeText={setChildAllergies}
-              placeholder="Enter any allergies (e.g., Peanuts, Dairy)"
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Allergies (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={childAllergies}
+                onChangeText={setChildAllergies}
+                placeholder="Enter any allergies (e.g., Peanuts, Dairy)"
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Special Notes (Optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={childNotes}
-              onChangeText={setChildNotes}
-              placeholder="Enter any special notes, allergies, etc."
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Special Notes (Optional)</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={childNotes}
+                onChangeText={setChildNotes}
+                placeholder="Enter any special notes, allergies, etc."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
 
-          <View style={styles.buttonContainer}>
-            <Button
-              mode="outlined"
-              onPress={onClose}
-              style={styles.button}
-              contentStyle={styles.buttonContent}
-            >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
-              onPress={handleSave}
-              style={styles.button}
-              contentStyle={styles.buttonContent}
-              disabled={!childName.trim()}
-            >
-              {editing ? "Save Changes" : "Add Child"}
-            </Button>
+            <View style={styles.buttonContainer}>
+              <Button
+                mode="outlined"
+                onPress={onClose}
+                style={styles.button}
+                contentStyle={styles.buttonContent}
+              >
+                Cancel
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleSave}
+                style={styles.button}
+                contentStyle={styles.buttonContent}
+                disabled={!childName.trim()}
+              >
+                {editing ? "Save Changes" : "Add Child"}
+              </Button>
+            </View>
           </View>
+        </ScrollView>
+      </KeyboardAvoidingWrapper>
     </ModalWrapper>
   );
 };

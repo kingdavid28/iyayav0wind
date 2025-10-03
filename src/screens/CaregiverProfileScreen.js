@@ -15,6 +15,42 @@ import ProfileImage from '../components/ui/feedback/ProfileImage';
 import { Calendar, Clock, MapPin, Phone, Mail, Award, Star } from 'lucide-react-native';
 import { formatDate } from '../utils/dateUtils';
 
+const formatLocationValue = (location) => {
+  if (!location) {
+    return null;
+  }
+
+  if (typeof location === 'string') {
+    return location;
+  }
+
+  if (Array.isArray(location)) {
+    return location.filter(Boolean).join(', ');
+  }
+
+  if (typeof location === 'object') {
+    const { street, barangay, city, province, zipCode, postalCode, country, coordinates } = location;
+
+    const coordinateString = Array.isArray(coordinates)
+      ? coordinates.filter((value) => typeof value === 'number').join(', ')
+      : null;
+
+    return [
+      street,
+      barangay,
+      city,
+      province,
+      zipCode || postalCode,
+      country,
+      coordinateString && `(${coordinateString})`,
+    ]
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  return String(location);
+};
+
 const formatCurrency = (value) => {
   if (value == null) {
     return '—';
@@ -65,7 +101,7 @@ const CaregiverProfileScreen = () => {
       contactEmail: base?.contactEmail || base?.email,
       contactPhone: base?.contactPhone || base?.phone,
       profileImage: base?.profileImage || base?.avatar || base?.photoUrl,
-      location: base?.location || base?.address,
+      location: formatLocationValue(base?.location || base?.address || rawCaregiver?.location || rawCaregiver?.address),
       bio: base?.bio || base?.aboutMe,
       createdAt: base?.createdAt,
       updatedAt: base?.updatedAt,

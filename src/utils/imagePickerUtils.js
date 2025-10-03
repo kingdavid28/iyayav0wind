@@ -1,12 +1,12 @@
-// src/utils/imagePickerUtils.js
 import * as ImagePicker from 'expo-image-picker';
 import * as Permissions from 'expo-permissions';
-import { Platform } from 'react-native';
+import { Platform, Image } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 
-// Default options for image picker
+const MEDIA_TYPES_IMAGES = ['images'];
+
 const defaultOptions = {
-  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  mediaTypes: MEDIA_TYPES_IMAGES,
   allowsEditing: true,
   aspect: [4, 3],
   quality: 0.8,
@@ -14,7 +14,12 @@ const defaultOptions = {
   exif: false,
 };
 
-// Check and request camera roll permissions
+const withDefaultOptions = (options = {}) => ({
+  ...defaultOptions,
+  ...options,
+  mediaTypes: options.mediaTypes || MEDIA_TYPES_IMAGES,
+});
+
 export const getCameraRollPermissions = async () => {
   if (Platform.OS !== 'web') {
     const { status } = await Permissions.askAsync(Permissions.MEDIA_LIBRARY);
@@ -25,7 +30,6 @@ export const getCameraRollPermissions = async () => {
   return true;
 };
 
-// Check and request camera permissions
 export const getCameraPermissions = async () => {
   if (Platform.OS !== 'web') {
     const { status } = await Permissions.askAsync(Permissions.CAMERA);
@@ -36,28 +40,25 @@ export const getCameraPermissions = async () => {
   return true;
 };
 
-// Pick an image from the device's media library
 export const pickImage = async (options = {}) => {
   try {
     await getCameraRollPermissions();
-    
-    const result = await ImagePicker.launchImageLibraryAsync({
-      ...defaultOptions,
-      ...options,
-    });
+
+    const result = await ImagePicker.launchImageLibraryAsync(withDefaultOptions(options));
 
     if (result.canceled) {
-      throw new Error('User cancelled image picker');
+      throw new Error('User canceled image picker');
     }
 
     if (result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
       return {
         cancelled: false,
-        uri: result.assets[0].uri,
-        width: result.assets[0].width,
-        height: result.assets[0].height,
-        type: result.assets[0].type || 'image',
-        base64: result.assets[0].base64,
+        uri: asset.uri,
+        width: asset.width,
+        height: asset.height,
+        type: asset.type || 'image',
+        base64: asset.base64,
       };
     }
 
@@ -68,28 +69,25 @@ export const pickImage = async (options = {}) => {
   }
 };
 
-// Take a photo using the device's camera
 export const takePhoto = async (options = {}) => {
   try {
     await getCameraPermissions();
-    
-    const result = await ImagePicker.launchCameraAsync({
-      ...defaultOptions,
-      ...options,
-    });
+
+    const result = await ImagePicker.launchCameraAsync(withDefaultOptions(options));
 
     if (result.canceled) {
-      throw new Error('User cancelled taking photo');
+      throw new Error('User canceled taking photo');
     }
 
     if (result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
       return {
         cancelled: false,
-        uri: result.assets[0].uri,
-        width: result.assets[0].width,
-        height: result.assets[0].height,
-        type: result.assets[0].type || 'image',
-        base64: result.assets[0].base64,
+        uri: asset.uri,
+        width: asset.width,
+        height: asset.height,
+        type: asset.type || 'image',
+        base64: asset.base64,
       };
     }
 
@@ -100,31 +98,32 @@ export const takePhoto = async (options = {}) => {
   }
 };
 
-// Resize an image to a maximum dimension
 export const resizeImage = async (uri, maxWidth, maxHeight) => {
   try {
-    const imageInfo = await FileSystem.getInfoAsync(uri);
-    if (!imageInfo.exists) {
+    const info = await FileSystem.getInfoAsync(uri);
+    if (!info.exists) {
       throw new Error('Image file not found');
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-      base64: true,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync(
+      withDefaultOptions({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        base64: true,
+      })
+    );
 
     if (result.canceled) {
-      throw new Error('User cancelled image resize');
+      throw new Error('User canceled image resize');
     }
 
     if (result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
       return {
-        uri: result.assets[0].uri,
-        width: result.assets[0].width,
-        height: result.assets[0].height,
+        uri: asset.uri,
+        width: asset.width,
+        height: asset.height,
       };
     }
 
@@ -135,7 +134,6 @@ export const resizeImage = async (uri, maxWidth, maxHeight) => {
   }
 };
 
-// Convert image to base64
 export const imageToBase64 = async (uri) => {
   try {
     const base64 = await FileSystem.readAsStringAsync(uri, {
@@ -148,16 +146,15 @@ export const imageToBase64 = async (uri) => {
   }
 };
 
-// Get image metadata (dimensions, size, etc.)
 export const getImageInfo = async (uri) => {
   try {
-    const result = await ImagePicker.getMediaLibraryPermissionsAsync();
-    if (!result.granted) {
+    const permission = await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
       await getCameraRollPermissions();
     }
 
-    const imageInfo = await FileSystem.getInfoAsync(uri, { size: true });
-    if (!imageInfo.exists) {
+    const info = await FileSystem.getInfoAsync(uri, { size: true });
+    if (!info.exists) {
       throw new Error('Image file not found');
     }
 
@@ -173,8 +170,8 @@ export const getImageInfo = async (uri) => {
       uri,
       width: dimensions.width,
       height: dimensions.height,
-      fileSize: imageInfo.size,
-      fileUri: imageInfo.uri,
+      fileSize: info.size,
+      fileUri: info.uri,
     };
   } catch (error) {
     console.error('Error getting image info:', error);
@@ -182,28 +179,29 @@ export const getImageInfo = async (uri) => {
   }
 };
 
-// Compress an image
 export const compressImage = async (uri, options = {}) => {
   try {
     const { quality = 0.8, base64 = false } = options;
-    
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality,
-      base64,
-    });
+
+    const result = await ImagePicker.launchImageLibraryAsync(
+      withDefaultOptions({
+        allowsEditing: true,
+        quality,
+        base64,
+      })
+    );
 
     if (result.canceled) {
-      throw new Error('User cancelled image compression');
+      throw new Error('User canceled image compression');
     }
 
     if (result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
       return {
-        uri: result.assets[0].uri,
-        width: result.assets[0].width,
-        height: result.assets[0].height,
-        base64: result.assets[0].base64,
+        uri: asset.uri,
+        width: asset.width,
+        height: asset.height,
+        base64: asset.base64,
       };
     }
 
@@ -214,11 +212,10 @@ export const compressImage = async (uri, options = {}) => {
   }
 };
 
-// Delete an image from the device
 export const deleteImage = async (uri) => {
   try {
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (fileInfo.exists) {
+    const info = await FileSystem.getInfoAsync(uri);
+    if (info.exists) {
       await FileSystem.deleteAsync(uri, { idempotent: true });
       return true;
     }
@@ -229,7 +226,6 @@ export const deleteImage = async (uri) => {
   }
 };
 
-// Export all functions
 export default {
   pickImage,
   takePhoto,

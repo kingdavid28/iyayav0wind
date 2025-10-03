@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import PropTypes from 'prop-types';
 import { colors, spacing, typography } from '../../../screens/styles/ParentDashboard.styles';
+import { formatAddress } from '../../../utils/addressUtils';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -137,6 +138,101 @@ export function BookingDetailsModal({
   const displayDate = booking.date || '—';
   const displayTime = booking.time || booking.timeRange || '—';
 
+  const normalizeFormattedAddress = (candidate) => {
+    if (!candidate) {
+      return null;
+    }
+
+    const formatted = formatAddress(candidate);
+    if (!formatted) {
+      return null;
+    }
+
+    const trimmed = formatted.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const lower = trimmed.toLowerCase();
+    if (lower === 'location not specified' || lower === 'location not available') {
+      return null;
+    }
+
+    return trimmed;
+  };
+
+  const mergeCandidates = (...values) => values.find((value) => value != null);
+
+  const formattedLocation = [
+    booking.location?.formattedAddress,
+    booking.address?.formattedAddress,
+    booking.location?.fullAddress,
+    booking.address?.fullAddress,
+    booking.location?.address,
+    booking.address?.address,
+    booking.location,
+    booking.address,
+  ]
+    .map(normalizeFormattedAddress)
+    .find(Boolean) || null;
+
+  const extractCoordinates = (candidate) => {
+    if (!candidate || typeof candidate !== 'object') {
+      return null;
+    }
+
+    const coordinates =
+      candidate.coordinates ||
+      candidate.location?.coordinates ||
+      candidate.geo ||
+      candidate.geoLocation ||
+      candidate.position ||
+      null;
+
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      return null;
+    }
+
+    const [lat, lng] = coordinates.map((value) => Number(value));
+
+    if ([lat, lng].some((value) => Number.isNaN(value))) {
+      return null;
+    }
+
+    return [lat, lng];
+  };
+
+  const resolvedCoordinates = [
+    booking.location,
+    booking.address,
+    booking.location?.address,
+    booking.address?.address,
+  ]
+    .map(extractCoordinates)
+    .find(Boolean) || null;
+
+  const directionsTarget = resolvedCoordinates
+    ? `${resolvedCoordinates[0]},${resolvedCoordinates[1]}`
+    : formattedLocation;
+
+  const directionsUrl = directionsTarget
+    ? resolvedCoordinates
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(directionsTarget)}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(directionsTarget)}`
+    : null;
+
+  const canOpenDirections = Boolean(directionsUrl);
+
+  const locationTitle =
+    mergeCandidates(
+      booking.location?.label,
+      booking.location?.name,
+      booking.location?.title,
+      booking.address?.label
+    ) || 'Booking Location';
+
+  const locationSubtitle = formattedLocation || 'Address will be shared after confirmation.';
+
   return (
     <View style={styles.overlay}>
       <View style={[styles.modalCard, styles.card]}>
@@ -203,12 +299,12 @@ export function BookingDetailsModal({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('location.contact')}</Text>
               <View style={styles.locationContainer}>
-                {(booking.location || booking.address) && (
+                {(booking.location || booking.address || formattedLocation) && (
                   <View style={styles.locationRow}>
                     <MapPin size={18} color={colors.primary} />
                     <View style={styles.locationTextWrap}>
-                      <Text style={styles.locationTitle}>{booking.location || 'Booking Location'}</Text>
-                      <Text style={styles.locationSubtitle}>{booking.address || 'Address will be shared after confirmation.'}</Text>
+                      <Text style={styles.locationTitle}>{locationTitle}</Text>
+                      <Text style={styles.locationSubtitle}>{locationSubtitle}</Text>
                     </View>
                   </View>
                 )}
@@ -368,24 +464,24 @@ export function BookingDetailsModal({
 
             <Pressable
               onPress={() => {
-                if (booking.address) {
-                  Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(booking.address)}`);
+                if (directionsUrl) {
+                  Linking.openURL(directionsUrl);
                   onGetDirections?.();
                 }
               }}
               style={[
                 styles.footerButton,
                 styles.secondaryButton,
-                !booking.address && styles.disabledButton,
+                !canOpenDirections && styles.disabledButton,
               ]}
               accessibilityRole="button"
-              disabled={!booking.address}
+              disabled={!canOpenDirections}
             >
-              <Navigation size={16} color={booking.address ? '#047857' : '#94A3B8'} />
+              <Navigation size={16} color={canOpenDirections ? '#047857' : '#94A3B8'} />
               <Text
                 style={[
                   styles.secondaryButtonText,
-                  !booking.address && styles.disabledButtonText,
+                  !canOpenDirections && styles.disabledButtonText,
                 ]}
               >
                 {t('actions.directions')}

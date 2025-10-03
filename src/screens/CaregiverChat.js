@@ -38,39 +38,39 @@ const CaregiverChat = ({ route }) => {
   const flatListRef = useRef(null);
 
   useEffect(() => {
-    if (!user?.id || !caregiverId) {
+    if (!user?.firebaseUid || !caregiverId) {
       Alert.alert('Error', 'Missing user information');
       navigation.goBack();
       return;
     }
 
-    const [id1, id2] = [user.id, caregiverId].sort();
+    const [id1, id2] = [user.firebaseUid, caregiverId].sort();
     setConversationId(`${id1}_${id2}`);
-  }, [user?.id, caregiverId, navigation]);
+  }, [user?.firebaseUid, caregiverId, navigation]);
 
   useEffect(() => {
-    if (!conversationId || !user?.id || !caregiverId) {
+    if (!conversationId || !user?.firebaseUid || !caregiverId) {
       return;
     }
 
     setActiveConversationId(conversationId);
-    subscribeToMessages(conversationId, user.id, caregiverId);
-    markMessagesAsRead(user.id, caregiverId, conversationId).catch(console.error);
+    subscribeToMessages(conversationId, user.firebaseUid, caregiverId);
+    markMessagesAsRead(user.firebaseUid, caregiverId, conversationId).catch(console.error);
 
     return () => {
       setActiveConversationId(null);
       subscribeToMessages(null);
     };
-  }, [conversationId, user?.id, caregiverId, setActiveConversationId, subscribeToMessages, markMessagesAsRead]);
+  }, [conversationId, user?.firebaseUid, caregiverId, setActiveConversationId, subscribeToMessages, markMessagesAsRead]);
 
   const handleSendMessage = async () => {
-    if (!newMessage?.trim() || !user?.id || !caregiverId || !conversationId) {
+    if (!newMessage?.trim() || !user?.firebaseUid || !caregiverId || !conversationId) {
       return;
     }
 
     try {
       await sendMessageFromContext(
-        user.id,
+        user.firebaseUid,
         caregiverId,
         newMessage.trim(),
         'text',
@@ -180,7 +180,7 @@ const CaregiverChat = ({ route }) => {
           ref={flatListRef}
           data={displayedMessages}
           renderItem={({ item }) => (
-            <MessageItem message={item} isCurrentUser={item.senderId === user?.id} />
+            <MessageItem message={item} isCurrentUser={item.senderId === user?.firebaseUid} />
           )}
           keyExtractor={(item, index) => item.id || `message-${index}`}
           style={styles.messagesList}

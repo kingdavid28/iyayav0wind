@@ -58,7 +58,7 @@ const DocumentUpload = ({ label, documentType, onUploadComplete, initialUri = ''
       // Try uploadsAPI first, fallback to authAPI
       let res;
       try {
-        res = await uploadsAPI.base64Upload({ imageBase64, mimeType, folder, name });
+        res = await uploadsAPI.base64Upload(imageBase64, mimeType);
       } catch (uploadError) {
         console.log('Upload API failed, trying auth API:', uploadError.message);
         res = await authAPI.uploadProfileImageBase64(imageBase64, mimeType);

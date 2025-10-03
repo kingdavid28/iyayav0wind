@@ -66,6 +66,7 @@ export const MessagingProvider = ({ children }) => {
       return;
     }
 
+    console.log('👤 Subscribing to presence for user:', key);
     const unsubscribe = firebaseMessagingService.listenToUserPresence(key, (status) => {
       setPresenceMap((prev) => ({
         ...prev,
@@ -137,16 +138,17 @@ export const MessagingProvider = ({ children }) => {
       try {
         await firebaseMessagingService.ensureRealtimeSession();
         const firebaseUid = firebaseAuthService.getCurrentUser()?.uid;
-        if (firebaseUid && String(firebaseUid) !== String(userId)) {
-          console.warn('⚠️ MessagingContext: Firebase UID mismatch for conversations subscription', {
-            firebaseUid,
-            requestedUserId: userId,
-            userType,
-          });
-        }
+
+        // Use Firebase UID for Firebase operations, but MongoDB ID for API context
+        const firebaseUserId = firebaseUid;
+        console.log('🔗 Subscribing to conversations with Firebase UID:', {
+          firebaseUid,
+          mongoUserId: userId,
+          userType,
+        });
 
         const unsubscribe = firebaseMessagingService.getConversations(
-          userId,
+          firebaseUserId, // Use Firebase UID for Firebase operations
           (data) => {
             const conversationsList = data || [];
             setConversations(conversationsList);
@@ -157,6 +159,14 @@ export const MessagingProvider = ({ children }) => {
 
             conversationsList.forEach((conversation) => {
               const participantId = userType === 'caregiver' ? conversation?.parentId : conversation?.caregiverId;
+
+              console.log('👤 Conversation presence subscription:', {
+                conversationId: conversation?.conversationId,
+                participantId,
+                firebaseUid,
+                userType,
+              });
+
               ensurePresenceSubscription(participantId);
             });
           },
@@ -207,16 +217,15 @@ export const MessagingProvider = ({ children }) => {
       try {
         await firebaseMessagingService.ensureRealtimeSession();
         const firebaseUid = firebaseAuthService.getCurrentUser()?.uid;
-        if (firebaseUid && userId && String(firebaseUid) !== String(userId)) {
-          console.warn('⚠️ MessagingContext: Firebase UID mismatch for message subscription', {
-            firebaseUid,
-            conversationId,
-            requestedUserId: userId,
-          });
-        }
+
+        console.log('🔗 Subscribing to messages with Firebase UID:', {
+          firebaseUid,
+          conversationId,
+          mongoUserId: userId,
+        });
 
         const unsubscribe = firebaseMessagingService.getMessages(
-          userId,
+          firebaseUid, // Use Firebase UID for Firebase operations
           caregiverId,
           (data) => {
             setMessages(data?.messages || []);
@@ -238,10 +247,18 @@ export const MessagingProvider = ({ children }) => {
 
         typingUnsubscribeRef.current = typingUnsubscribe;
         const participantIds = String(conversationId).split('_');
-        const normalizedUserId = userId ? String(userId) : null;
+        const normalizedUserId = firebaseUid ? String(firebaseUid) : null;
         const otherParticipantId = participantIds.length === 2
           ? participantIds.find((id) => id !== normalizedUserId) || participantIds[0]
           : caregiverId || participantIds[0];
+
+        console.log('👤 Presence subscription for participant:', {
+          conversationId,
+          participantIds,
+          firebaseUid,
+          mongoUserId: userId,
+          otherParticipantId,
+        });
 
         ensurePresenceSubscription(otherParticipantId);
       } catch (error) {
@@ -264,7 +281,21 @@ export const MessagingProvider = ({ children }) => {
 
   const sendMessage = useCallback(async (userId, caregiverId, messageText, messageType = 'text', fileData = null, conversationId = null) => {
     try {
-      return await firebaseMessagingService.sendMessage(userId, caregiverId, messageText, messageType, fileData, conversationId);
+      const firebaseUid = firebaseAuthService.getCurrentUser()?.uid;
+      console.log('📨 Sending message with Firebase UID:', {
+        firebaseUid,
+        mongoUserId: userId,
+        caregiverId,
+      });
+
+      return await firebaseMessagingService.sendMessage(
+        firebaseUid, // Use Firebase UID for Firebase operations
+        caregiverId,
+        messageText,
+        messageType,
+        fileData,
+        conversationId
+      );
     } catch (error) {
       console.error('MessagingContext: sendMessage failed', error);
       throw error;
@@ -273,8 +304,15 @@ export const MessagingProvider = ({ children }) => {
 
   const setTypingStatus = useCallback(async (conversationId, userId, typing) => {
     try {
+      const firebaseUid = firebaseAuthService.getCurrentUser()?.uid;
+      console.log('⌨️ Setting typing status with Firebase UID:', {
+        firebaseUid,
+        conversationId,
+        mongoUserId: userId,
+      });
+
       setIsTyping(Boolean(typing));
-      await firebaseMessagingService.setTypingStatus(conversationId, userId, typing);
+      await firebaseMessagingService.setTypingStatus(conversationId, firebaseUid, typing);
     } catch (error) {
       console.error('MessagingContext: setTypingStatus failed', error);
     }
@@ -290,7 +328,18 @@ export const MessagingProvider = ({ children }) => {
 
   const markMessagesAsRead = useCallback(async (userId, caregiverId, conversationId = null) => {
     try {
-      await firebaseMessagingService.markMessagesAsRead(userId, caregiverId, conversationId);
+      const firebaseUid = firebaseAuthService.getCurrentUser()?.uid;
+      console.log('👁️ Marking messages as read with Firebase UID:', {
+        firebaseUid,
+        mongoUserId: userId,
+        caregiverId,
+      });
+
+      await firebaseMessagingService.markMessagesAsRead(
+        firebaseUid, // Use Firebase UID for Firebase operations
+        caregiverId,
+        conversationId
+      );
     } catch (error) {
       console.error('MessagingContext: markMessagesAsRead failed', error);
       throw error;

@@ -35,7 +35,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
-import * as FileSystem from 'expo-file-system'; // Added missing import
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomDateTimePicker from '../shared/ui/inputs/DateTimePicker';
 import TimePicker from '../shared/ui/inputs/TimePicker';
@@ -46,6 +45,8 @@ import { getCurrentDeviceLocation, searchLocation, validateLocation, formatLocat
 import { compressImage, uploadWithRetry, handleUploadError } from '../utils/imageUploadUtils';
 
 const { width } = Dimensions.get('window');
+const FileSystem = Platform.OS === 'web' ? null : require('expo-file-system/legacy');
+const BASE64_ENCODING = FileSystem?.EncodingType?.Base64 || 'base64';
 
 // Add missing validation constants
 const VALIDATION = {
@@ -364,7 +365,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Fixed: use proper MediaTypeOptions
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -524,7 +525,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
     }
   };
 
-  // Document upload functionality
+  // Document upload functionality - FIXED VERSION
   const handleDocumentUpload = async (documentType) => {
     try {
       setDocumentUploading(true);
@@ -543,22 +544,24 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
           return;
         }
 
+        if (!FileSystem?.readAsStringAsync) {
+          throw new Error('File upload is not supported on this platform.');
+        }
+
         // Convert document to base64 for upload
         const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
+          encoding: BASE64_ENCODING,
         });
 
-        console.log('📄 Uploading document:', documentType.label);
-        const response = await uploadsAPI.uploadDocument({
-          documentBase64: base64,
-          mimeType: asset.mimeType,
-          documentType: documentType.key,
-          folder: 'documents',
-          fileName: asset.name
-        });
+        // Get the file extension
+        const fileExtension = asset.name.split('.').pop() || 'pdf';
+        const mimeType = fileExtension === 'pdf' ? 'application/pdf' : 'image/jpeg';
+
+        // Upload the document using the uploadsAPI service
+        const response = await uploadsAPI.base64Upload(base64, mimeType);
         
         console.log('📄 Upload response:', response);
-        const documentUrl = response?.url;
+        const documentUrl = response?.url || response?.data?.url;
         
         if (documentUrl) {
           const newDocument = {
@@ -917,7 +920,7 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         clearTimeout(autoSaveTimer.current);
       }
     };
-  }, [formData, currentStep, user?.id, touched]); // Added touched back as it's needed
+  }, [formData, currentStep, user?.id, touched]);
 
   // Reset profile image error when image URL changes
   useEffect(() => {
@@ -1028,9 +1031,16 @@ const EnhancedCaregiverProfileWizard = ({ navigation, route }) => {
         const frontendType = typeof doc.type === 'string' ? doc.type : '';
         const mappedType = DOCUMENT_TYPE_MAP[frontendType] || 'other';
         return {
-          ...doc,
-          type: mappedType,
           name: doc.name || doc.label || doc.fileName || 'Document',
+          url: doc.url,
+          type: mappedType,
+          category: doc.category || undefined,
+          size: typeof doc.size === 'number' ? doc.size : undefined,
+          verified: !!doc.verified,
+          verifiedAt: doc.verifiedAt ? new Date(doc.verifiedAt) : undefined,
+          verifiedBy: doc.verifiedBy || undefined,
+          uploadedAt: doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(),
+          expiryDate: doc.expiryDate ? new Date(doc.expiryDate) : undefined,
         };
       });
 

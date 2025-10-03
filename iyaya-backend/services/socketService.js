@@ -135,6 +135,28 @@ class SocketService {
     }
   }
 
+  notifyNewApplication(parentId, payload) {
+    if (!this.io) {
+      console.warn('⚠️ notifyNewApplication called without active socket server');
+      return;
+    }
+
+    if (!parentId) {
+      console.warn('⚠️ notifyNewApplication missing parentId');
+      return;
+    }
+
+    try {
+      this.io.to(`user_${parentId.toString()}`).emit('application:new', {
+        ...payload,
+        parentId: parentId.toString(),
+        notifiedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('❌ Failed to emit new application notification:', error);
+    }
+  }
+
   // Emit message deleted event
   emitMessageDeleted(conversationId, messageId) {
     if (!this.io) return;

@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const ApplicationSchema = new mongoose.Schema(
   {
     jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true },
-    caregiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    caregiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver', required: true },
+    caregiverUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     coverLetter: { type: String },
     proposedRate: { type: Number },
     message: { type: String },

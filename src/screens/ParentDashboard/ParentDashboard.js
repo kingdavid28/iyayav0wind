@@ -169,6 +169,17 @@ const ParentDashboardInner = () => {
     return (profileForm.name && String(profileForm.name).trim()) || displayName;
   }, [profileForm.name, displayName]);
 
+  const resolvedProfileImage = useMemo(() => {
+    return (
+      profileForm.image ||
+      profile?.profileImage ||
+      profile?.avatar ||
+      profile?.photoURL ||
+      profile?.photoUrl ||
+      null
+    );
+  }, [profileForm.image, profile?.profileImage, profile?.avatar, profile?.photoURL, profile?.photoUrl]);
+
   const bookingFilterStats = useMemo(() => {
     const initial = {
       total: 0,
@@ -563,33 +574,48 @@ const ParentDashboardInner = () => {
   }, [navigation]);
 
   const handleMessageCaregiver = useCallback(async (caregiver) => {
-    if (!user?.uid) {
+    console.log('💬 handleMessageCaregiver called for:', caregiver?.name, caregiver?._id);
+
+    if (!user?.firebaseUid) {
+      console.error('❌ No Firebase UID available for messaging');
       Alert.alert('Error', 'User not found');
       return;
     }
 
-    try {
-      const firebaseMessagingService = (await import('../../services/firebaseMessagingService')).default;
-      await firebaseMessagingService.createConnection(user.uid, caregiver._id || caregiver.id);
-    } catch (error) {
-      console.log('Connection setup warning:', error.message);
+    if (!caregiver?._id) {
+      console.error('❌ No caregiver ID available for messaging');
+      Alert.alert('Error', 'Caregiver information is missing');
+      return;
     }
 
-    navigation.navigate('CaregiverChat', {
-      userId: user.uid,
-      caregiverId: caregiver._id || caregiver.id,
-      caregiverName: caregiver.name
-    });
+    try {
+      console.log('🔗 Setting up connection and navigating to chat...');
+      const firebaseMessagingService = (await import('../../services/firebaseMessagingService')).default;
+
+      const connectionResult = await firebaseMessagingService.createConnection(user.firebaseUid, caregiver._id);
+      console.log('🔗 Connection result:', connectionResult);
+
+      navigation.navigate('CaregiverChat', {
+        userId: user.firebaseUid,
+        caregiverId: caregiver._id,
+        caregiverName: caregiver.name
+      });
+
+      console.log('✅ Successfully navigated to chat');
+    } catch (error) {
+      console.error('❌ Error in handleMessageCaregiver:', error);
+      Alert.alert('Error', 'Failed to open chat. Please try again.');
+    }
   }, [navigation, user]);
 
   const handleViewReviews = useCallback((caregiver) => {
-    if (!user?.uid) {
+    if (!user?.firebaseUid) {
       Alert.alert('Error', 'User not found');
       return;
     }
 
     navigation.navigate('CaregiverReviews', {
-      userId: user.uid,
+      userId: user.firebaseUid,
       caregiverId: caregiver._id || caregiver.id
     });
   }, [navigation, user]);
@@ -609,41 +635,66 @@ const ParentDashboardInner = () => {
     toggleModal('booking', true);
   }, [toggleModal]);
 
-  const handleViewCaregiverProfile = useCallback((entity) => {
+  const resolveCaregiverFromEntity = useCallback((entity) => {
     if (!entity) {
-      return;
+      return null;
     }
 
-    const candidates = [];
+    const candidateObjects = [];
+    const candidateIds = new Set();
 
-    const pushIfObject = (value) => {
-      if (value && typeof value === 'object') {
-        candidates.push(value);
+    const addObjectCandidate = (value) => {
+      if (!value || typeof value !== 'object') {
+        return;
       }
+
+      const isBookingLike = Boolean(
+        value.status &&
+        (value.date || value.bookingCode || value.bookingId || value.reference)
+      );
+
+      if (isBookingLike) {
+        return;
+      }
+
+      const ids = [
+        value._id,
+        value.id,
+        value.caregiverId,
+        value.userId,
+        value.userId?._id,
+        value.userId?.id,
+      ].filter(Boolean);
+
+      ids.forEach((id) => candidateIds.add(id.toString()));
+      candidateObjects.push(value);
     };
 
-    pushIfObject(entity);
-    pushIfObject(entity.caregiver);
-    pushIfObject(entity.caregiverId);
-    pushIfObject(entity.assignedCaregiver);
+    const addIdCandidate = (id) => {
+      if (!id) {
+        return;
+      }
+      candidateIds.add(id.toString());
+    };
 
-    let resolvedCaregiver = candidates.find((candidate) => candidate?._id || candidate?.id);
+    addObjectCandidate(entity.caregiver);
+    addObjectCandidate(entity.caregiverProfile);
+    addObjectCandidate(entity.assignedCaregiver);
+    addObjectCandidate(entity.provider);
+    addObjectCandidate(entity.profile);
 
-    if (!resolvedCaregiver) {
-      const candidateIds = [
-        entity?.caregiverId,
-        entity?.caregiver?._id,
-        entity?.caregiver?.id,
-        entity?.assignedCaregiver?._id,
-        entity?.assignedCaregiver?.id,
-        entity?._id,
-        entity?.id,
-      ]
-        .filter(Boolean)
-        .map((value) => value?.toString?.() ?? String(value));
+    addIdCandidate(
+      typeof entity.caregiver === 'string' ? entity.caregiver : entity.caregiverId
+    );
+    addIdCandidate(entity.assignedCaregiverId);
 
-      resolvedCaregiver = caregivers?.find((caregiverItem) => {
-        const caregiverIds = [
+    if (candidateObjects.length > 0) {
+      return candidateObjects[0];
+    }
+
+    if (candidateIds.size > 0 && Array.isArray(caregivers) && caregivers.length > 0) {
+      const caregiversMatch = caregivers.find((caregiverItem) => {
+        const ids = [
           caregiverItem?._id,
           caregiverItem?.id,
           caregiverItem?.userId,
@@ -651,22 +702,37 @@ const ParentDashboardInner = () => {
           caregiverItem?.userId?.id,
         ]
           .filter(Boolean)
-          .map((value) => value?.toString?.() ?? String(value));
+          .map((value) => value.toString());
 
-        return caregiverIds.some((id) => candidateIds.includes(id));
+        return ids.some((id) => candidateIds.has(id));
       });
 
-      if (!resolvedCaregiver && candidateIds.length > 0) {
-        resolvedCaregiver = { _id: candidateIds[0] };
+      if (caregiversMatch) {
+        return caregiversMatch;
+      }
+
+      const [firstId] = Array.from(candidateIds);
+      if (firstId) {
+        return { _id: firstId };
       }
     }
 
-    if (resolvedCaregiver?._id || resolvedCaregiver?.id) {
-      handleViewCaregiver(resolvedCaregiver);
+    return null;
+  }, [caregivers]);
+
+  const handleViewCaregiverProfile = useCallback((entity) => {
+    if (!entity) {
+      return;
+    }
+
+    const caregiverEntity = resolveCaregiverFromEntity(entity);
+
+    if (caregiverEntity?._id || caregiverEntity?.id) {
+      handleViewCaregiver(caregiverEntity);
     } else if (__DEV__) {
       console.warn('ParentDashboard: Unable to resolve caregiver for profile view', entity);
     }
-  }, [caregivers, handleViewCaregiver]);
+  }, [handleViewCaregiver, resolveCaregiverFromEntity]);
 
   // Booking functions
   const handleBookingConfirm = useCallback(async (bookingData) => {
@@ -949,7 +1015,7 @@ const ParentDashboardInner = () => {
             onViewAllChildren={handleViewAllChildren}
             showAllChildren={showAllChildren}
             greetingName={greetingName}
-            profileImage={profileForm.image}
+            profileImage={resolvedProfileImage}
             profileContact={profileForm.contact}
             profileLocation={profile?.location || profile?.address || profileForm.location}
             caregivers={caregivers || []}
@@ -1079,7 +1145,9 @@ const ParentDashboardInner = () => {
         greetingName={greetingName}
         onProfileEdit={() => toggleModal('profile', true)}
         profileName={profileForm.name}
-        profileImage={profileForm.image}
+        profileImage={resolvedProfileImage}
+        profileContact={profileForm.contact}
+        profileLocation={profile?.location || profile?.address || profileForm.location}
         setActiveTab={switchTabSafely}
       />
 

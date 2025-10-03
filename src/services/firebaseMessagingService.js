@@ -63,15 +63,20 @@ class FirebaseMessagingService {
 
   async createConnection(userId, caregiverId) {
     try {
+      console.log('🔗 Creating connection between:', { userId, caregiverId });
       await this.ensureRealtimeSession();
       if (!ensureFirebaseInitialized()) {
+        console.warn('⚠️ Firebase not initialized for connection creation');
         return false;
       }
 
-      await safeCreateConnection(userId, caregiverId);
-      await safeCreateConnection(caregiverId, userId);
+      const result1 = await safeCreateConnection(userId, caregiverId);
+      const result2 = await safeCreateConnection(caregiverId, userId);
+
+      console.log('✅ Connection created successfully:', { userId, caregiverId, result1, result2 });
       return true;
     } catch (error) {
+      console.error('❌ Connection creation failed:', error);
       return false;
     }
   }
@@ -322,6 +327,7 @@ class FirebaseMessagingService {
       }
 
       // Get user info for the other party in the conversation using imported createRef
+      // Try to access user data - connectionId might be MongoDB ID or Firebase UID
       const userRef = createRef(`users/${connectionId}`);
       if (!userRef) {
         console.error('❌ Cannot create user reference');
@@ -329,7 +335,17 @@ class FirebaseMessagingService {
       }
 
       let userSnapshot = await safeGet(userRef);
-      const userData = userSnapshot ? (userSnapshot.val() || {}) : {};
+      let userData = userSnapshot ? (userSnapshot.val() || {}) : {};
+
+      // If no user data found with connectionId, it might be a MongoDB ID
+      // In this case, we'll return basic conversation info without user details
+      if (!userSnapshot || !userSnapshot.exists()) {
+        console.warn('⚠️ No user data found for connectionId:', connectionId);
+        userData = {
+          name: userType === 'caregiver' ? 'Parent' : 'Caregiver',
+          profileImage: null
+        };
+      }
 
       // Return conversation data based on user type
       if (userType === 'caregiver') {

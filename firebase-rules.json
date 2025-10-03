@@ -5,8 +5,8 @@
 
     "users": {
       "$userId": {
-        ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && auth.uid == $userId"
+        ".read": "auth != null",
+        ".write": "auth != null"
       }
     },
 
@@ -27,8 +27,8 @@
 
     "connections": {
       "$userId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId"
       }
     },
 
@@ -65,6 +65,11 @@
     },
 
     "children": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "typing": {
       ".read": "auth != null",
       ".write": "auth != null"
     },
