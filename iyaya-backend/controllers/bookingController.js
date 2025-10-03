@@ -130,13 +130,16 @@ const hydrateSingleBooking = async (bookingRecord) => {
     bookingObj.caregiverId = caregiverIdValue;
 
     const caregiverProfile = await buildCaregiverProfile(caregiverIdValue);
-
     if (caregiverProfile) {
       bookingObj.caregiverProfile = caregiverProfile;
       if (!bookingObj.caregiver || typeof bookingObj.caregiver !== 'object') {
         bookingObj.caregiver = caregiverProfile;
       }
+    } else {
+      bookingObj.caregiverProfile = null;
     }
+  } else {
+    bookingObj.caregiverProfile = null;
   }
 
   const sanitizedChildren = sanitizeChildren(bookingObj.children);
@@ -144,6 +147,7 @@ const hydrateSingleBooking = async (bookingRecord) => {
     bookingObj.children = sanitizedChildren;
   }
 
+  return bookingObj;
 };
 
 // Get user's bookings
