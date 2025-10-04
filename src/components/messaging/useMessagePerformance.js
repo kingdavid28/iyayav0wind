@@ -232,23 +232,23 @@ export const useMessagePagination = (conversationId) => {
 
   const nextPage = useCallback(() => {
     loadPage(currentPage + 1);
-  }, [currentPage, loadPage]);
+  }, [currentPage]);
 
   const previousPage = useCallback(() => {
     if (currentPage > 0) {
       loadPage(currentPage - 1);
     }
-  }, [currentPage, loadPage]);
+  }, [currentPage]);
 
   const refresh = useCallback(() => {
     loadPage(0);
-  }, [loadPage]);
+  }, []);
 
   useEffect(() => {
     if (conversationId) {
       loadPage(0);
     }
-  }, [conversationId, loadPage]);
+  }, [conversationId]);
 
   return {
     messages,

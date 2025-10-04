@@ -1,4 +1,3 @@
-// ============================================
 // Environment Configuration - MUST BE FIRST
 // ============================================
 require('dotenv').config({ path: './.env' });
@@ -6,6 +5,7 @@ const config = require('./config/env');
 const { createServer } = require('http');
 const { app, server } = require('./app');
 const realtime = require('./services/realtime');
+const { initializeFirebase } = require('./services/backendFirebaseRealtimeService');
 const connectDB = require('./config/database'); // Import from dedicated file
 
 // ============================================
@@ -13,7 +13,15 @@ const connectDB = require('./config/database'); // Import from dedicated file
 // ============================================
 const startServer = async () => {
   const conn = await connectDB(); // Use the imported connection function
-  
+
+  // Initialize Firebase for messaging
+  try {
+    await initializeFirebase();
+    console.log('[Firebase] Backend Firebase initialized for messaging');
+  } catch (err) {
+    console.warn('[Firebase] Initialization failed:', err?.message || err);
+  }
+
   // Initialize optional realtime layer
   try {
     realtime.init(server);

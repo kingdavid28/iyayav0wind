@@ -21,7 +21,6 @@ const MessagingInterface = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const {
-    ensureRealtimeSession,
     subscribeToConversations,
     subscribeToMessages,
     conversations,
@@ -42,7 +41,6 @@ const MessagingInterface = () => {
     const initialize = async () => {
       try {
         setAuthError(null);
-        await ensureRealtimeSession();
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -61,7 +59,7 @@ const MessagingInterface = () => {
     return () => {
       subscribeToConversations(null);
     };
-  }, [ensureRealtimeSession, subscribeToConversations, user?.id, userType]);
+  }, [subscribeToConversations, user?.id]);
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -77,7 +75,7 @@ const MessagingInterface = () => {
     return () => {
       subscribeToMessages(null);
     };
-  }, [conversations, subscribeToMessages, selectedConversationId, user?.id, userType]);
+  }, [conversations, subscribeToMessages, selectedConversationId, user?.id]);
 
   const selectedConversation = useMemo(
     () => conversations?.find((conversation) => conversation?.id === selectedConversationId) || null,
@@ -97,7 +95,7 @@ const MessagingInterface = () => {
         setSnackbarVisible(true);
       }
     },
-    [sendMessage, selectedConversation, user?.id, userType]
+    [sendMessage, selectedConversation, user?.id]
   );
 
   const handleImagePick = async () => {

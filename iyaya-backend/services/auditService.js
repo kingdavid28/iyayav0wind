@@ -119,6 +119,15 @@ const auditService = {
   },
 
   /**
+   * Legacy log method for backward compatibility
+   * @param {Object} params - Log parameters
+   * @returns {Promise<AuditLog|null>}
+   */
+  log: async (params) => {
+    return await auditService.logAction(params);
+  },
+
+  /**
    * Search audit logs with filters and pagination
    * (Keep your existing implementation here)
    */

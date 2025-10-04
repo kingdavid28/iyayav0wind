@@ -85,60 +85,69 @@ const ConversationList = ({ onSelectConversation, selectedConversation }) => {
     [onSelectConversation]
   );
 
-  const renderConversation = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => handleConversationPress(item)}
-      style={[
-        styles.conversationItem,
-        selectedConversation?.id === item.id && styles.selectedConversation
-      ]}
-    >
-      <Surface style={styles.conversationCard} elevation={selectedConversation?.id === item.id ? 4 : 1}>
-        <View style={styles.conversationContent}>
-          <Avatar.Image
-            size={50}
-            source={item.recipientAvatar ? { uri: item.recipientAvatar } : null}
-            style={styles.avatar}
-          />
-          <View style={styles.conversationInfo}>
-            <View style={styles.conversationHeader}>
-              <Text variant="titleMedium" style={styles.recipientName}>
-                {item.recipientName}
-              </Text>
-              <Text variant="caption" style={styles.timestamp}>
-                {formatTime(item.lastActivity)}
-              </Text>
-            </View>
+  const renderConversation = ({ item }) => {
+    console.log('📨 Rendering conversation:', {
+      id: item.id,
+      lastMessage: item.lastMessage,
+      recipientName: item.recipientName,
+      unreadCount: item.unreadCount
+    });
 
-            <View style={styles.conversationMeta}>
-              <Text variant="bodySmall" style={styles.lastMessage}>
-                {item.lastMessage || 'No messages yet'}
-              </Text>
+    return (
+      <TouchableOpacity
+        onPress={() => handleConversationPress(item)}
+        style={[
+          styles.conversationItem,
+          selectedConversation?.id === item.id && styles.selectedConversation
+        ]}
+      >
+        <Surface style={styles.conversationCard} elevation={selectedConversation?.id === item.id ? 4 : 1}>
+          <View style={styles.conversationContent}>
+            <Avatar.Image
+              size={50}
+              source={item.recipientAvatar ? { uri: item.recipientAvatar } : null}
+              style={styles.avatar}
+            />
+            <View style={styles.conversationInfo}>
+              <View style={styles.conversationHeader}>
+                <Text variant="titleMedium" style={styles.recipientName}>
+                  {item.recipientName}
+                </Text>
+                <Text variant="bodySmall" style={styles.timestamp}>
+                  {formatTime(item.lastActivity)}
+                </Text>
+              </View>
 
-              <View style={styles.conversationActions}>
-                {item.unreadCount > 0 && (
-                  <Chip
-                    compact
-                    style={styles.unreadBadge}
-                    textStyle={styles.unreadText}
-                  >
-                    {item.unreadCount}
-                  </Chip>
-                )}
+              <View style={styles.conversationMeta}>
+                <Text variant="bodySmall" style={styles.lastMessage}>
+                  {item.lastMessage || 'No messages yet'}
+                </Text>
 
-                <View style={styles.statusContainer}>
-                  <Clock size={12} color="#666" />
-                  <Text variant="caption" style={styles.statusText}>
-                    {item.recipientRole === 'caregiver' ? 'Caregiver' : 'Parent'}
-                  </Text>
+                <View style={styles.conversationActions}>
+                  {item.unreadCount > 0 && (
+                    <Chip
+                      compact
+                      style={styles.unreadBadge}
+                      textStyle={styles.unreadText}
+                    >
+                      {item.unreadCount}
+                    </Chip>
+                  )}
+
+                  <View style={styles.statusContainer}>
+                    <Clock size={12} color="#666" />
+                    <Text variant="bodySmall" style={styles.statusText}>
+                      {item.recipientRole === 'caregiver' ? 'Caregiver' : 'Parent'}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
           </View>
-        </View>
-      </Surface>
-    </TouchableOpacity>
-  );
+        </Surface>
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -163,7 +172,15 @@ const ConversationList = ({ onSelectConversation, selectedConversation }) => {
     );
   }
 
-  const isEmpty = normalizedConversations.length === 0;
+  console.log('📨 ConversationList Debug:', {
+    conversationsCount: conversations?.length || 0,
+    loading: conversationsLoading,
+    sampleConversation: conversations?.[0] ? {
+      id: conversations[0].id,
+      lastMessage: conversations[0].lastMessage,
+      recipientName: conversations[0].recipientName
+    } : null
+  });
 
   return (
     <View style={styles.container}>

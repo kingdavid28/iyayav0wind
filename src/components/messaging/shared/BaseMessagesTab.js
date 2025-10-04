@@ -28,9 +28,8 @@ const BaseMessagesTab = ({
   const { user } = useAuth();
   const {
     conversations,
-    conversationsStatus,
     conversationsLoading,
-    conversationsError,
+    conversationsStatus,
     subscribeToConversations,
     clearConversationsError,
   } = useMessaging();
@@ -46,7 +45,7 @@ const BaseMessagesTab = ({
     return () => {
       subscribeToConversations(null);
     };
-  }, [subscribeToConversations, userId, userRole]);
+  }, [subscribeToConversations, userId]);
 
   const handleRefresh = useCallback(() => {
     if (onRefresh) {
@@ -55,7 +54,7 @@ const BaseMessagesTab = ({
     if (userId) {
       subscribeToConversations(userId, userRole);
     }
-  }, [onRefresh, subscribeToConversations, userId, userRole]);
+  }, [onRefresh, subscribeToConversations, userId]);
 
   const handleRetry = useCallback(() => {
     clearConversationsError();
@@ -94,7 +93,7 @@ const BaseMessagesTab = ({
         return;
       }
 
-      navigation.navigate('ChatScreen', {
+      navigation.navigate('Messaging', {
         conversationId: conversation.id,
         recipientId: conversation.participantId,
         recipientName: conversation.participantName,
@@ -102,7 +101,7 @@ const BaseMessagesTab = ({
         userRole,
       });
     },
-    [navigation, userRole]
+    [navigation]
   );
 
   const renderAvatar = useCallback(
@@ -126,7 +125,7 @@ const BaseMessagesTab = ({
 
       return <Ionicons name="person-circle" size={maxAvatarSize} color="#6B7280" />;
     },
-    [maxAvatarSize, userRole]
+    [maxAvatarSize]
   );
 
   const renderConversation = useCallback(
@@ -188,14 +187,11 @@ const BaseMessagesTab = ({
   }, [userId, conversationsStatus, conversationData.length]);
 
   const errorMessage = useMemo(() => {
-    if (!conversationsError) {
-      return null;
+    if (conversationsStatus === 'error') {
+      return 'Unable to load conversations right now.';
     }
-
-    return typeof conversationsError === 'string'
-      ? conversationsError
-      : conversationsError.message || 'Unable to load conversations right now.';
-  }, [conversationsError]);
+    return null;
+  }, [conversationsStatus]);
 
   const shouldShowRetry = derivedStatus === 'error' || derivedStatus === 'maintenance';
 

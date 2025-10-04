@@ -18,6 +18,7 @@ import {
   safeGet,
   safeUpdate
 } from '../config/firebase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { getMessageQueue } from '../components/messaging/OfflineMessageQueue';
 import { MessagingErrorHandler } from '../components/messaging/ErrorHandler';
@@ -173,6 +174,14 @@ class FirebaseMessagingService {
         throw new Error('Cannot create message reference');
       }
 
+      console.log('✅ Message sent successfully:', {
+        messageId: newMessageRef.key,
+        conversationId: finalConversationId,
+        messageText: messageText,
+        senderId: userId,
+        path: messagesPath
+      });
+
       // Track the message
       trackingSystem.trackMessage(finalConversationId, newMessageRef.key, MESSAGE_STATUS.SENDING);
 
@@ -326,25 +335,36 @@ class FirebaseMessagingService {
         lastMessage = messageData[messageKey];
       }
 
-      // Get user info for the other party in the conversation using imported createRef
-      // Try to access user data - connectionId might be MongoDB ID or Firebase UID
-      const userRef = createRef(`users/${connectionId}`);
-      if (!userRef) {
-        console.error('❌ Cannot create user reference');
-        return null;
-      }
+      // Get user info for the other party in the conversation
+      // Since connectionId is a MongoDB ID, we need to fetch user data from backend API
+      let userData = {
+        name: userType === 'caregiver' ? 'Parent' : 'Caregiver',
+        profileImage: null
+      };
 
-      let userSnapshot = await safeGet(userRef);
-      let userData = userSnapshot ? (userSnapshot.val() || {}) : {};
+      try {
+        // Try to fetch user data from backend API using MongoDB ID
+        const token = await AsyncStorage.getItem('auth_token');
+        const userResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000/api'}/auth/user/${connectionId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        });
 
-      // If no user data found with connectionId, it might be a MongoDB ID
-      // In this case, we'll return basic conversation info without user details
-      if (!userSnapshot || !userSnapshot.exists()) {
-        console.warn('⚠️ No user data found for connectionId:', connectionId);
-        userData = {
-          name: userType === 'caregiver' ? 'Parent' : 'Caregiver',
-          profileImage: null
-        };
+        if (userResponse.ok) {
+          const userInfo = await userResponse.json();
+          userData = {
+            name: userInfo.data?.name || userInfo.name || userData.name,
+            profileImage: userInfo.data?.profileImage || userInfo.profileImage || null
+          };
+          console.log('✅ Successfully fetched user data from API:', { connectionId, userData });
+        } else {
+          console.log('ℹ️ API endpoint not available (404), using fallback data');
+        }
+      } catch (error) {
+        console.log('ℹ️ API not accessible, using fallback data:', error.message);
       }
 
       // Return conversation data based on user type
@@ -381,7 +401,10 @@ class FirebaseMessagingService {
 
   // Enhanced getMessages with pagination, caching, and connection pooling
   getMessages(userId, caregiverId, callback, conversationId = null) {
-    if (!userId || !caregiverId) return () => {};
+    if (!userId || !caregiverId) {
+      console.error('❌ getMessages called without userId or caregiverId');
+      return () => {};
+    }
 
     // Create consistent conversation ID if not provided
     const finalConversationId = conversationId || (() => {
@@ -390,6 +413,7 @@ class FirebaseMessagingService {
     })();
 
     console.log('📨 Enhanced getMessages with performance optimizations for:', finalConversationId);
+    console.log('🔍 Debug info:', { userId, caregiverId, conversationId, finalConversationId });
 
     // Use imported createRef helpers
     const messagesRef = createRef(`messages/${finalConversationId}`);
@@ -424,10 +448,18 @@ class FirebaseMessagingService {
           const message = childSnapshot.val();
           const messageId = childSnapshot.key;
 
+          console.log('📨 Processing message:', {
+            id: messageId,
+            text: message.messageText,
+            senderId: message.senderId,
+            timestamp: message.timestamp,
+            conversationId: finalConversationId
+          });
+
           // Enhanced message with performance tracking
           const enhancedMessage = {
             id: messageId,
-            text: message.text || '',
+            text: message.messageText || '', // Fix: Map messageText to text property
             senderId: message.senderId,
             timestamp: message.timestamp,
             status: message.status || MESSAGE_STATUS.SENT,
@@ -462,6 +494,7 @@ class FirebaseMessagingService {
         allMessages = messagesData.sort((a, b) => a.timestamp - b.timestamp);
 
         console.log('📨 Enhanced messages found and cached:', allMessages.length);
+        console.log('📨 Sample message data:', allMessages[0]);
         callback(allMessages);
       }
     };
@@ -506,17 +539,23 @@ class FirebaseMessagingService {
       const oldMessagesQuery = createQuery(oldMessagesRef, orderByChild('timestamp'));
 
       if (newMessagesQuery && onValue) {
+        console.log('🔗 Setting up NEW format listener for:', finalConversationId);
         unsubscribeNew = onValue(newMessagesQuery, handleNewFormat, (error) => {
           console.error('❌ Firebase new format listener error:', error);
           connectionPool.releaseConnection(finalConversationId);
         });
+      } else {
+        console.warn('⚠️ Could not create new format query or onValue not available');
       }
 
       if (oldMessagesQuery && onValue) {
+        console.log('🔗 Setting up OLD format listener for:', finalConversationId);
         unsubscribeOld = onValue(oldMessagesQuery, handleOldFormat, (error) => {
           console.error('❌ Firebase old format listener error:', error);
           connectionPool.releaseConnection(finalConversationId);
         });
+      } else {
+        console.warn('⚠️ Could not create old format query or onValue not available');
       }
     } catch (error) {
       console.error('❌ Failed to set up enhanced listeners:', error);

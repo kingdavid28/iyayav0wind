@@ -80,7 +80,11 @@ const authController = loadController('auth') || {
   logout: (req, res) => res.status(503).json({ error: 'Auth service unavailable' }),
   refreshToken: (req, res) => res.status(503).json({ error: 'Auth service unavailable' }),
   getCurrentUser: (req, res) => res.status(503).json({ error: 'Auth service unavailable' }),
-  updateChildren: (req, res) => res.status(503).json({ error: 'Update children service unavailable' })
+  updateChildren: (req, res) => res.status(503).json({ error: 'Update children service unavailable' }),
+  updateRole: (req, res) => res.status(503).json({ error: 'Update role service unavailable' }),
+  updateFirebaseUid: (req, res) => res.status(503).json({ error: 'Update Firebase UID service unavailable' }),
+  getUserByFirebaseUid: (req, res) => res.status(503).json({ error: 'Get user by Firebase UID service unavailable' }),
+  getUserByMongoId: (req, res) => res.status(503).json({ error: 'Get user by MongoDB ID service unavailable' })
 };
 
 // Load validation from utils directory instead of controllers
@@ -124,7 +128,10 @@ verifyMethods(authController, [
   'refreshToken',
   'getCurrentUser',
   'updateChildren',
-  'updateRole'
+  'updateRole',
+  'updateFirebaseUid',
+  'getUserByFirebaseUid',
+  'getUserByMongoId'
 ], 'auth');
 
 verifyMethods(validation, [
@@ -265,10 +272,10 @@ router.get('/profile',
   authController.getCurrentUser
 );
 
-// Update current authenticated user's profile
-router.put('/profile',
+// Update current authenticated user's Firebase UID
+router.post('/update-firebase-uid',
   authenticate,
-  authController.updateProfile
+  authController.updateFirebaseUid
 );
 
 // Persist selected role for the authenticated user
@@ -289,11 +296,11 @@ router.post('/upload-profile-image',
   authController.uploadProfileImageBase64
 );
 
-// Get user profile by Firebase UID (for messaging)
-router.get('/user/:firebaseUid',
+// Get user profile by MongoDB ID (for messaging conversation data)
+router.get('/user/:userId',
   profileLimiter,
   authenticate,
-  authController.getUserByFirebaseUid
+  authController.getUserByMongoId
 );
 
 // CSRF token endpoint (for compatibility)

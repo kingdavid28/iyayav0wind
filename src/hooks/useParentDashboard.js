@@ -163,28 +163,29 @@ export const useParentDashboard = () => {
   }, [user?.id, setLoadingSafe, safeSetCaregivers]);
 
   // Fetch bookings function
-  const fetchBookings = useCallback(async () => {
-    if (!user?.id || user?.role !== 'parent') {
-      console.log('[useParentDashboard] fetchBookings skipped - invalid user context');
-      return;
-    }
-
-    try {
-      setLoadingSafe(true);
-      console.log('[useParentDashboard] fetchBookings start');
-      const res = await apiService.bookings.getMy();
-      console.log('📅 Bookings API response:', res);
-
-      const bookingsList = res?.data?.bookings || res?.bookings || [];
-      safeSetBookings(bookingsList);
-    } catch (error) {
-      console.error('❌ Error fetching bookings:', error);
-      safeSetBookings([]);
-    } finally {
-      setLoadingSafe(false);
-      console.log('[useParentDashboard] fetchBookings complete');
-    }
-  }, [user?.id, user?.role, setLoadingSafe, safeSetBookings]);
+    // Fetch bookings function
+    const fetchBookings = useCallback(async () => {
+      if (!user?.id || user?.role !== 'parent') {
+        console.log('[useParentDashboard] fetchBookings skipped - invalid user context');
+        return;
+      }
+  
+      try {
+        setLoadingSafe(true);
+        console.log('[useParentDashboard] fetchBookings start');
+        const res = await apiService.bookings.getMy();
+        console.log('📅 Bookings API response:', res);
+  
+        const bookingsList = res?.data?.bookings || res?.bookings || [];
+        safeSetBookings(bookingsList);
+      } catch (error) {
+        console.error('❌ Error fetching bookings:', error);
+        safeSetBookings([]);
+      } finally {
+        setLoadingSafe(false);
+        console.log('[useParentDashboard] fetchBookings complete');
+      }
+    }, [user?.id, user?.role, setLoadingSafe, safeSetBookings]);
 
   // Fetch children function
   const fetchChildren = useCallback(async () => {

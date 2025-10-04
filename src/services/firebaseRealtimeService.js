@@ -96,7 +96,7 @@ class FirebaseRealtimeService {
   async sendMessage(chatId, messageData) {
     try {
       const database = await getFirebaseDatabase();
-      const messagesRef = ref(database, `chats/${chatId}/messages`);
+      const messagesRef = ref(database, `messages/${chatId}`);
       const newMessageRef = push(messagesRef);
       await set(newMessageRef, {
         ...messageData,
@@ -112,7 +112,7 @@ class FirebaseRealtimeService {
 
   async listenToMessages(chatId, callback) {
     const database = await getFirebaseDatabase();
-    const messagesRef = ref(database, `chats/${chatId}/messages`);
+    const messagesRef = ref(database, `messages/${chatId}`);
     const messagesQuery = query(messagesRef, orderByChild('timestamp'));
 
     const listener = onValue(messagesQuery, (snapshot) => {

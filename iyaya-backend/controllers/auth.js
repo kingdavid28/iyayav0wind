@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const Caregiver = require('../models/Caregiver');
 const Contract = require('../models/Contract');
@@ -49,7 +50,7 @@ const notifyParentsOfNewCaregiver = async (caregiverUser) => {
     console.log(`📢 Notifying ${parents.length} parents about new caregiver: ${caregiverUser.name}`);
 
     // Create in-app notifications for each parent
-    for (const parent of parents) {
+    const notificationPromises = parents.map(async (parent) => {
       try {
         await Notification.create({
           userId: parent._id,
@@ -62,7 +63,9 @@ const notifyParentsOfNewCaregiver = async (caregiverUser) => {
       } catch (error) {
         console.warn(`Failed to notify parent ${parent._id}:`, error.message);
       }
-    }
+    });
+
+    await Promise.allSettled(notificationPromises);
   } catch (error) {
     console.error('Error notifying parents of new caregiver:', error);
     throw error;
@@ -127,7 +130,7 @@ exports.firebaseSync = async (req, res, next) => {
         profileImage: profileImage || user.profileImage,
         authProvider: authProvider || user.authProvider,
         lastLogin: new Date(),
-        'verification.emailVerified': emailVerified || user.verification.emailVerified
+        'verification.emailVerified': emailVerified || user.verification?.emailVerified
       };
 
       // Update social provider IDs if provided
@@ -149,7 +152,9 @@ exports.firebaseSync = async (req, res, next) => {
         user.authProvider = authProvider;
         user.profileImage = profileImage || user.profileImage;
         user.lastLogin = new Date();
-        user.verification.emailVerified = emailVerified || user.verification.emailVerified;
+        if (user.verification) {
+          user.verification.emailVerified = emailVerified || user.verification.emailVerified;
+        }
 
         // Update social provider IDs if provided
         if (facebookId) user.facebookId = facebookId;
@@ -224,7 +229,7 @@ exports.firebaseSync = async (req, res, next) => {
         authProvider: user.authProvider,
         facebookId: user.facebookId,
         googleId: user.googleId,
-        emailVerified: user.verification.emailVerified,
+        emailVerified: user.verification?.emailVerified || false,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       },
@@ -290,7 +295,9 @@ exports.uploadProfileImageBase64 = async (req, res, next) => {
 
     // Create uploads dir if not exists
     const uploadsDir = path.join(__dirname, '..', 'uploads');
-    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
 
     // File name by user id and timestamp
     const fileName = `profile_${req.user.id}_${Date.now()}.${ext}`;
@@ -304,8 +311,12 @@ exports.uploadProfileImageBase64 = async (req, res, next) => {
     const publicUrl = `/uploads/${fileName}`;
 
     // Update user profileImage
-    let query = { _id: req.user.id };
-    const user = await User.findOneAndUpdate(query, { profileImage: publicUrl }, { new: true }).select('-password');
+    const user = await User.findOneAndUpdate(
+      { _id: req.user.id },
+      { profileImage: publicUrl },
+      { new: true }
+    ).select('-password');
+    
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -381,10 +392,11 @@ exports.updateProfile = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'Authentication required' });
     }
 
-    // JWT lookup
-    let query = { _id: req.user.id };
-
-    const user = await User.findOneAndUpdate(query, update, { new: true, runValidators: true }).select('-password');
+    const user = await User.findOneAndUpdate(
+      { _id: req.user.id },
+      update,
+      { new: true, runValidators: true }
+    ).select('-password');
 
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
@@ -404,15 +416,19 @@ exports.updateChildren = async (req, res, next) => {
     if (!Array.isArray(children)) {
       return res.status(400).json({ success: false, error: 'Children must be an array.' });
     }
+    
     // Only allow parents to update children
     const user = await User.findById(req.user.id);
     if (!user || user.role !== 'parent') {
       return res.status(403).json({ success: false, error: 'Only parent users can update children.' });
     }
+    
     user.children = children;
     await user.save();
+    
     res.status(200).json({ success: true, data: user });
   } catch (err) {
+    console.error('Error in updateChildren:', err);
     res.status(500).json({ success: false, error: 'Failed to update children.' });
   }
 };
@@ -427,11 +443,8 @@ exports.updateRole = async (req, res, next) => {
 
     const normalizedRole = normalizeRole(role);
 
-    // JWT lookup
-    let query = { _id: req.user.id };
-
     const user = await User.findOneAndUpdate(
-      query,
+      { _id: req.user.id },
       { role: normalizedRole },
       { new: true }
     ).select('-password');
@@ -440,12 +453,17 @@ exports.updateRole = async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    auditService.logSecurityEvent('USER_ROLE_UPDATED', {
-      userId: user._id?.toString?.() || req.user.id,
-      newRole: normalizedRole,
-      via: req.user.firebase ? 'firebase' : 'jwt',
-      timestamp: new Date(),
-    });
+    // Log security event
+    try {
+      await auditService.logSecurityEvent('USER_ROLE_UPDATED', {
+        userId: user._id?.toString() || req.user.id,
+        newRole: normalizedRole,
+        via: req.user.firebase ? 'firebase' : 'jwt',
+        timestamp: new Date(),
+      });
+    } catch (auditError) {
+      console.warn('Failed to log role update audit:', auditError.message);
+    }
 
     // If moving to caregiver role, make sure a caregiver profile exists with proper name
     if (normalizedRole === 'caregiver' && user && user._id) {
@@ -503,7 +521,6 @@ exports.updateRole = async (req, res, next) => {
 // Get current authenticated user
 exports.getCurrentUser = async (req, res, next) => {
   try {
-    // For JWT users
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return next(new ErrorResponse('User not found', 404));
@@ -511,14 +528,14 @@ exports.getCurrentUser = async (req, res, next) => {
 
     // If self-access (user requesting own profile), return all info
     if (req.user.id === String(user._id)) {
-      const obj = user.toObject ? user.toObject() : user;
-      const mappedRole = obj.role === 'caregiver' ? 'caregiver' : 'parent';
+      const userObj = user.toObject ? user.toObject() : user;
+      const mappedRole = userObj.role === 'caregiver' ? 'caregiver' : 'parent';
       
       // Include email verification status
       const responseObj = {
-        ...obj,
+        ...userObj,
         role: mappedRole,
-        emailVerified: obj.verification?.emailVerified || false
+        emailVerified: userObj.verification?.emailVerified || false
       };
       
       return res.status(200).json(responseObj);
@@ -620,22 +637,22 @@ exports.login = async (req, res, next) => {
     });
   } catch (err) {
     console.error('💥 Login error:', err);
-    res.status(500).json({ success: false, error: 'Login failed: ' + err.message });
+    res.status(500).json({ success: false, error: 'Login failed: ' + err.message, details: err });
   }
 };
 
 // User registration
 exports.register = async (req, res, next) => {
-  const { name, email, password, role } = req.body;
-  console.log('📝 Registration request:', { name, email, role, hasPassword: !!password });
+  const { name, email, password, role, firebaseUid, authProvider = 'local' } = req.body;
+  console.log('📝 Registration request:', { name, email, role, hasPassword: !!password, hasFirebaseUid: !!firebaseUid, authProvider });
 
   try {
     // Normalize incoming role
     const normalizedRole = normalizeRole(role);
     console.log('🔄 Normalized role:', { input: role, normalized: normalizedRole });
 
-    // Create user
-    const user = await User.create({
+    // Create user with firebaseUid if provided
+    const userData = {
       name,
       email,
       password,
@@ -645,8 +662,17 @@ exports.register = async (req, res, next) => {
       middleInitial: req.body.middleInitial,
       birthDate: req.body.birthDate ? new Date(req.body.birthDate) : undefined,
       phone: req.body.phone
-    });
-    console.log('✅ User created:', user.email, 'with role:', user.role);
+    };
+
+    // Set firebaseUid if provided (for Firebase Auth users)
+    if (firebaseUid) {
+      userData.firebaseUid = firebaseUid;
+      userData.authProvider = authProvider;
+      console.log('🔥 Setting Firebase UID:', firebaseUid, 'Auth Provider:', authProvider);
+    }
+
+    const user = await User.create(userData);
+    console.log('✅ User created:', user.email, 'with role:', user.role, 'Firebase UID:', user.firebaseUid || 'none');
 
     // Send verification email
     try {
@@ -728,19 +754,23 @@ exports.register = async (req, res, next) => {
   } catch (err) {
     // Provide clearer error responses for common failure cases
     console.error('💥 Registration error:', err && (err.message || err));
+    
     // Duplicate email error from Mongo/Mongoose (various shapes)
     const msg = (err && err.message) || '';
     const isDupCode = err && (err.code === 11000 || err.code === 'E11000');
     const isDupMsg = /duplicate key/i.test(msg) || /email already exists/i.test(msg);
     const isDupKey = err && (err.keyPattern?.email || err.keyValue?.email);
+    
     if (isDupCode || isDupMsg || isDupKey) {
       return res.status(409).json({ success: false, error: 'Email already exists' });
     }
+    
     // Mongoose validation error
     if (err && err.name === 'ValidationError') {
       const details = Object.values(err.errors || {}).map(e => e.message);
       return res.status(400).json({ success: false, error: 'Validation error', details });
     }
+    
     return res.status(500).json({ success: false, error: 'Registration failed: ' + err.message });
   }
 };
@@ -761,6 +791,7 @@ exports.logout = async (req, res, next) => {
       data: {}
     });
   } catch (err) {
+    console.error('Error in logout:', err);
     next(new ErrorResponse('Logout failed', 500));
   }
 };
@@ -796,6 +827,7 @@ exports.refreshToken = async (req, res, next) => {
       token: accessToken
     });
   } catch (err) {
+    console.error('Error in refreshToken:', err);
     next(new ErrorResponse('Not authorized', 401));
   }
 };
@@ -910,7 +942,7 @@ exports.confirmPasswordReset = async (req, res, next) => {
 
   try {
     // Hash the token to compare with stored hash
-    const hashedToken = require('crypto')
+    const hashedToken = crypto
       .createHash('sha256')
       .update(token)
       .digest('hex');
@@ -937,11 +969,15 @@ exports.confirmPasswordReset = async (req, res, next) => {
     await user.save();
 
     // Log security event
-    auditService.logSecurityEvent('PASSWORD_RESET_COMPLETED', {
-      userId: user._id.toString(),
-      email: user.email,
-      timestamp: new Date()
-    });
+    try {
+      await auditService.logSecurityEvent('PASSWORD_RESET_COMPLETED', {
+        userId: user._id.toString(),
+        email: user.email,
+        timestamp: new Date()
+      });
+    } catch (auditError) {
+      console.warn('Failed to log password reset audit:', auditError.message);
+    }
 
     res.status(200).json({
       success: true,
@@ -965,7 +1001,7 @@ exports.verifyEmail = async (req, res, next) => {
     console.log('🔍 Verifying token:', token);
     
     // Hash the token to compare with stored hash
-    const hashedToken = require('crypto')
+    const hashedToken = crypto
       .createHash('sha256')
       .update(token)
       .digest('hex');
@@ -1288,22 +1324,100 @@ exports.getFirebaseProfile = async (req, res, next) => {
   }
 };
 
+// Update current authenticated user's Firebase UID
+exports.updateFirebaseUid = async (req, res, next) => {
+  try {
+    const { firebaseUid } = req.body || {};
+
+    if (!firebaseUid) {
+      return res.status(400).json({
+        success: false,
+        error: 'firebaseUid is required'
+      });
+    }
+
+    // Validate Firebase UID format (basic validation)
+    if (typeof firebaseUid !== 'string' || firebaseUid.length < 10) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Firebase UID format'
+      });
+    }
+
+    console.log('🔄 Updating Firebase UID for user:', req.user.id, 'New UID:', firebaseUid);
+
+    // Update the user's firebaseUid
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { firebaseUid: firebaseUid },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Log the Firebase UID update
+    try {
+      await auditService.log({
+        action: 'FIREBASE_UID_UPDATED',
+        userId: user._id,
+        details: {
+          oldFirebaseUid: req.user.firebaseUid,
+          newFirebaseUid: firebaseUid,
+          via: 'auth_context_sync'
+        },
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+    } catch (auditError) {
+      console.warn('Failed to log Firebase UID update audit:', auditError.message);
+    }
+
+    console.log('✅ Firebase UID updated successfully for user:', user.email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Firebase UID updated successfully',
+      data: {
+        firebaseUid: user.firebaseUid,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (err) {
+    console.error('Error updating Firebase UID:', err);
+    return next(new ErrorResponse('Failed to update Firebase UID', 500));
+  }
+};
+
 // Get user profile by Firebase UID (for messaging)
 exports.getUserByFirebaseUid = async (req, res, next) => {
   try {
     const { firebaseUid } = req.params;
-    
+
     if (!firebaseUid) {
-      return res.status(400).json({ success: false, error: 'Firebase UID is required' });
+      return res.status(400).json({
+        success: false,
+        error: 'Firebase UID is required'
+      });
     }
-    
+
+    console.log('🔍 Getting user by Firebase UID:', firebaseUid);
+
     // Find user by Firebase UID
-    const user = await User.findOne({ firebaseUid }).select('name firstName lastName email profileImage role');
-    
+    const user = await User.findOne({ firebaseUid }).select('-password');
+
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      console.log('❌ No user found for Firebase UID:', firebaseUid);
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
     }
-    
+
     // Return basic profile info for messaging
     const profile = {
       id: user._id,
@@ -1315,10 +1429,56 @@ exports.getUserByFirebaseUid = async (req, res, next) => {
       profileImage: user.profileImage,
       role: user.role
     };
-    
+
+    console.log('✅ User profile found for Firebase UID:', firebaseUid);
     res.status(200).json({ success: true, data: profile });
   } catch (err) {
     console.error('Get user by Firebase UID error:', err);
+    next(new ErrorResponse('Failed to get user profile', 500));
+  }
+};
+
+// Get user profile by MongoDB ID (for messaging conversation data)
+exports.getUserByMongoId = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+
+    console.log('🔍 Getting user by MongoDB ID:', userId);
+
+    // Find user by MongoDB ID
+    const user = await User.findById(userId).select('-password');
+
+    if (!user) {
+      console.log('❌ No user found for MongoDB ID:', userId);
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Return basic profile info for messaging
+    const profile = {
+      id: user._id,
+      firebaseUid: user.firebaseUid,
+      name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      profileImage: user.profileImage,
+      role: user.role
+    };
+
+    console.log('✅ User profile found for MongoDB ID:', userId);
+    res.status(200).json({ success: true, data: profile });
+  } catch (err) {
+    console.error('Get user by MongoDB ID error:', err);
     next(new ErrorResponse('Failed to get user profile', 500));
   }
 };

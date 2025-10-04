@@ -6,7 +6,8 @@ const {
   getMessages,
   sendMessage,
   startConversation,
-  markAsRead
+  markAsRead,
+  resolveConnection
 } = require('../controllers/messagingController');
 
 // All messaging routes require authentication
@@ -23,6 +24,9 @@ router.post('/', sendMessage);
 
 // Start a new conversation
 router.post('/start', startConversation);
+
+// Debug endpoint to resolve connection IDs to user data
+router.get('/resolve/:connectionId', resolveConnection);
 
 // Mark messages as read
 router.post('/conversation/:conversationId/read', markAsRead);

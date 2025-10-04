@@ -3,80 +3,119 @@
     ".read": false,
     ".write": false,
 
-    "users": {
-      "$userId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
-      }
-    },
-
     "messages": {
       "$conversationId": {
         ".read": "auth != null",
         ".write": "auth != null",
-        ".indexOn": ["timestamp", "participants"]
+        ".indexOn": ["timestamp"]
       }
     },
 
     "conversations": {
       "$conversationId": {
+        ".read": "auth != null && root.child('conversations').child($conversationId).child('participants').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('conversations').child($conversationId).child('participants').child(auth.uid).exists()"
+      }
+    },
+
+    "messageSync": {
+      "$conversationId": {
         ".read": "auth != null",
-        ".write": "auth != null"
+        ".write": "auth != null",
+        "$messageId": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          "$userId": {
+            ".read": "auth != null",
+            ".write": "auth != null && auth.uid == $userId"
+          }
+        }
       }
     },
 
     "connections": {
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && auth.uid == $userId"
+        ".write": "auth != null && auth.uid == $userId",
+        "$otherUid": {
+          ".read": "auth != null && (auth.uid == $userId || auth.uid == $otherUid)",
+          ".write": "auth != null && (auth.uid == $userId || auth.uid == $otherUid)"
+        }
       }
     },
 
     "presence": {
-      ".read": true,
-      ".write": "auth != null"
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId"
+      }
+    },
+
+    "users": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId",
+        "status": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId"
+        }
+      }
     },
 
     "notifications": {
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null"
+        ".write": "auth != null && auth.uid == $userId"
       }
     },
 
     "bookings": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      "$bookingId": {
+        ".read": "auth != null && (root.child('bookings').child($bookingId).child('clientId').val() == auth.uid || root.child('bookings').child($bookingId).child('caregiverId').val() == auth.uid)",
+        ".write": "auth != null && (root.child('bookings').child($bookingId).child('clientId').val() == auth.uid || root.child('bookings').child($bookingId).child('caregiverId').val() == auth.uid)"
+      }
     },
 
     "jobs": {
-      ".read": true,
-      ".write": "auth != null"
+      "$jobId": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('jobs').child($jobId).child('clientId').val() == auth.uid"
+      }
     },
 
     "applications": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      "$applicationId": {
+        ".read": "auth != null && (root.child('applications').child($applicationId).child('caregiverId').val() == auth.uid || root.child('applications').child($applicationId).child('jobId').child('clientId').val() == auth.uid)",
+        ".write": "auth != null && (root.child('applications').child($applicationId).child('caregiverId').val() == auth.uid || root.child('applications').child($applicationId).child('jobId').child('clientId').val() == auth.uid)"
+      }
     },
 
     "caregivers": {
-      ".read": true,
-      ".write": "auth != null"
+      "$caregiverId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid == $caregiverId || root.child('caregivers').child($caregiverId).child('userId').val() == auth.uid)"
+      }
     },
 
     "children": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      "$childId": {
+        ".read": "auth != null && root.child('children').child($childId).child('parentId').val() == auth.uid",
+        ".write": "auth != null && root.child('children').child($childId).child('parentId').val() == auth.uid"
+      }
     },
 
     "typing": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      "$conversationId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
     },
 
     "ratings": {
-      ".read": true,
-      ".write": "auth != null"
+      "$ratingId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('ratings').child($ratingId).child('authorId').val() == auth.uid || root.child('ratings').child($ratingId).child('targetId').val() == auth.uid)"
+      }
     }
   }
 }

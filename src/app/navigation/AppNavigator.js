@@ -28,6 +28,9 @@ import ParentProfile from "../../screens/ParentProfile";
 import CaregiverReviewsScreen from "../../screens/CaregiverReviewsScreen";
 import CaregiverChat from "../../screens/CaregiverChat";
 
+// Messaging imports
+import MessagingInterface from "../../components/messaging/MessagingInterface";
+
 // Legacy screen imports (to be migrated)
 import AvailabilityManagementScreen from "../../screens/AvailabilityManagementScreen";
 import BookingManagementScreen from "../../screens/BookingManagementScreen";
@@ -115,7 +118,6 @@ const AppNavigatorWithAuth = () => {
         <Stack.Screen name="CaregiverDashboard" component={CaregiverDashboard} options={{ headerShown: false }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: "Edit Profile", headerBackTitle: "Back" }} />
         <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} options={{ title: "Confirm Payment", headerBackTitle: "Back" }} />
-        <Stack.Screen name="JobPosting" component={JobPostingScreen} options={{ title: "Post a Job", headerBackTitle: "Back" }} />
         <Stack.Screen name="JobSearch" component={JobSearchScreen} options={{ title: "Find Jobs", headerBackTitle: "Back" }} />
         <Stack.Screen name="BookingFlow" component={BookingManagementScreen} options={{ title: "Book Caregiver", headerBackTitle: "Back" }} />
         <Stack.Screen name="BookingManagement" component={BookingManagementScreen} options={{ title: "Manage Bookings", headerBackTitle: "Back" }} />
@@ -127,11 +129,11 @@ const AppNavigatorWithAuth = () => {
         <Stack.Screen name="EmailVerificationPending" component={EmailVerificationPendingScreen} options={{ title: "Verify Your Email", headerShown: false }} />
         <Stack.Screen name="Demo" component={DemoScreen} options={{ title: "Component Demo", headerBackTitle: "Back" }} />
 
+        <Stack.Screen name="CaregiverChat" component={CaregiverChat} options={{ title: "Chat with Caregiver" }} />
         <Stack.Screen name="CaregiverProfileComplete" component={CaregiverProfileComplete} options={{ headerShown: false }} />
         <Stack.Screen name="CaregiverProfile" component={CaregiverProfileScreen} options={{ title: "Caregiver Profile" }} />
         <Stack.Screen name="ParentProfile" component={ParentProfile} options={{ title: "My Profile", headerBackTitle: "Back" }} />
-        <Stack.Screen name="CaregiverChat" component={CaregiverChat} options={{ title: "Chat with Caregiver" }} />
-        <Stack.Screen name="CaregiverReviews" component={CaregiverReviewsScreen} options={{ title: "Caregiver Reviews" }} />
+        <Stack.Screen name="Messaging" component={MessagingInterface} options={{ title: "Messages", headerBackTitle: "Back" }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

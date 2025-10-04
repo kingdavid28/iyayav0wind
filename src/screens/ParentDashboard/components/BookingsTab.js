@@ -455,7 +455,15 @@ const BookingsTab = ({
       return [entity];
     }
 
-    const candidates = [entity._id, entity.id, entity.caregiverId, entity.userId];
+    const candidates = [
+      entity._id,
+      entity.id,
+      entity.caregiverId,
+      entity.caregiverProfileId,
+      entity.caregiverAccountId,
+      entity.messagingUserId,
+      entity.userId,
+    ];
 
     if (entity.userId && typeof entity.userId === 'object') {
       candidates.push(entity.userId._id, entity.userId.id);
@@ -499,25 +507,23 @@ const BookingsTab = ({
       (candidate) => candidate && typeof candidate === 'object'
     );
 
-    let resolvedId = caregiverId;
-
     if (resolvedObject) {
       const resolvedCandidates = resolveIdCandidates(resolvedObject);
-      if (resolvedCandidates.length > 0) {
-        resolvedId = resolvedCandidates[0];
-      }
 
-      const featured = findFeaturedCaregiver(resolvedId);
-      if (featured) {
-        return {
-          ...featured,
-          _id: featured._id || featured.id || resolvedId,
-          id: featured.id || featured._id || resolvedId,
-          profileImage: featured.profileImage || featured.avatar,
-          avatar: featured.avatar || featured.profileImage,
-          rating: featured.rating ?? caregiverRating,
-          reviewCount: featured.reviewCount ?? caregiverReviewsCount ?? caregiverReviewCount,
-        };
+      for (const candidateId of resolvedCandidates) {
+        const featured = findFeaturedCaregiver(candidateId);
+        if (featured) {
+          const resolvedId = candidateId;
+          return {
+            ...featured,
+            _id: featured._id || featured.id || resolvedId,
+            id: featured.id || featured._id || resolvedId,
+            profileImage: featured.profileImage || featured.avatar,
+            avatar: featured.avatar || featured.profileImage,
+            rating: featured.rating ?? caregiverRating,
+            reviewCount: featured.reviewCount ?? caregiverReviewsCount ?? caregiverReviewCount,
+          };
+        }
       }
 
       if (__DEV__) {
@@ -526,7 +532,8 @@ const BookingsTab = ({
           '[BookingsTab] Caregiver not found in featured list',
           {
             bookingId: booking?._id || booking?.id,
-            resolvedId,
+            resolvedCandidates,
+            caregiverId,
             availableFeaturedIds,
           }
         );

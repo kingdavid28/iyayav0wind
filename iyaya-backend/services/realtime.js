@@ -1,6 +1,7 @@
 // Optional Socket.IO realtime initializer
 // This file is safe if socket.io is not installed. It will no-op.
 let ioInstance = null;
+const { socketAuth } = require('../middleware/messagingAuth');
 
 function init(server) {
   try {
@@ -23,37 +24,89 @@ function init(server) {
       transports: ['websocket', 'polling'],
     });
 
+    // Use messaging authentication middleware for all connections
+    ioInstance.use(socketAuth);
+
     ioInstance.on('connection', (socket) => {
-      // Authenticate via token if provided (basic example)
-      const { token, userId } = socket.handshake.auth || {};
-      socket.data.userId = userId || null;
+      console.log('🔗 New socket connection established:', {
+        socketId: socket.id,
+        userId: socket.data.user?._id,
+        firebaseUid: socket.data.firebaseUid,
+        authMethod: socket.data.authMethod
+      });
+
+      // Store user data in socket for easy access
+      socket.data.userId = socket.data.user?._id;
+      socket.data.role = socket.data.user?.role;
 
       socket.on('typing:start', (payload) => {
         const { conversationId } = payload || {};
         if (!conversationId) return;
-        socket.to(conversationId).emit('typing:start', { userId: socket.data.userId, conversationId });
+
+        console.log('⌨️ Typing started:', {
+          userId: socket.data.userId,
+          conversationId,
+          firebaseUid: socket.data.firebaseUid
+        });
+
+        socket.to(conversationId).emit('typing:start', {
+          userId: socket.data.userId,
+          firebaseUid: socket.data.firebaseUid,
+          conversationId
+        });
       });
 
       socket.on('typing:stop', (payload) => {
         const { conversationId } = payload || {};
         if (!conversationId) return;
-        socket.to(conversationId).emit('typing:stop', { userId: socket.data.userId, conversationId });
+
+        console.log('⌨️ Typing stopped:', {
+          userId: socket.data.userId,
+          conversationId,
+          firebaseUid: socket.data.firebaseUid
+        });
+
+        socket.to(conversationId).emit('typing:stop', {
+          userId: socket.data.userId,
+          firebaseUid: socket.data.firebaseUid,
+          conversationId
+        });
       });
 
       socket.on('conversation:join', ({ conversationId }) => {
         if (!conversationId) return;
+
+        console.log('👥 User joined conversation:', {
+          userId: socket.data.userId,
+          conversationId,
+          firebaseUid: socket.data.firebaseUid
+        });
+
         socket.join(conversationId);
       });
 
       socket.on('conversation:leave', ({ conversationId }) => {
         if (!conversationId) return;
+
+        console.log('👥 User left conversation:', {
+          userId: socket.data.userId,
+          conversationId,
+          firebaseUid: socket.data.firebaseUid
+        });
+
         socket.leave(conversationId);
       });
 
-      socket.on('disconnect', () => {});
+      socket.on('disconnect', () => {
+        console.log('🔌 Socket disconnected:', {
+          socketId: socket.id,
+          userId: socket.data.userId,
+          firebaseUid: socket.data.firebaseUid
+        });
+      });
     });
 
-    console.log('[Realtime] Socket.IO initialized');
+    console.log('[Realtime] Socket.IO initialized with Firebase UID support');
     return ioInstance;
   } catch (err) {
     // socket.io not installed; skip

@@ -110,41 +110,119 @@ const buildCaregiverProfile = async (caregiverIdValue) => {
 };
 
 const hydrateSingleBooking = async (bookingRecord) => {
-  if (!bookingRecord) {
-    return null;
-  }
+  if (!bookingRecord) return null;
 
+  // Safely convert to plain object if it's a Mongoose document
   const bookingObj = bookingRecord.toObject ? bookingRecord.toObject() : { ...bookingRecord };
 
+  // Ensure we have a proper client/parent reference
   if (bookingObj.clientId) {
-    bookingObj.parentId = bookingObj.clientId._id || bookingObj.clientId;
+    if (typeof bookingObj.clientId === 'object') {
+      bookingObj.parentId = bookingObj.clientId._id || bookingObj.clientId.id || bookingObj.clientId;
+      // Preserve client details for easier access
+      bookingObj.clientDetails = {
+        _id: bookingObj.clientId._id || bookingObj.clientId.id,
+        name: bookingObj.clientId.name,
+        email: bookingObj.clientId.email,
+        profileImage: bookingObj.clientId.profileImage
+      };
+    } else {
+      bookingObj.parentId = bookingObj.clientId;
+    }
   }
 
+  // Process caregiver information
   const caregiverRef = bookingObj.caregiverId;
-  const caregiverIdValue =
-    caregiverRef && typeof caregiverRef === 'object'
-      ? caregiverRef._id || caregiverRef.id || caregiverRef.toString?.()
-      : caregiverRef;
+  let caregiverIdValue = null;
+
+  if (caregiverRef) {
+    if (typeof caregiverRef === 'object') {
+      caregiverIdValue = caregiverRef._id || caregiverRef.id || caregiverRef.toString?.();
+    } else {
+      caregiverIdValue = caregiverRef.toString?.() || caregiverRef;
+    }
+  }
 
   if (caregiverIdValue) {
     bookingObj.caregiverId = caregiverIdValue;
 
-    const caregiverProfile = await buildCaregiverProfile(caregiverIdValue);
-    if (caregiverProfile) {
-      bookingObj.caregiverProfile = caregiverProfile;
-      if (!bookingObj.caregiver || typeof bookingObj.caregiver !== 'object') {
-        bookingObj.caregiver = caregiverProfile;
+    try {
+      const caregiverProfile = await buildCaregiverProfile(caregiverIdValue);
+      
+      if (caregiverProfile) {
+        bookingObj.caregiverProfile = caregiverProfile;
+        bookingObj.caregiverProfileId = caregiverProfile._id || caregiverProfile.id;
+        bookingObj.caregiverAccountId = caregiverProfile.userId;
+        bookingObj.caregiverFirebaseUid = caregiverProfile.firebaseUid || bookingObj.caregiverFirebaseUid || null;
+
+        // Merge caregiver data intelligently
+        if (!bookingObj.caregiver || typeof bookingObj.caregiver !== 'object') {
+          bookingObj.caregiver = caregiverProfile;
+        } else {
+          bookingObj.caregiver = {
+            ...bookingObj.caregiver,
+            ...caregiverProfile,
+            // Preserve existing properties that might not be in caregiverProfile
+            _id: bookingObj.caregiver._id || caregiverProfile._id,
+            id: bookingObj.caregiver.id || caregiverProfile.id,
+            userId: bookingObj.caregiver.userId || caregiverProfile.userId
+          };
+        }
+      } else {
+        // Handle case where caregiver profile is not found
+        bookingObj.caregiverProfile = null;
+        bookingObj.caregiver = bookingObj.caregiver || null;
+        console.warn(`Caregiver profile not found for ID: ${caregiverIdValue}`);
       }
-    } else {
+    } catch (error) {
+      console.error('Error building caregiver profile:', error);
       bookingObj.caregiverProfile = null;
+      bookingObj.caregiver = bookingObj.caregiver || null;
     }
   } else {
     bookingObj.caregiverProfile = null;
+    bookingObj.caregiver = bookingObj.caregiver || null;
   }
 
-  const sanitizedChildren = sanitizeChildren(bookingObj.children);
-  if (sanitizedChildren !== undefined) {
-    bookingObj.children = sanitizedChildren;
+  // Process children data
+  try {
+    const sanitizedChildren = sanitizeChildren(bookingObj.children);
+    if (sanitizedChildren !== undefined) {
+      bookingObj.children = sanitizedChildren;
+    }
+  } catch (error) {
+    console.error('Error sanitizing children data:', error);
+    // Keep original children data if sanitization fails
+  }
+
+  // Ensure consistent date formats
+  if (bookingObj.createdAt && !(bookingObj.createdAt instanceof Date)) {
+    try {
+      bookingObj.createdAt = new Date(bookingObj.createdAt);
+    } catch (dateError) {
+      console.warn('Invalid createdAt date:', bookingObj.createdAt);
+    }
+  }
+
+  if (bookingObj.updatedAt && !(bookingObj.updatedAt instanceof Date)) {
+    try {
+      bookingObj.updatedAt = new Date(bookingObj.updatedAt);
+    } catch (dateError) {
+      console.warn('Invalid updatedAt date:', bookingObj.updatedAt);
+    }
+  }
+
+  // Add calculated fields for frontend convenience
+  if (bookingObj.startTime && bookingObj.endTime) {
+    try {
+      const start = new Date(bookingObj.startTime);
+      const end = new Date(bookingObj.endTime);
+      if (!isNaN(start) && !isNaN(end)) {
+        bookingObj.durationHours = Math.round((end - start) / (1000 * 60 * 60) * 100) / 100;
+      }
+    } catch (error) {
+      console.warn('Error calculating booking duration:', error);
+    }
   }
 
   return bookingObj;
@@ -467,5 +545,6 @@ module.exports = {
   uploadPaymentProof: exports.uploadPaymentProof,
   getBookingById: exports.getBookingById,
   updateBookingStatus: exports.updateBookingStatus,
-  cancelBooking: exports.cancelBooking
+  cancelBooking: exports.cancelBooking,
+  hydrateSingleBooking // Added this missing export
 };

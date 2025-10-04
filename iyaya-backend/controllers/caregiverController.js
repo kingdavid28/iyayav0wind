@@ -64,7 +64,6 @@ const getDefaultProfileTemplate = () => ({
   location: ""
 });
 
-// Get current caregiver's profile (Optimized)
 exports.getCaregiverProfile = async (req, res) => {
   try {
     console.log('🔍 Getting caregiver profile for user:', req.user);
@@ -74,30 +73,29 @@ exports.getCaregiverProfile = async (req, res) => {
       return res.status(401).json({ success: false, error: 'User mapping not found' });
     }
 
-    // Optimized query with lean() for better performance
+    const userDoc = await User.findById(userMongoId).select('name firebaseUid');
+    const userFirebaseUid = userDoc?.firebaseUid || req.user?.firebaseUid || null;
+
     let caregiver = await Caregiver.findOne({ userId: userMongoId })
       .populate('userId', 'name email phone')
-      .select('-portfolio -documents -reviews') // Exclude heavy fields for basic profile
+      .select('-portfolio -documents -reviews')
       .lean();
 
     if (!caregiver) {
-      // Auto-create minimal caregiver profile for this user
-      // Ensure we use the persisted User's name, not just req.user payload
-      const userDoc = await User.findById(userMongoId).select('name');
       const derivedName = (userDoc && typeof userDoc.name === 'string' && userDoc.name.trim().length > 0)
         ? userDoc.name.trim()
         : (req.user?.name && String(req.user.name).trim().length > 0
             ? String(req.user.name).trim()
             : 'Caregiver');
 
-      // Generate unique caregiverId
       const timestamp = Date.now().toString(36);
       const random = Math.random().toString(36).substr(2, 5);
       const caregiverId = `CG${timestamp}${random}`.toUpperCase();
-      
-      const newCaregiver = await Caregiver.create({ 
+
+      const newCaregiver = await Caregiver.create({
         caregiverId,
         userId: userMongoId,
+        firebaseUid: userFirebaseUid,
         name: derivedName,
         bio: '',
         profileImage: '',
@@ -107,9 +105,9 @@ exports.getCaregiverProfile = async (req, res) => {
         emergencyContacts: [],
         documents: [],
         portfolio: { images: [], videos: [] },
-        availability: { 
-          days: [], 
-          hours: { start: '08:00', end: '18:00' }, 
+        availability: {
+          days: [],
+          hours: { start: '08:00', end: '18:00' },
           flexible: false,
           weeklySchedule: {
             Monday: { available: false, timeSlots: [] },
@@ -129,18 +127,31 @@ exports.getCaregiverProfile = async (req, res) => {
           trustScore: 0,
           badges: []
         },
-
       });
-      
+
       caregiver = await Caregiver.findById(newCaregiver._id)
         .populate('userId', 'name email phone')
         .select('-portfolio -documents -reviews')
         .lean();
     }
 
-    // Add calculated fields without heavy computation
+    if (caregiver && !caregiver.firebaseUid) {
+      const linkedUserId = caregiver.userId?._id || caregiver.userId || userMongoId;
+      let firebaseUidToPersist = userFirebaseUid;
+
+      if (!firebaseUidToPersist && linkedUserId) {
+        const linkedUser = await User.findById(linkedUserId).select('firebaseUid');
+        firebaseUidToPersist = linkedUser?.firebaseUid || null;
+      }
+
+      if (firebaseUidToPersist) {
+        await Caregiver.findByIdAndUpdate(caregiver._id, { firebaseUid: firebaseUidToPersist });
+        caregiver.firebaseUid = firebaseUidToPersist;
+      }
+    }
+
     if (caregiver) {
-      caregiver.includeCalculations = false; // Skip trust score calculation in toJSON
+      caregiver.includeCalculations = false;
     }
 
     await logActivity('PROVIDER_PROFILE_VIEW', {
@@ -181,14 +192,12 @@ exports.searchCaregivers = async (req, res) => {
   try {
     const { skills, minRate, maxRate, daysAvailable, search, page = 1, limit = 50 } = req.query;
     console.log('🔍 Caregiver search request:', { skills, minRate, maxRate, daysAvailable, search, page, limit });
-    
-    // Build user query for caregivers
+
     let userQuery = {
       role: 'caregiver',
       status: 'active'
     };
-    
-    // Add search filter for user fields
+
     if (search && typeof search === 'string') {
       const sanitizedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       userQuery.$or = [
@@ -196,38 +205,41 @@ exports.searchCaregivers = async (req, res) => {
         { email: { $regex: sanitizedSearch, $options: 'i' } }
       ];
     }
-    
+
     console.log('📋 User query:', JSON.stringify(userQuery, null, 2));
-    
-    // Get caregiver users from Users collection
+
     const caregiverUsers = await User.find(userQuery)
-      .select('name email phone profileImage role createdAt address')
+      .select('name email phone profileImage role createdAt address firebaseUid')
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 })
       .lean();
-    
+
     console.log('👥 Found caregiver users:', caregiverUsers.length);
-    
-    // Get their caregiver profiles if they exist
+
     const userIds = caregiverUsers.map(u => u._id);
     const caregiverProfiles = await Caregiver.find({ userId: { $in: userIds } })
-      .select('userId name skills experience hourlyRate availability rating ageCareRanges profileImage address location bio hasCompletedJobs')
+      .select('userId name skills experience hourlyRate availability rating ageCareRanges profileImage address location bio hasCompletedJobs caregiverId firebaseUid')
       .lean();
-    
-    // Create a map for quick lookup
+
     const profileMap = new Map();
     caregiverProfiles.forEach(profile => {
       profileMap.set(profile.userId.toString(), profile);
     });
-    
-    // Merge user data with caregiver profiles
+
     let filteredCaregivers = caregiverUsers.map(user => {
       const profile = profileMap.get(user._id.toString());
-      
+      const caregiverProfileId = profile?._id || null;
+      const caregiverAccountId = user._id;
+      const firebaseUid = profile?.firebaseUid || user.firebaseUid || null;
+
       return {
-        _id: profile?._id || user._id,
+        _id: caregiverProfileId || caregiverAccountId,
         userId: user,
+        userAccountId: caregiverAccountId,
+        caregiverProfileId,
+        caregiverId: profile?.caregiverId || caregiverProfileId || caregiverAccountId,
+        firebaseUid,
         name: profile?.name || user.name,
         skills: profile?.skills || [],
         experience: profile?.experience || 0,
@@ -244,15 +256,14 @@ exports.searchCaregivers = async (req, res) => {
         hasCompletedJobs: profile?.hasCompletedJobs || false
       };
     });
-    
-    // Apply caregiver-specific filters
+
     if (skills) {
       const skillsArray = skills.split(',');
-      filteredCaregivers = filteredCaregivers.filter(c => 
+      filteredCaregivers = filteredCaregivers.filter(c =>
         c.skills.some(skill => skillsArray.includes(skill))
       );
     }
-    
+
     if (minRate || maxRate) {
       filteredCaregivers = filteredCaregivers.filter(c => {
         const rate = c.hourlyRate;
@@ -261,45 +272,57 @@ exports.searchCaregivers = async (req, res) => {
         return true;
       });
     }
-    
+
     if (daysAvailable) {
       const daysArray = daysAvailable.split(',');
-      filteredCaregivers = filteredCaregivers.filter(c => 
+      filteredCaregivers = filteredCaregivers.filter(c =>
         c.availability.days.some(day => daysArray.includes(day))
       );
     }
-    
+
     const count = filteredCaregivers.length;
-    
+
     console.log('📊 Search results:', { count, caregivers: filteredCaregivers.length });
     console.log('👥 Found caregivers:', filteredCaregivers.map(c => ({ id: c._id, name: c.name, hasProfile: c.hasProfile })));
-    
+
     await logActivity('PROVIDER_SEARCH', { searchParams: req.query, results: filteredCaregivers.length });
-    
-    // Map caregivers to public info only - use User ID for messaging
-    const publicCaregivers = filteredCaregivers.map(p => ({
-      _id: p.userId._id, // Use User ID for messaging compatibility
-      id: p.userId._id,  // Use User ID for messaging compatibility
-      user: p.userId,
-      name: p.name,
-      skills: p.skills,
-      experience: p.experience,
-      hourlyRate: p.hourlyRate,
-      availability: p.availability,
-      rating: p.rating,
-      ageCareRanges: p.ageCareRanges,
-      avatar: p.profileImage,
-      location: p.location,
-      address: p.address,
-      bio: p.bio,
-      createdAt: p.createdAt,
-      registeredAt: p.createdAt,
-      hasProfile: p.hasProfile,
-      hasCompletedJobs: p.hasCompletedJobs || false
-    }));
-    
+
+    const publicCaregivers = filteredCaregivers.map(p => {
+      const caregiverProfileId = p.caregiverProfileId || (p._id?.toString ? p._id.toString() : p._id) || null;
+      const caregiverAccountId = p.userAccountId || (p.userId && p.userId._id) || null;
+      const messagingUserId = caregiverAccountId || caregiverProfileId;
+
+      return {
+        _id: caregiverProfileId || caregiverAccountId,
+        id: caregiverAccountId || caregiverProfileId,
+        caregiverProfileId,
+        caregiverAccountId,
+        caregiverId: p.caregiverId || caregiverProfileId || caregiverAccountId,
+        messagingUserId,
+        user: p.userId,
+        userId: caregiverAccountId || caregiverProfileId,
+        firebaseUid: p.firebaseUid || null,
+        name: p.name,
+        skills: p.skills,
+        experience: p.experience,
+        hourlyRate: p.hourlyRate,
+        availability: p.availability,
+        rating: p.rating,
+        ageCareRanges: p.ageCareRanges,
+        avatar: p.profileImage,
+        profileImage: p.profileImage,
+        location: p.location,
+        address: p.address,
+        bio: p.bio,
+        createdAt: p.createdAt,
+        registeredAt: p.createdAt,
+        hasProfile: p.hasProfile,
+        hasCompletedJobs: p.hasCompletedJobs || false
+      };
+    });
+
     console.log('✅ Sending response with', publicCaregivers.length, 'caregivers');
-    
+
     res.json({
       success: true,
       count: filteredCaregivers.length,
@@ -310,7 +333,7 @@ exports.searchCaregivers = async (req, res) => {
   } catch (err) {
     console.error('Search error:', err);
     await logActivity('PROVIDER_SEARCH_ERROR', { error: err.message });
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Server error',
       details: process.env.NODE_ENV === 'development' ? err.message : undefined

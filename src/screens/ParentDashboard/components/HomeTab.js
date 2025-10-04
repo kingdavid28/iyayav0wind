@@ -183,7 +183,7 @@ const HomeTab = ({
             <Text style={[styles.sectionTitle, { marginBottom: 12, marginLeft: 8 }]}>Featured Caregivers ({featuredCaregivers.length})</Text>
             {featuredCaregivers.map((caregiver) => (
               <CaregiverCard
-                key={caregiver.id || caregiver._id}
+                key={caregiver.caregiverProfileId || caregiver.caregiverAccountId || caregiver.id || caregiver._id}
                 caregiver={caregiver}
                 onPress={onBookCaregiver}
                 onMessagePress={onMessageCaregiver}

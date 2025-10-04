@@ -4,6 +4,7 @@ import { ThemeProvider, useThemeContext } from '../contexts/ThemeContext';
 import { PaperProvider } from 'react-native-paper';
 import { AppProvider as CoreAppProvider } from '../contexts/AppContext';
 import { ReviewProvider } from '../contexts/ReviewContext';
+import { MessagingProvider } from '../contexts/MessagingContext';
 
 // Wrapper component to access theme context
 const ThemeWrapper = ({ children }) => {
@@ -30,9 +31,11 @@ export const AppProvider = ({ children }) => {
     <ThemeProvider>
       <ThemeWrapper>
         <CoreAppProvider>
-          <ReviewProvider>
-            {children}
-          </ReviewProvider>
+          <MessagingProvider>
+            <ReviewProvider>
+              {children}
+            </ReviewProvider>
+          </MessagingProvider>
         </CoreAppProvider>
       </ThemeWrapper>
     </ThemeProvider>

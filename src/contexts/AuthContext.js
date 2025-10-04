@@ -96,20 +96,20 @@ export const AuthProvider = ({ children }) => {
       } catch (fallbackError) {
         console.error('❌ Fallback profile fetch also failed:', fallbackError.message);
       }
-
       return null;
     }
   };
 
   // Validate UID consistency between Firebase and MongoDB
   const validateUidConsistency = (firebaseUid, mongoUserId, context = 'unknown') => {
+    // Firebase UIDs and MongoDB IDs are fundamentally different
+    // This comparison should only warn about actual Firebase UID mismatches in MongoDB
     if (firebaseUid && mongoUserId && firebaseUid !== mongoUserId) {
       console.warn(`⚠️ Firebase UID mismatch detected in ${context}`, {
-        firebaseUid,
-        apiUserId: mongoUserId,
+        firebaseUid: firebaseUid?.substring(0, 10) + '...', // Partial for privacy
+        mongoUserId: mongoUserId?.substring(0, 10) + '...',
         context
       });
-      return false;
     }
     return true;
   };
@@ -178,11 +178,39 @@ export const AuthProvider = ({ children }) => {
                   firebaseUid,
                   apiUserId: normalizedUser?.id,
                 });
+
+                // Handle Firebase UID mismatch by updating MongoDB document
                 if (firebaseUid && normalizedUser?.id && firebaseUid !== normalizedUser.id) {
-                  console.warn('⚠️ Firebase UID mismatch detected for realtime messaging', {
-                    firebaseUid,
+                  console.warn('⚠️ Firebase UID mismatch detected - updating MongoDB document', {
+                    currentFirebaseUid: firebaseUid,
+                    storedFirebaseUid: normalizedUser.firebaseUid,
                     apiUserId: normalizedUser.id,
                   });
+
+                  try {
+                    // Update the user's firebaseUid in MongoDB to match current Firebase Auth
+                    const updateResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/update-firebase-uid`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({
+                        firebaseUid: firebaseUid
+                      })
+                    });
+
+                    if (updateResponse.ok) {
+                      console.log('✅ Firebase UID updated in MongoDB successfully');
+                      // Update the normalized user object with the correct Firebase UID
+                      normalizedUser.firebaseUid = firebaseUid;
+                      setUser(normalizedUser);
+                    } else {
+                      console.error('❌ Failed to update Firebase UID in MongoDB');
+                    }
+                  } catch (updateError) {
+                    console.error('❌ Error updating Firebase UID:', updateError);
+                  }
                 }
               } catch (realtimeError) {
                 console.warn('⚠️ Failed to initialize realtime auth session:', realtimeError?.message || realtimeError);
@@ -305,11 +333,39 @@ export const AuthProvider = ({ children }) => {
             firebaseUid,
             apiUserId: normalizedLoginUser?.id,
           });
+
+          // Handle Firebase UID mismatch by updating MongoDB document
           if (firebaseUid && normalizedLoginUser?.id && firebaseUid !== normalizedLoginUser.id) {
-            console.warn('⚠️ Firebase UID mismatch detected immediately after login', {
-              firebaseUid,
+            console.warn('⚠️ Firebase UID mismatch detected after login - updating MongoDB document', {
+              currentFirebaseUid: firebaseUid,
+              storedFirebaseUid: normalizedLoginUser.firebaseUid,
               apiUserId: normalizedLoginUser.id,
             });
+
+            try {
+              // Update the user's firebaseUid in MongoDB to match current Firebase Auth
+              const updateResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/update-firebase-uid`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${res.token}`
+                },
+                body: JSON.stringify({
+                  firebaseUid: firebaseUid
+                })
+              });
+
+              if (updateResponse.ok) {
+                console.log('✅ Firebase UID updated in MongoDB successfully after login');
+                // Update the normalized user object with the correct Firebase UID
+                normalizedLoginUser.firebaseUid = firebaseUid;
+                setUser(normalizedLoginUser);
+              } else {
+                console.error('❌ Failed to update Firebase UID in MongoDB after login');
+              }
+            } catch (updateError) {
+              console.error('❌ Error updating Firebase UID after login:', updateError);
+            }
           }
         } catch (realtimeError) {
           console.warn('⚠️ Failed to initialize realtime auth immediately after login:', realtimeError?.message || realtimeError);
@@ -373,11 +429,39 @@ export const AuthProvider = ({ children }) => {
             firebaseUid,
             apiUserId: normalizedUser?.id,
           });
+
+          // Handle Firebase UID mismatch by updating MongoDB document
           if (firebaseUid && normalizedUser?.id && firebaseUid !== normalizedUser.id) {
-            console.warn('⚠️ Firebase UID mismatch detected after Facebook login', {
-              firebaseUid,
+            console.warn('⚠️ Firebase UID mismatch detected after Facebook login - updating MongoDB document', {
+              currentFirebaseUid: firebaseUid,
+              storedFirebaseUid: normalizedUser.firebaseUid,
               apiUserId: normalizedUser.id,
             });
+
+            try {
+              // Update the user's firebaseUid in MongoDB to match current Firebase Auth
+              const updateResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.9:5000'}/api/auth/update-firebase-uid`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${facebookResult.token}`
+                },
+                body: JSON.stringify({
+                  firebaseUid: firebaseUid
+                })
+              });
+
+              if (updateResponse.ok) {
+                console.log('✅ Firebase UID updated in MongoDB successfully after Facebook login');
+                // Update the normalized user object with the correct Firebase UID
+                normalizedUser.firebaseUid = firebaseUid;
+                setUser(normalizedUser);
+              } else {
+                console.error('❌ Failed to update Firebase UID in MongoDB after Facebook login');
+              }
+            } catch (updateError) {
+              console.error('❌ Error updating Firebase UID after Facebook login:', updateError);
+            }
           }
         } catch (realtimeError) {
           console.warn('⚠️ Failed to initialize realtime auth after Facebook login:', realtimeError?.message || realtimeError);

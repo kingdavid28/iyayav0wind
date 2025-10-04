@@ -12,6 +12,12 @@ const CaregiverSchema = new mongoose.Schema({
     ref: 'User', 
     required: true 
   },
+  firebaseUid: {
+    type: String,
+    index: true,
+    sparse: true,
+    maxlength: 100
+  },
   // Basic Information
   name: {
     type: String,

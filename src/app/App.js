@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
 // Core imports
-import AppProvider from '../core/providers/AppProvider';
+import AppProvider from '../providers/AppProvider';
 import AppIntegration from './AppIntegration';
 import PrivacyProvider from '../components/features/privacy/PrivacyManager';
 import ProfileDataProvider from '../components/features/privacy/ProfileDataManager';
@@ -14,7 +14,6 @@ import { ErrorBoundary, LoadingSpinner } from '../shared/ui';
 // Auth Context
 import { AuthProvider } from '../contexts/AuthContext';
 import { NotificationProvider } from '../contexts/NotificationContext';
-import { MessagingProvider } from '../contexts/MessagingContext';
 
 // Firebase - Direct import for initialization
 import { initializeFirebase, getAuthSync } from '../config/firebase';
@@ -131,14 +130,12 @@ export default function App() {
             <PrivacyProvider>
               {/* Wrap with FirebaseAuthProvider to ensure proper initialization order */}
               <FirebaseAuthProvider>
-                <MessagingProvider>
-                  <NotificationProvider>
-                    <AppIntegration>
-                      <AppNavigator />
-                      <StatusBar style="auto" />
-                    </AppIntegration>
-                  </NotificationProvider>
-                </MessagingProvider>
+                <NotificationProvider>
+                  <AppIntegration>
+                    <AppNavigator />
+                    <StatusBar style="auto" />
+                  </AppIntegration>
+                </NotificationProvider>
               </FirebaseAuthProvider>
             </PrivacyProvider>
           </ProfileDataProvider>
